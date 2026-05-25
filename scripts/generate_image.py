@@ -273,6 +273,24 @@ def _resolve_api_key(image_cfg: dict[str, Any]) -> str:
     raise SystemExit("OPENAI_API_KEY not found in env, config, or ~/.codex/auth.json")
 
 
+def _image2_is_configured(cfg: dict[str, Any]) -> bool:
+    image_cfg = cfg.get("image2", {})
+    # Explicit config in AutoPaper2 config files
+    if str(image_cfg.get("api_key") or "").strip():
+        return True
+    if str(image_cfg.get("api_base_url") or "").strip():
+        return True
+    # Environment variables
+    if os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_BASE_URL"):
+        return True
+    env_name = str(image_cfg.get("api_key_env", "OPENAI_API_KEY"))
+    if os.getenv(env_name):
+        return True
+    # Intentionally NOT checking ~/.codex/ — that is global and would
+    # prevent fallback even when the user has not set up image2 for this project.
+    return False
+
+
 def _slugify(text: str, limit: int = 48) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", text.strip().lower()).strip("-")
     return slug[:limit] or f"figure-{int(time.time())}"
@@ -518,9 +536,12 @@ def _drawio_generate(prompt: str, args: argparse.Namespace, cfg: dict[str, Any])
         style_profile_spec=args.style_profile,
     )
     mcp_output = _run_drawio_mcp_command(final_prompt, output, drawio_cfg)
-    if mcp_output is not None:
-        return mcp_output
-    return _drawio_stub(final_prompt, output)
+    if mcp_output is None:
+        raise SystemExit(
+            "Draw.io MCP command is not configured. Set the DRAWIO_MCP_COMMAND environment variable "
+            "or configure drawio.mcp_command in config/image_generation.yaml."
+        )
+    return mcp_output
 
 
 def main() -> int:
@@ -544,7 +565,14 @@ def main() -> int:
     args = parser.parse_args()
 
     cfg = _load_config()
-    backend = args.backend if args.backend != "auto" else cfg.get("default_backend", "image2")
+    if args.backend == "auto":
+        default_backend = cfg.get("default_backend", "image2")
+        if default_backend == "image2" and not _image2_is_configured(cfg):
+            backend = cfg.get("fallback_backend", "drawio")
+        else:
+            backend = default_backend
+    else:
+        backend = args.backend
 
     if backend == "drawio":
         if args.image or args.mask:

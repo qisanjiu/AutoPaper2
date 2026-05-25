@@ -6,6 +6,7 @@
 
 figure_generation:
   default_backend: image2  # image2 | drawio
+  fallback_backend: drawio  # used when backend=auto and image2 is not configured
   output_dir: generated-images
 
   image2:
@@ -17,13 +18,21 @@ figure_generation:
     quality: medium
 
   drawio:
-    mode: mcp_or_stub
+    mode: mcp
     mcp_server: drawio
     output_dir: generated-images
     editable_ext: .drawio
     export_ext: .svg
-    # Optional shell command template for MCP / Draw.io automation.
+    # Shell command template for Draw.io MCP automation.
     # Available placeholders: {prompt}, {output}, {output_dir}, {mcp_server}
     # The placeholders are shell-escaped before substitution.
-    # Leave empty to fall back to a local editable stub.
+    #
+    # Example (Claude Code MCP):
+    #   mcp_command: "mcp {mcp_server} generate-diagram --prompt {prompt} --output {output}"
+    #
+    # Example (custom script):
+    #   mcp_command: "python /path/to/drawio_mcp.py --prompt {prompt} --out {output}"
+    #
+    # If left empty, the drawio backend will fail with an error instead of
+    # producing a placeholder stub.
     mcp_command: ""
