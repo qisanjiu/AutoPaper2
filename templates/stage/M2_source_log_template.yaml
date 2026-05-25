@@ -1,0 +1,73 @@
+# M2 Source Log — Cross-Domain Literature Search Record
+# Auto-generated during M2S01, imported into Public Literature Database after completion.
+# Schema mirrors M1_source_log.yaml with M2-specific extensions.
+
+sources:
+  - id: "{{paper_id}}"
+    title: "{{paper_title}}"
+    authors: ["{{author1}}", "{{author2}}"]
+    venue: "{{venue}}"
+    date: "{{YYYY-MM}}"
+    url: "{{url}}"
+    type: academic
+    credibility: {{1-5}}
+    verification: confirmed
+    key_claims: ["{{claim_id}}"]
+    limitations_noted: ["{{limitation1}}", "{{limitation2}}"]
+    code_availability: open_source / broken / closed
+    # M2-specific fields
+    search_dimension: same_modality_diff_task   # same_modality_diff_task | same_task_diff_modality | shared_principle | similar_structure | within_domain
+    target_gap: "{{gap_id}}"
+    source_domain: "{{source_domain_tag}}"
+    core_mechanism: "{{one_sentence_mechanism}}"
+    adaptation_potential: high   # high | medium | low
+    relevance_to_our_gap: "{{gap_id}}"
+    # Discovery tracking
+    discovery_source: public_db   # public_db | web_search | citation_chain | recommendation
+    discovery_query: "{{search_query_used}}"
+    # Paper details for deep analysis (populated for shortlisted papers)
+    abstract: "{{abstract}}"
+    problem_statement: "{{problem_summary}}"
+    method_summary: "{{method_summary}}"
+    key_results: ["{{result1}}"]
+
+gap_solution_map:
+  # Maps each Gap to candidate solutions found in cross-domain search
+  {{gap_id}}:
+    description: "{{gap_description}}"
+    # Solutions from different search dimensions
+    solutions:
+      - source_id: "{{paper_id}}"
+        search_dimension: same_modality_diff_task
+        core_mechanism: "{{mechanism}}"
+        adaptation_strategy: "{{how_to_adapt}}"
+        expected_benefit: "{{benefit}}"
+        risk: "{{risk}}"
+        confidence: high   # high | medium | low
+      - source_id: "{{paper_id_2}}"
+        search_dimension: shared_principle
+        ...
+    # Final selected solution after M2S02 analysis
+    selected_solution: "{{selected_paper_id}}"
+    selection_reason: "{{why_selected}}"
+    confidence: high
+
+search_statistics:
+  total_queries: {{N}}
+  public_db_hits: {{N_db}}
+  web_search_hits: {{N_web}}
+  citation_chain_hits: {{N_cite}}
+  unique_papers_discovered: {{M}}
+  papers_shortlisted: {{K}}
+  search_dimensions_covered:
+    - same_modality_diff_task
+    - same_task_diff_modality
+    - shared_principle
+    - similar_structure
+  # Query ledger (for audit and reproducibility)
+  query_ledger:
+    - query: "{{query_text}}"
+      source: public_db   # public_db | web_search | citation_chain
+      filters: "{{filters_applied}}"
+      results_count: {{N}}
+      timestamp: "{{ISO8601}}"

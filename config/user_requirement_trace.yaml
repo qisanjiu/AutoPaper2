@@ -1,0 +1,231 @@
+version: 1
+last_audited: "2026-05-23"
+description: >
+  Machine-checkable trace from the user's M1-M6 objective to AutoPaper2
+  framework artifacts. This proves framework-level enforcement only; actual
+  project completion still requires topic-specific literature, experiments,
+  external review, and final LaTeX package evidence.
+
+requirements:
+  - id: AP2-M1
+    module: M1
+    status: framework_enforced
+    user_requirement: >
+      Search library/internet sources, understand related work background,
+      contributions, models, methods, experiments, results, analysis, and
+      conclusions; synthesize large/middle/small direction gaps with evidence.
+    enforced_by:
+      stage_gates: [M1S02, M1S03, M1S04, M1S05]
+      validators: [utils/source_log_validator.py]
+      reviews: [coverage, source_log_validator, survey_review, logic, novelty]
+    evidence_paths:
+      - docs/AGENTS/survey/AGENT.md
+      - docs/AGENTS/ideation/AGENT.md
+      - docs/AGENTS/critic/coverage/AGENT.md
+      - docs/AGENTS/critic/source_log_validator/AGENT.md
+      - templates/stage/M1S02_template.md
+      - templates/stage/M1S03_template.md
+      - templates/stage/M1S04_template.md
+      - templates/stage/M1S05_template.md
+      - utils/source_log_validator.py
+      - utils/stage_gate.py
+    tests:
+      - tests/test_m1_integration.py
+      - tests/test_m1_e2e.py
+    residual_gaps:
+      - Runtime quality depends on real topic-specific searches, source accessibility, and the quality of each covered perspective.
+
+  - id: AP2-M2
+    module: M2
+    status: framework_enforced
+    user_requirement: >
+      Use M1 problems to search library/internet sources for transferable or
+      newly designed solutions, integrate inspirations, design methods, and
+      define experiment setup with datasets, metrics, purposes, and full reports.
+    enforced_by:
+      stage_gates: [M2S01, M2S02, M2S03, M2S04, M2S05, M2S06]
+      validators: [utils/source_log_validator.py]
+      reviews: [m2_search_quality, m2_migration, m2_design_review, m2_experiment_design_review, m2_experiment_plan_review]
+    evidence_paths:
+      - docs/AGENTS/method/AGENT.md
+      - docs/AGENTS/critic/m2_search_quality/AGENT.md
+      - docs/AGENTS/critic/m2_experiment_design_review/AGENT.md
+      - docs/AGENTS/critic/m2_experiment_plan_review/AGENT.md
+      - templates/stage/M2S01_template.md
+      - templates/stage/M2S05_template.md
+      - templates/stage/M2S06_template.md
+      - templates/stage/M2_source_log_template.yaml
+      - utils/source_log_validator.py
+      - utils/stage_gate.py
+    tests:
+      - tests/test_dispatch.py
+      - tests/test_m1_integration.py
+    residual_gaps:
+      - Optional branch/frontier search for multiple candidate methods is not yet implemented.
+
+  - id: AP2-M3
+    module: M3
+    status: framework_enforced
+    user_requirement: >
+      Build environment according to local or ssh configuration, patiently
+      download/upload files and run models, implement experiments, analyze
+      whether results match expectations, and trigger backtracking when needed.
+    enforced_by:
+      stage_gates: [M3S01, M3S02, M3S03, M3S04]
+      configs: [config/execution_env.yaml]
+      reviews: [m3_dataset_env_review, m3_baseline_result_review, m3_main_result_review, evidence]
+    evidence_paths:
+      - docs/AGENTS/experiment/AGENT.md
+      - docs/AGENTS/analysis/AGENT.md
+      - docs/AGENTS/critic/m3_dataset_env_review/AGENT.md
+      - templates/stage/M3S01_template.md
+      - templates/stage/M3S03_template.md
+      - templates/stage/M3S04_template.md
+      - config/execution_env.yaml
+      - scripts/env_probe.py
+      - utils/stage_gate.py
+    tests:
+      - tests/test_m3_integration.py
+      - tests/test_full_pipeline_simulation.py
+    residual_gaps:
+      - Actual downloads, uploads, and model runtime can only be proven in a real project run.
+
+  - id: AP2-M4
+    module: M4
+    status: framework_enforced
+    user_requirement: >
+      After M3 verifies the method works, run deeper analysis through
+      visualization, ablation, robustness, and literature- or idea-driven
+      experiments to prove how, where, and why it works, including baselines
+      whenever required.
+    enforced_by:
+      stage_gates: [M4S01, M4S02, M4S03, M4S04]
+      reviews: [m4_findings_audit, m4_analysis_design_review, m4_analysis_execution_review]
+    evidence_paths:
+      - docs/AGENTS/analysis/AGENT.md
+      - docs/AGENTS/experiment/AGENT.md
+      - docs/AGENTS/critic/m4_analysis_design_review/AGENT.md
+      - docs/AGENTS/critic/m4_analysis_execution_review/AGENT.md
+      - templates/stage/M4S02_template.md
+      - templates/stage/M4S03_template.md
+      - templates/stage/M4S04_template.md
+      - scripts/conductor_helper.py
+      - utils/stage_gate.py
+    tests:
+      - tests/test_m4_integration.py
+      - tests/test_dispatch.py
+    residual_gaps:
+      - Per-claim automatic analysis task expansion remains a future optimization.
+
+  - id: AP2-M5
+    module: M5
+    status: framework_enforced
+    user_requirement: >
+      Check prior deliverables support writing, distill framework and writing
+      style from M1 papers, write the full paper, generate framework/method
+      figures with image2 using paper-framework-figure-studio-pro style, and
+      generate experiment figures from real data using Nature-style plotting.
+    enforced_by:
+      stage_gates: [M5S01, M5S02, M5S03, M5S04, M5S05, M5S06, M5S07, M5S08]
+      reviews: [m5_prewrite_review, m5_outline_style_review, m5_method_figure_review, m5_final_compilation_review]
+    evidence_paths:
+      - docs/AGENTS/analysis/AGENT.md
+      - docs/AGENTS/writing/AGENT.md
+      - docs/AGENTS/build_verifier/AGENT.md
+      - docs/AGENTS/critic/m5_stage_review/AGENT.md
+      - templates/stage/M5S01_template.md
+      - templates/stage/M5S02_template.md
+      - templates/stage/M5S04_template.md
+      - templates/stage/M5S05_template.md
+      - templates/stage/M5S08_template.md
+      - config/figure_style_profiles.yaml
+      - config/image_generation.yaml
+      - utils/stage_gate.py
+    tests:
+      - tests/test_m4_integration.py
+    residual_gaps:
+      - Visual QA of generated framework figures is still manual or reviewer-driven.
+
+  - id: AP2-M6
+    module: M6
+    status: framework_enforced
+    user_requirement: >
+      Run harsh multi-reviewer internal review until reaching 8/10, submit to
+      external review only after internal pass, monitor returned review, route
+      revisions item-by-item, and finish with a complete LaTeX submission package.
+    enforced_by:
+      stage_gates: [M6S01, M6S02, M6S03, M6S04, M6S05, M6S06]
+      reviews: [m6_internal_peer_review, m6_external_submission_review, m6_rebuttal_strategy_review, g6_resolution]
+      scripts: [scripts/paperreview_uploader.py, scripts/email_monitor.py, scripts/m6_action_router.py]
+    evidence_paths:
+      - docs/AGENTS/submission/AGENT.md
+      - docs/AGENTS/rebuttal/AGENT.md
+      - docs/AGENTS/revision/AGENT.md
+      - docs/AGENTS/critic/m6_internal_peer_review/AGENT.md
+      - docs/AGENTS/critic/g6_resolution/AGENT.md
+      - templates/stage/M6S01_template.md
+      - templates/stage/M6S04_template.md
+      - templates/stage/M6S06_template.md
+      - scripts/paperreview_uploader.py
+      - scripts/email_monitor.py
+      - scripts/m6_action_router.py
+      - spiral/revision_router.py
+      - utils/stage_gate.py
+    tests:
+      - tests/test_m6_integration.py
+      - tests/test_dispatch.py
+    residual_gaps:
+      - True completion requires a live paperreview.ai submission and returned review evidence.
+
+  - id: AP2-CONDUCTOR
+    module: CONDUCTOR
+    status: framework_enforced
+    user_requirement: >
+      The main agent must orchestrate only: project creation, routing, stage
+      advancement, review scheduling, gates, and backtracking. It must never
+      directly execute stage or review work.
+    enforced_by:
+      scripts: [scripts/state_manager.py]
+      dispatch: [spiral/dispatch.py]
+      state: [spiral/conductor.py, spiral/state.py]
+    evidence_paths:
+      - docs/AGENTS/conductor/AGENT.md
+      - spiral/project.py
+      - spiral/conductor.py
+      - spiral/dispatch.py
+      - scripts/state_manager.py
+      - scripts/conductor_helper.py
+    tests:
+      - tests/test_dispatch.py
+      - tests/test_full_pipeline_simulation.py
+    residual_gaps:
+      - Real multi-agent delegation still depends on the runtime Agent tool honoring dispatch packets.
+
+  - id: AP2-EXTERNAL-COMPARISON
+    module: EXTERNAL_COMPARISON
+    status: framework_partial
+    user_requirement: >
+      Compare AutoPaper2 modules against open-source or openly documented
+      research-agent work and identify further optimization opportunities.
+    enforced_by:
+      docs: [docs/EXTERNAL_OPEN_SOURCE_COMPARISON.md]
+      trace: [config/user_requirement_trace.yaml]
+    evidence_paths:
+      - docs/EXTERNAL_OPEN_SOURCE_COMPARISON.md
+      - docs/AUTOPAPER2_AUDIT_AND_OPTIMIZATION.md
+    tests:
+      - tests/test_requirement_trace.py
+    external_sources:
+      - https://github.com/sakanaai/ai-scientist
+      - https://arxiv.org/abs/2408.06292
+      - https://arxiv.org/abs/2504.08066
+      - https://agentlaboratory.github.io/
+      - https://arxiv.org/abs/2501.04227
+      - https://github.com/stanford-oval/storm
+      - https://github.com/OpenHands/OpenHands
+      - https://docs.openhands.dev/openhands/usage/sandboxes/docker
+      - https://openai.com/index/paperbench/
+      - https://github.com/openai/frontier-evals/tree/main/project/paperbench
+      - https://github.com/c-narcissus/paper-framework-figure-studio-pro
+    residual_gaps:
+      - Source comparison should be refreshed periodically because external projects change.

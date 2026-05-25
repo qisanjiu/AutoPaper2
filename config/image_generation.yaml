@@ -1,0 +1,29 @@
+# AutoPaper2 — Figure / Diagram Generation Defaults
+#
+# Public defaults only. Local secrets can be placed in
+# `config/image_generation.local.yaml`, which is ignored by git.
+# Venue-specific figure style presets live in `config/figure_style_profiles.yaml`.
+
+figure_generation:
+  default_backend: image2  # image2 | drawio
+  output_dir: generated-images
+
+  image2:
+    model: gpt-image-2
+    # If empty, fall back to OPENAI_BASE_URL or the Codex provider config.
+    api_base_url: ""
+    api_key_env: OPENAI_API_KEY
+    size: 1024x1024
+    quality: medium
+
+  drawio:
+    mode: mcp_or_stub
+    mcp_server: drawio
+    output_dir: generated-images
+    editable_ext: .drawio
+    export_ext: .svg
+    # Optional shell command template for MCP / Draw.io automation.
+    # Available placeholders: {prompt}, {output}, {output_dir}, {mcp_server}
+    # The placeholders are shell-escaped before substitution.
+    # Leave empty to fall back to a local editable stub.
+    mcp_command: ""

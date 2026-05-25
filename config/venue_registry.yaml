@@ -1,0 +1,65 @@
+default_venue: arxiv
+
+venues:
+  arxiv:
+    name: "arXiv"
+    full_name: "arXiv Preprint Server"
+    page_limit: null
+    page_limit_note: "No strict limit, but typical is 8-12 pages"
+    format: "preprint"
+    style_package: ""
+    template_dir: "arxiv"
+
+  neurips:
+    name: "NeurIPS"
+    full_name: "Conference on Neural Information Processing Systems"
+    page_limit: 9
+    page_limit_note: "9 pages + references + appendix"
+    format: "conference"
+    style_package: "neurips"
+    template_dir: "neurips"
+
+  icml:
+    name: "ICML"
+    full_name: "International Conference on Machine Learning"
+    page_limit: 9
+    page_limit_note: "9 pages + references + appendix"
+    format: "conference"
+    style_package: "icml"
+    template_dir: "icml"
+
+  iclr:
+    name: "ICLR"
+    full_name: "International Conference on Learning Representations"
+    page_limit: 9
+    page_limit_note: "9 pages + references + appendix"
+    format: "conference"
+    style_package: "iclr"
+    template_dir: "iclr"
+
+  acl:
+    name: "ACL"
+    full_name: "Annual Meeting of the Association for Computational Linguistics"
+    page_limit: 8
+    page_limit_note: "8 pages + references + appendix"
+    format: "conference"
+    style_package: "acl"
+    template_dir: "acl"
+
+  cvpr:
+    name: "CVPR"
+    full_name: "IEEE/CVF Conference on Computer Vision and Pattern Recognition"
+    page_limit: 8
+    page_limit_note: "8 pages + references + appendix"
+    format: "conference"
+    style_package: "cvpr"
+    template_dir: "cvpr"
+
+  ieee_trans:
+    name: "IEEE Trans"
+    full_name: "IEEE Transactions"
+    page_limit: null
+    page_limit_note: "Varies by journal, typically 10-14 pages"
+    format: "journal"
+    style_package: "IEEEtran"
+    template_dir: "ieee_trans"

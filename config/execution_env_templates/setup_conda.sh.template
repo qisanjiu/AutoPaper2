@@ -1,0 +1,36 @@
+#!/bin/bash
+# AutoPaper2 — Conda 环境创建脚本模板
+# 复制到项目目录后按需修改并执行
+
+set -e
+
+ENV_NAME="${1:-autopaper2}"
+PYTHON_VERSION="${2:-3.10}"
+CUDA_VERSION="${3:-12.1}"
+
+echo "[SETUP] Creating conda environment: $ENV_NAME (Python $PYTHON_VERSION, CUDA $CUDA_VERSION)"
+
+# 创建环境
+conda create -n "$ENV_NAME" python="$PYTHON_VERSION" -y
+
+# 激活环境（注意：在脚本中需要使用conda run）
+conda run -n "$ENV_NAME" pip install --upgrade pip
+
+# 安装PyTorch（根据CUDA版本调整）
+if [ -n "$CUDA_VERSION" ]; then
+    conda run -n "$ENV_NAME" pip install torch torchvision torchaudio --index-url "https://download.pytorch.org/whl/cu${CUDA_VERSION//./}"
+fi
+
+# 安装项目依赖
+if [ -f "requirements.lock" ]; then
+    conda run -n "$ENV_NAME" pip install -r requirements.lock
+elif [ -f "requirements.txt" ]; then
+    conda run -n "$ENV_NAME" pip install -r requirements.txt
+fi
+
+# 生成/刷新依赖锁定文件
+conda run -n "$ENV_NAME" pip freeze > experiments/requirements.lock
+echo "[SETUP] requirements.lock written to experiments/requirements.lock"
+
+echo "[SETUP] Environment '$ENV_NAME' created successfully."
+echo "[SETUP] Activate with: conda activate $ENV_NAME"

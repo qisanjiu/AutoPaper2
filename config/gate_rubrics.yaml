@@ -1,0 +1,159 @@
+version: 1
+rubric_format:
+  required_section: Rubric Results
+  required_columns:
+    - Rubric ID
+    - Verdict
+    - Score
+    - Evidence paths
+  passing_verdict_line: "Verdict: PASS"
+  score_scale: 2
+  min_item_score: 2
+  note: "Every aggregate gate review must cover every rubric item with PASS, 2/2, and at least one existing evidence path."
+
+gates:
+  G1:
+    title: "Domain survey and problem selection"
+    items:
+      - id: G1-R1
+        criterion: "M1 deep-reading coverage explains background, contributions, model, method, experiment setup, results, analysis, and conclusions for relevant work."
+        evidence_examples:
+          - knowledge/M1/M1_source_log.yaml
+          - knowledge/M1/M1S02_literature_deepdive.md
+      - id: G1-R2
+        criterion: "The research report separates large, middle, and small direction problems and supports each with source evidence."
+        evidence_examples:
+          - knowledge/M1/M1S02_literature_deepdive.md
+          - knowledge/M1/M1S05_novelty_feasibility.md
+      - id: G1-R3
+        criterion: "The selected research question and hypothesis follow from the surveyed gaps without unsupported novelty claims."
+        evidence_examples:
+          - knowledge/M1/M1S03_research_question.md
+          - knowledge/M1/M1S04_hypothesis_generation.md
+          - knowledge/M1/M1S05_novelty_feasibility.md
+
+  G2:
+    title: "Method design and experiment plan"
+    items:
+      - id: G2-R1
+        criterion: "M2 searches for transferable methods from literature or web sources and records why each source can or cannot transfer."
+        evidence_examples:
+          - knowledge/M2/M2S01_cross_domain_search.md
+          - knowledge/M2/M2_source_log.yaml
+      - id: G2-R2
+        criterion: "Method inspiration is integrated into a concrete architecture, algorithm, and theory plan rather than a loose idea list."
+        evidence_examples:
+          - knowledge/M2/M2S02_method_inspiration.md
+          - knowledge/M2/M2S03_method_architecture.md
+          - knowledge/M2/M2S04_algorithm_theory.md
+      - id: G2-R3
+        criterion: "Experiment setup follows related-field protocols and gives datasets, metrics, baselines, per-experiment purpose, and full report blueprint."
+        evidence_examples:
+          - knowledge/M2/M2S05_experiment_setup.md
+          - knowledge/M2/M2S06_full_experiment_plan.md
+          - knowledge/handoff_M2_M3.md
+
+  G3:
+    title: "Implementation and main experiment evidence"
+    items:
+      - id: G3-R1
+        criterion: "M3S01 builds the configured local or SSH environment with sandbox policy, dependencies, data access, and long-running task ledger."
+        evidence_examples:
+          - knowledge/M3/M3S01_implementation.md
+          - config/execution_env.yaml
+          - experiments/configs/sandbox_profile.yaml
+          - experiments/logs/m3s01_longrun_ledger.md
+      - id: G3-R2
+        criterion: "Baselines are locked, smoke-tested, and comparable to the proposed method."
+        evidence_examples:
+          - knowledge/M3/M3S02_baseline_lock.md
+          - experiments/baselines/baseline_1/metric_contract.yaml
+      - id: G3-R3
+        criterion: "Main experiment results have raw logs or tables, seed coverage, provenance, and validation against expectations."
+        evidence_examples:
+          - knowledge/M3/M3S03_main_experiment.md
+          - knowledge/M3/M3S04_result_validation.md
+          - experiments/results.tsv
+          - knowledge/handoff_M3_M4.md
+
+  G4:
+    title: "Deep analysis and mechanism evidence"
+    items:
+      - id: G4-R1
+        criterion: "M4 identifies post-experiment findings, negative results, and analysis questions grounded in M3 evidence."
+        evidence_examples:
+          - knowledge/M4/M4S01_other_findings.md
+          - knowledge/M3/M3S04_result_validation.md
+      - id: G4-R2
+        criterion: "Analysis design covers ablation, mechanism, robustness or failure slices, literature basis, baseline inclusion, and evidence criteria."
+        evidence_examples:
+          - knowledge/M4/M4S02_analysis_experiment_design.md
+          - knowledge/M2/M2S06_full_experiment_plan.md
+      - id: G4-R3
+        criterion: "Analysis execution records sandboxed commands, logs, tables, baseline comparisons when required, and usable claims."
+        evidence_examples:
+          - knowledge/M4/M4S03_analysis_experiment.md
+          - experiments/analysis_results.tsv
+          - knowledge/M4/M4S04_analysis_results.md
+          - knowledge/handoff_M4_M5.md
+
+  G5:
+    title: "Paper writing, evidence fidelity, and figures"
+    items:
+      - id: G5-R1
+        criterion: "Pre-write audit and outline prove that M1-M4 evidence is complete enough for writing and that gaps are not hidden."
+        evidence_examples:
+          - knowledge/M5/M5S01_pre_write_audit.md
+          - knowledge/M5/M5S02_paper_outline.md
+      - id: G5-R2
+        criterion: "The paper draft covers introduction, related work, method, experiments, analysis, abstract, and conclusion without inventing numbers or citations."
+        evidence_examples:
+          - knowledge/M5/M5S03_introduction_relatedwork.md
+          - knowledge/M5/M5S04_methodology.md
+          - knowledge/M5/M5S05_experiments_results.md
+          - knowledge/M5/M5S06_analysis_discussion.md
+          - knowledge/M5/M5S07_abstract_conclusion.md
+      - id: G5-R3
+        criterion: "Figure policy is followed: experiment plots are data/code generated using nature-figure principles; method/framework figures use image2/gpt-image-2 style profile."
+        evidence_examples:
+          - knowledge/M5/M5S02_paper_outline.md
+          - knowledge/M5/M5S04_methodology.md
+          - knowledge/M5/M5S05_experiments_results.md
+          - config/figure_style_profiles.yaml
+      - id: G5-R4
+        criterion: "Final LaTeX package compiles and the compilation report confirms style, layout, citation, and figure compliance."
+        evidence_examples:
+          - knowledge/M5/M5S08_final_compilation.md
+          - artifacts/paper.tex
+          - artifacts/paper.pdf
+          - knowledge/handoff_M5_completion.md
+
+  G6:
+    title: "Submission review, revision, and final package"
+    items:
+      - id: G6-R1
+        criterion: "Internal peer review used multiple strict reviewers, reached at least 8/10, and has zero unresolved high-priority issues."
+        evidence_examples:
+          - knowledge/reviews/M6S01_internal_peer_review.md
+          - knowledge/M6/M6S01_submission_audit.md
+      - id: G6-R2
+        criterion: "External review submission and review parsing preserve submission logs, tracking data, raw email evidence, and atomic review matrix."
+        evidence_examples:
+          - knowledge/M6/M6S02_external_review_submission.md
+          - knowledge/M6/M6S02_submission_log.json
+          - knowledge/M6/M6S03_review_parsing.md
+          - knowledge/M6/M6S03_review_email.json
+          - knowledge/M6/M6S03_review_matrix.md
+      - id: G6-R3
+        criterion: "Rebuttal strategy and revision execution map every review item to target stages, fixes, evidence, and rerun scope."
+        evidence_examples:
+          - knowledge/M6/M6S04_rebuttal_strategy.md
+          - knowledge/M6/M6S04_action_plan.md
+          - knowledge/M6/M6S05_revision_execution.md
+      - id: G6-R4
+        criterion: "Revision validation proves review resolution, quality preservation versus G5, and a complete final LaTeX submission package."
+        evidence_examples:
+          - knowledge/M6/M6S06_revision_validation.md
+          - knowledge/handoff_M6_completion.md
+          - artifacts/submission_package/paper_final.pdf
+          - artifacts/submission_package/source.zip

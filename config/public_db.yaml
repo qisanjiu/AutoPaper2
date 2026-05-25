@@ -1,0 +1,48 @@
+# Public Literature Database Configuration
+# =============================================================================
+# This is the FRAMEWORK-WIDE shared literature database used by ALL projects.
+# It lives outside the framework directory (at ../data/ by default) so that
+# it persists across framework updates and is shared by every AutoPaper2
+# project you create.
+#
+# You do NOT need to create this database manually.  It is auto-initialized
+# on first use (first project creation or first query).
+#
+# If you want project-specific overrides, copy this file into:
+#   {your_project}/config/public_db.yaml
+# =============================================================================
+
+public_literature_db:
+  enabled: true
+
+  # Path to the SQLite database file.
+  # The default is resolved automatically inside the AutoPaper2
+  # framework directory (data/public_literature_db/literature.db).
+  # Only override this if you want the DB in a custom location.
+  path: ""
+
+  # Minimum number of high-confidence hits from the public DB before
+  # skipping a web search. Set to 0 to always search the web.
+  min_hit_threshold: 10
+
+  # Query cache time-to-live in days.
+  query_cache_ttl_days: 180
+
+  # Automatically derive domain tags from paper titles/abstracts.
+  auto_tagging: true
+
+  # Default and maximum result limits for queries.
+  default_limit: 50
+  max_limit: 500
+
+  # SQLite busy-timeout in seconds.
+  timeout: 30.0
+
+  # Cross-project merge policy when importing papers from different projects.
+  merge_policy:
+    merge_limitations: true
+    inherit_credibility: true
+    inherit_tags: true
+    inherit_verification: true
+    inherit_code_url: true
+    max_limitations: 50

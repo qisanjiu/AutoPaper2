@@ -1,0 +1,106 @@
+#!/bin/bash
+# AutoPaper2 — 远程同步脚本（密钥认证版）
+# 用法: ./sync_remote.sh [push|pull]
+# 本脚本优先从 config/execution_env.yaml 读取 SSH 配置，也可通过环境变量覆盖。
+#
+# ⚠️ 重要：本脚本不同步数据集！
+#    数据集应在远程服务器上独立准备（远程直接下载或 rsync 手动上传）。
+#    参见 M3S01 数据集准备规范：docs/AGENTS/experiment/AGENT.md §9
+#    远程数据集路径应在 experiments/configs/*.yaml 中配置。
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${SCRIPT_DIR}/config/execution_env.yaml"
+
+# ---------------------------------------------------------------------------
+# 读取 execution_env.yaml 配置（简单 YAML 解析）
+# ---------------------------------------------------------------------------
+parse_yaml() {
+    local file="$1" key="$2"
+    if [[ -f "$file" ]]; then
+        python3 -c "
+import yaml, sys
+try:
+    d = yaml.safe_load(open('$file'))
+    v = d
+    for p in '$key'.split('.'):
+        v = v.get(p, '') if isinstance(v, dict) else ''
+    print(v or '')
+except Exception:
+    print('')
+" 2>/dev/null || true
+    fi
+}
+
+if [[ -f "$CONFIG_FILE" ]]; then
+    REMOTE_HOST="$(parse_yaml "$CONFIG_FILE" 'execution.ssh.host')"
+    REMOTE_USER="$(parse_yaml "$CONFIG_FILE" 'execution.ssh.user')"
+    REMOTE_PORT="$(parse_yaml "$CONFIG_FILE" 'execution.ssh.port')"
+    IDENTITY_FILE="$(parse_yaml "$CONFIG_FILE" 'execution.ssh.identity_file')"
+    REMOTE_PATH="$(parse_yaml "$CONFIG_FILE" 'execution.ssh.workspace_path')"
+fi
+
+# 环境变量优先级最高
+REMOTE_HOST="${REMOTE_HOST:-gpu-server}"
+REMOTE_USER="${REMOTE_USER:-researcher}"
+REMOTE_PORT="${REMOTE_PORT:-22}"
+REMOTE_PATH="${REMOTE_PATH:-~/autopaper2-projects/$(basename "$SCRIPT_DIR")}"
+IDENTITY_FILE="${IDENTITY_FILE:-}"
+
+# 构建 rsync 的 SSH 后端命令字符串（rsync -e 需要单个字符串参数）
+SSH_BASE="ssh -p $REMOTE_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+if [[ -n "$IDENTITY_FILE" ]]; then
+    SSH_BASE="$SSH_BASE -i $IDENTITY_FILE"
+fi
+
+# rsync 排除项
+EXCLUDES=(
+  --exclude='__pycache__'
+  --exclude='*.pyc'
+  --exclude='.git'
+  --exclude='*.log'
+  --exclude='*.pt'
+  --exclude='*.pth'
+  --exclude='*.ckpt'
+  --exclude='runs/*/logs/*.txt'
+)
+
+SYNC_MODE="${1:-push}"
+
+if [ "$SYNC_MODE" == "push" ]; then
+    echo "[SYNC] Pushing local code → $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH (port $REMOTE_PORT)"
+    rsync -avz --progress -e "$SSH_BASE" "${EXCLUDES[@]}" \
+        ./ "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/"
+    echo "[SYNC] Push complete."
+
+elif [ "$SYNC_MODE" == "pull" ]; then
+    echo "[SYNC] Pulling results from $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH"
+    mkdir -p ./experiments/runs ./experiments/baselines ./experiments/artifacts/main_experiment ./knowledge/M3 ./knowledge/reviews
+    rsync -avz --progress -e "$SSH_BASE" \
+        "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/experiments/results.tsv" \
+        ./experiments/ 2>/dev/null || echo "[WARN] results.tsv not found on remote"
+    rsync -avz --progress -e "$SSH_BASE" \
+        "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/experiments/requirements.lock" \
+        ./experiments/ 2>/dev/null || echo "[WARN] requirements.lock not found on remote"
+    rsync -avz --progress -e "$SSH_BASE" \
+        "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/experiments/runs/" \
+        ./experiments/runs/ 2>/dev/null || echo "[WARN] runs/ not found on remote"
+    rsync -avz --progress -e "$SSH_BASE" \
+        "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/experiments/baselines/" \
+        ./experiments/baselines/ 2>/dev/null || echo "[WARN] baselines/ not found on remote"
+    rsync -avz --progress -e "$SSH_BASE" \
+        "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/experiments/artifacts/main_experiment/" \
+        ./experiments/artifacts/main_experiment/ 2>/dev/null || echo "[WARN] main_experiment artifacts not found on remote"
+    rsync -avz --progress -e "$SSH_BASE" \
+        "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/knowledge/M3/" \
+        ./knowledge/M3/ 2>/dev/null || echo "[WARN] knowledge/M3/ not found on remote"
+    rsync -avz --progress -e "$SSH_BASE" \
+        "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/knowledge/reviews/" \
+        ./knowledge/reviews/ 2>/dev/null || echo "[WARN] reviews/ not found on remote"
+    echo "[SYNC] Pull complete."
+
+else
+    echo "Usage: $0 [push|pull]"
+    exit 1
+fi

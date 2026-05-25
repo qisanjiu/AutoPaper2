@@ -1,0 +1,50 @@
+# =============================================================================
+# AutoPaper2 — Git Ignore
+# =============================================================================
+
+# User data directories (projects & shared database)
+/projects/
+/data/
+
+# SQLite WAL/SHM companion files
+*.db-wal
+*.db-shm
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Generated figure assets
+generated-images/
+
+# Local media config with API secrets
+config/image_generation.local.yaml
+config/figure_style_profiles.local.yaml
+
+# Personal / environment-specific configs (contain SSH, hardware, author info)
+config/execution_env.yaml
+config/author_info.yaml
+config/email_config.yaml

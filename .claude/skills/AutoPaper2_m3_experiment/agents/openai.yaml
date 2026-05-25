@@ -1,0 +1,7 @@
+interface:
+  display_name: "AutoPaper2 M3 Experiment"
+  short_description: "M3 实验环境搭建、baseline 锁定、主实验验证与 M3→M4 交接"
+  default_prompt: "Use $AutoPaper2_m3_experiment to run M3 from environment setup through baseline review, main experiment, validation, and handoff."
+
+policy:
+  allow_implicit_invocation: true

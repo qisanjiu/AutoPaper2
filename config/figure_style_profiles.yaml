@@ -1,0 +1,169 @@
+# AutoPaper2 — Figure Style Profiles
+#
+# These presets are for architecture / mechanism / concept figures only.
+# Experiment result plots must still be generated from data and plotting code.
+#
+# The strategy is hybrid:
+# 1) If exemplar figures are readable, distill their visual grammar.
+# 2) If image reading is unavailable, use the venue preset as the base.
+# 3) In either case, avoid dead minimalism; keep controlled color, hierarchy,
+#    and figure density appropriate to the venue.
+
+figure_styles:
+  default_preset: journal_generic
+  framework_method_reference:
+    name: paper-framework-figure-studio-pro
+    url: "https://github.com/c-narcissus/paper-framework-figure-studio-pro"
+    applies_to:
+      - architecture figures
+      - mechanism figures
+      - method framework figures
+      - concept flow figures
+    backend_requirement: "image2/gpt-image-2 by default; Draw.io only when editable vector source is explicitly needed"
+    distilled_style:
+      - "publication-facing framework diagram with clear hierarchy and compact information flow"
+      - "controlled color accents, grouped regions, consistent component sizes, and readable arrows"
+      - "labels must be sourced from method documents or the explicit prompt"
+      - "avoid decorative, marketing-like, stock-like, or invented modules"
+  experiment_plot_reference:
+    name: nature-figure
+    applies_to:
+      - main result plots
+      - ablation plots
+      - robustness plots
+      - quantitative mechanism plots
+    backend_requirement: "raw data plus plotting code only, following the nature-figure skill principles"
+  venue_map:
+    arxiv: journal_generic
+    ieee_trans: ieee_trans_conservative
+    neurips: ml_conference_modern
+    icml: ml_conference_modern
+    iclr: ml_conference_modern
+    acl: acl_text_centric
+    cvpr: cvpr_visual_rich
+
+  presets:
+    journal_generic:
+      tone: "polished, moderately rich, editorial but technical"
+      palette:
+        primary: "deep navy"
+        secondary: "muted teal"
+        accent: "warm amber"
+        background: "white or very light cool gray"
+        panel_fill: "pale blue-gray"
+        line: "near-black"
+      layout:
+        - "use grouped panels or lanes rather than isolated boxes"
+        - "keep the figure compact but not sparse"
+        - "allow moderate density of labels and callouts"
+      typography:
+        - "clean sans-serif"
+        - "strong title, moderate body labels"
+      richness:
+        - "subtle tinted panels and light shading are allowed"
+        - "small emphasis accents are preferred over monochrome blocks"
+      avoid:
+        - "flat minimal diagrams with no hierarchy"
+        - "monochrome-only figures unless the venue is strictly print-bound"
+        - "heavy gradients, photo textures, 3D, cartoon icons"
+      notes: "Good default for high-impact journal-style figures."
+
+    ieee_trans_conservative:
+      tone: "conservative, print-safe, technically dense"
+      palette:
+        primary: "navy"
+        secondary: "slate blue"
+        accent: "muted teal"
+        background: "white"
+        panel_fill: "light gray-blue"
+        line: "dark gray"
+      layout:
+        - "compact structure with clear borders and readable labels"
+        - "avoid empty canvas space that weakens the technical message"
+        - "use small callouts, subtle legends, and modular blocks"
+      typography:
+        - "clean sans-serif"
+        - "moderate label size; prioritize readability in print"
+      richness:
+        - "allowed: subtle fills, small accents, and structured grouping"
+        - "avoid: sterile monochrome boxes with no depth"
+      avoid:
+        - "flashy saturation"
+        - "decorative illustration style"
+        - "large unused whitespace"
+      notes: "Suitable for IEEE-style journal figures that still need visual hierarchy."
+
+    ml_conference_modern:
+      tone: "clear, modular, research-lab polished"
+      palette:
+        primary: "deep blue"
+        secondary: "teal"
+        accent: "orange"
+        background: "white"
+        panel_fill: "soft gray-blue"
+        line: "charcoal"
+      layout:
+        - "prefer left-to-right pipelines or modular panels"
+        - "use color-coded modules and concise callouts"
+        - "preserve hierarchy with section headers and arrows"
+      typography:
+        - "clean sans-serif"
+        - "slightly stronger title and component labels"
+      richness:
+        - "module-specific colors and tinted containers are allowed"
+        - "avoid boring all-white blocks"
+      avoid:
+        - "overly decorative gradients"
+        - "childish cartoon icons"
+        - "overly flat single-color diagrams"
+      notes: "Works well for NeurIPS / ICML / ICLR style papers."
+
+    acl_text_centric:
+      tone: "text-aware, compact, narrative flow"
+      palette:
+        primary: "deep blue"
+        secondary: "muted green"
+        accent: "warm accent"
+        background: "white"
+        panel_fill: "light warm gray"
+        line: "dark gray"
+      layout:
+        - "use token/sequence blocks, annotations, and short labels"
+        - "prefer compact story-first organization"
+        - "keep diagram readable without becoming empty"
+      typography:
+        - "clean sans-serif"
+        - "text should be the main carrier of meaning"
+      richness:
+        - "text callouts, highlight bands, and small colored group boxes are allowed"
+        - "avoid sparse boxes that look unfinished"
+      avoid:
+        - "visual clutter"
+        - "overly ornamental figures"
+        - "monochrome deadness"
+      notes: "Good for NLP-style papers that need flow and text emphasis."
+
+    cvpr_visual_rich:
+      tone: "visual, multi-panel, comparison-friendly"
+      palette:
+        primary: "blue"
+        secondary: "green"
+        accent: "orange-red"
+        background: "white"
+        panel_fill: "light neutral gray"
+        line: "dark gray"
+      layout:
+        - "allow multi-panel comparison layouts"
+        - "use example thumbnails, input/output strips, or subpanel labels when appropriate"
+        - "favor a slightly richer composition than conference flowcharts"
+      typography:
+        - "clean sans-serif"
+        - "strong figure-level title and panel labels"
+      richness:
+        - "higher figure density and richer module grouping are acceptable"
+        - "do not collapse everything into a bare pipeline"
+      avoid:
+        - "single-line minimal diagrams that waste the canvas"
+        - "overly soft pastel-only figures"
+        - "photo-like illustration unrelated to the method"
+      notes: "Use when the paper benefits from a more visual and layered composition."
