@@ -20,9 +20,13 @@
 4. [Core Mechanisms](#core-mechanisms)
    - [Survey Memory Persistence](#survey-memory-persistence)
    - [Backtrack Mechanism](#backtrack-mechanism)
+   - [Orchestrator Identity Persistence](#orchestrator-identity-persistence)
    - [Gate Review](#gate-review)
    - [Public Literature DB](#public-literature-db)
 5. [Quick Start](#quick-start)
+   - [Environment Setup](#environment-setup)
+   - [Project Onboarding](#project-onboarding)
+   - [Running Stages](#running-stages)
 6. [CLI Reference](#cli-reference)
 7. [Project Structure](#project-structure)
 8. [Configuration](#configuration)
@@ -39,49 +43,51 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 
 | Feature | AutoPaper | **AutoPaper2** |
 |:---|:---|:---|
-| Phase division | 8 Phases × 37 Stages | **6 Modules × 33 Stages** |
-| Survey memory | ❌ None | ✅ **Persistent `survey_memory.yaml`** |
-| Iterative search | ❌ Single pass | ✅ **3-Round Search→Verify→Iterate loop** |
-| Source tracking | ❌ Embedded in Markdown | ✅ **Structured `M1_source_log.yaml`** |
-| Coverage review | ❌ Not checked | ✅ **Gate G1 Coverage Critic** |
-| Backtrack mechanism | ❌ Simple retry | ✅ **Full Backtrack + Spiral Count** |
-| Public literature DB | ❌ None | ✅ **SQLite + FTS cross-project reuse** |
-| Submission module | ❌ None | ✅ **M6 external review & revision loop** |
+| Phase division | 8 Phases x 37 Stages | **6 Modules x 33 Stages** |
+| Survey memory | None | **Persistent `survey_memory.yaml`** |
+| Iterative search | Single pass | **3-Round Search->Verify->Iterate loop** |
+| Source tracking | Embedded in Markdown | **Structured `M1_source_log.yaml`** |
+| Coverage review | Not checked | **Gate G1 Coverage Critic** |
+| Backtrack mechanism | Simple retry | **Full Backtrack + Spiral Count** |
+| Public literature DB | None | **SQLite + FTS cross-project reuse** |
+| Submission module | None | **M6 external review & revision loop** |
+| Orchestrator guard | None | **Runtime boundary enforcement** |
 
 ---
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    AutoPaper2 Six-Module Pipeline                       │
-├─────────┬─────────┬─────────┬─────────┬─────────┬─────────────────────┤
-│   M1    │   M2    │   M3    │   M4    │   M5    │        M6           │
-│ Domain  │ Method  │  Exp.   │  Deep   │ Writing │  Submission &       │
-│ Survey  │ Design  │  Run    │ Analysis│ & Review│  Rebuttal           │
-├─────────┼─────────┼─────────┼─────────┼─────────┼─────────────────────┤
-│ M1S01   │ M2S01   │ M3S01   │ M4S01   │ M5S01   │ M6S01 Submission    │
-│ M1S02   │ M2S02   │ M3S02   │ M4S02   │ M5S02   │      Audit          │
-│ M1S03   │ M2S03   │ M3S03   │ M4S03   │ M5S03   │ M6S02 External      │
-│ M1S04   │ M2S04   │ M3S04   │ M4S04   │ M5S04   │      Review Submit  │
-│ M1S05   │ M2S05   │   ↓     │   ↓     │ M5S05   │ M6S03 Review        │
-│   ↓     │ M2S06   │   G3    │   G4    │ M5S06   │      Parsing        │
-│   G1    │   ↓     │         │         │ M5S07   │ M6S04 Rebuttal      │
-│         │   G2    │         │         │ M5S08   │      Strategy       │
-│         │         │         │         │   ↓     │ M6S05 Revision      │
-│         │         │         │         │   G5    │      Execution      │
-│         │         │         │         │         │ M6S06 Revision      │
-│         │         │         │         │         │      Validation     │
-│         │         │         │         │         │   ↓                 │
-│         │         │         │         │         │   G6                │
-└─────────┴─────────┴─────────┴─────────┴─────────┴─────────────────────┘
++-------------------------------------------------------------------------+
+|                    AutoPaper2 Six-Module Pipeline                       |
++---------+---------+---------+---------+---------+---------------------+
+|   M1    |   M2    |   M3    |   M4    |   M5    |        M6           |
+| Domain  | Method  |  Exp.   |  Deep   | Writing |  Submission &       |
+| Survey  | Design  |  Run    | Analysis| & Review|  Rebuttal           |
++---------+---------+---------+---------+---------+---------------------+
+| M1S01   | M2S01   | M3S01   | M4S01   | M5S01   | M6S01 Submission    |
+| M1S02   | M2S02   | M3S02   | M4S02   | M5S02   |      Audit          |
+| M1S03   | M2S03   | M3S03   | M4S03   | M5S03   | M6S02 External      |
+| M1S04   | M2S04   | M3S04   | M4S04   | M5S04   |      Review Submit  |
+| M1S05   | M2S05   |   v     |   v     | M5S05   | M6S03 Review        |
+|   v     | M2S06   |   G3    |   G4    | M5S06   |      Parsing        |
+|   G1    |   v     |         |         | M5S07   | M6S04 Rebuttal      |
+|         |   G2    |         |         | M5S08   |      Strategy       |
+|         |         |         |         |   v     | M6S05 Revision      |
+|         |         |         |         |   G5    |      Execution      |
+|         |         |         |         |         | M6S06 Revision      |
+|         |         |         |         |         |      Validation     |
+|         |         |         |         |         |   v                 |
+|         |         |         |         |         |   G6                |
++---------+---------+---------+---------+---------+---------------------+
 ```
 
 **Core Design Principles**:
-- **Conductor only orchestrates, never executes**: The main Agent handles project creation, module routing, stage advancement, backtrack scheduling, gate handling, and **never directly executes stage content or review work**
+- **Conductor only orchestrates, never executes**: The main Agent handles project creation, module routing, stage advancement, review scheduling, gate handling, and **never directly executes stage content or review work**
 - **Stage execution delegated to subagents**: Each stage is executed by the corresponding role subagent (Survey / Method / Experiment / Analysis / Writing, etc.)
 - **Independent review layer**: Stage-level review + Gate Critic + Human Review, three layers of quality control
 - **Traceable backtracking**: All backtracks are persisted to `pipeline_state.yaml`, with Spiral Count limits
+- **Orchestrator identity persistence**: Main agent identity is durably locked via state files and runtime guards, surviving conversation pauses
 
 ---
 
@@ -89,14 +95,14 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 
 ### M1 Domain Survey
 
-> **Goal**: comprehensively survey the research field, identify research gaps, and produce a structured literature review  
+> **Goal**: Comprehensively survey the research field, identify research gaps, and produce a structured literature review  
 > **Agents**: Survey Agent + Ideation Agent  
 > **Gate**: G1 (Logic + Novelty + Coverage + Survey Review)
 
 | Stage | Name | Description |
 |:---|:---|:---|
 | **M1S01** | Topic Scoping | Define research topic, keywords, search strategy, and expected contribution type |
-| **M1S02** | Literature Deep Dive | Execute **3-Round iterative search**: Round 1 Breadth scan → Round 2 Depth validation → Round 3 Blindspot filling. Each round requires independent Reviewer verdict = PASS to proceed |
+| **M1S02** | Literature Deep Dive | Execute **3-Round iterative search**: Round 1 Breadth scan -> Round 2 Depth validation -> Round 3 Blindspot filling. Each round requires independent Reviewer verdict = PASS to proceed |
 | **M1S03** | Research Question | Transform identified gaps into concrete, testable research questions |
 | **M1S04** | Hypothesis Generation | Generate research hypotheses with independent variables, dependent variables, and expected effects |
 | **M1S05** | Novelty & Feasibility | Argue novelty and feasibility, complete M1 deliverable integration |
@@ -115,7 +121,7 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 
 ### M2 Method Design
 
-> **Goal**: based on gaps identified in M1, design rigorous, reproducible, and hypothesis-testable research methods through cross-domain search, idea migration, and method synthesis  
+> **Goal**: Based on gaps identified in M1, design rigorous, reproducible, and hypothesis-testable research methods through cross-domain search, idea migration, and method synthesis  
 > **Agent**: Method Agent  
 > **Gate**: G2 (Logic + Method + Novelty)
 
@@ -126,13 +132,13 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 | **M2S03** | Method Architecture | Method architecture design: module decomposition, data flow, interface definitions |
 | **M2S04** | Algorithm & Theory | Algorithm details and theoretical analysis: convergence, complexity, boundary conditions |
 | **M2S05** | Experiment Setup | Experiment setup design: datasets, evaluation metrics, hyperparameters, reproduction environment |
-| **M2S06** | Full Experiment Plan | Integrate complete experiment plan, output M2→M3 handoff document |
+| **M2S06** | Full Experiment Plan | Integrate complete experiment plan, output M2->M3 handoff document |
 
 **Stage Review Mechanism**:
-- M2S01 → `m2_search_quality` review
-- M2S02 → `m2_migration` review (bridge review, checks cross-domain mapping rationality)
-- M2S03 → `m2_design_review` review
-- M2S04 → `m2_design_review` review
+- M2S01 -> `m2_search_quality` review
+- M2S02 -> `m2_migration` review (bridge review, checks cross-domain mapping rationality)
+- M2S03 -> `m2_design_review` review
+- M2S04 -> `m2_design_review` review
 
 **Key Outputs**:
 - `knowledge/M2/M2S01_cross_domain_search.md`
@@ -148,25 +154,29 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 
 ### M3 Experiment
 
-> **Goal**: correctly and efficiently implement the method designed in M2, run experiment iteration loops, and produce credible empirical evidence  
+> **Goal**: Correctly and efficiently implement the method designed in M2, run experiment iteration loops, and produce credible empirical evidence  
 > **Agent**: Experiment Agent  
 > **Gate**: G3 (Method + Evidence)
 
 | Stage | Name | Description |
 |:---|:---|:---|
-| **M3S01** | Implementation | Code implementation and environment setup: dependency locking, dataset acquisition, data pipeline |
-| **M3S02** | Baseline Lock | Baseline reproduction and locking: ensure baselines run, establish metric contract, pass smoke test |
+| **M3S01** | Implementation | Code implementation and environment setup: dependency locking, **dataset acquisition (simulated data forbidden)**, data pipeline |
+| **M3S02** | Baseline Lock | Baseline reproduction and locking: **checkpoint search and acquisition**, metric contract establishment, smoke test |
 | **M3S03** | Main Experiment | Main experiment execution: full training/evaluation pipeline, multiple random seeds, result logging |
 | **M3S04** | Result Validation | Result validation and evidence packaging: statistical significance tests, negative result logging, decision (KEEP / FIX / BACKTRACK) |
 
 **Stage Review Mechanism**:
-- M3S01 → `m3_dataset_env_review` review
-- M3S02 → `m3_baseline_result_review` review
-- M3S03 → `m3_main_result_review` review
+- M3S01 -> `m3_dataset_env_review` review
+- M3S02 -> `m3_baseline_result_review` review
+- M3S03 -> `m3_main_result_review` review
 
 **M3S04 Decision Enforcement**:
-- If M3S04 output decision is `FIX` or `BACKTRACK`, it **must** include complete `backtrack direction` and repair fields, otherwise `advance` will be blocked
+- If M3S04 output decision is `FIX` or `BACKTRACK`, it **must** include complete backtrack direction and repair fields, otherwise `advance` will be blocked
 - Decision must be `KEEP` to normally proceed to M4
+
+**M3 Hard Rules**:
+- **Dataset Acquisition Rule (M3S01)**: Real data is the only valid input. **Absolutely forbidden** to use simulated/synthetic/random data as substitutes. Large datasets (>10GB) must also be attempted for download or transfer; when automatic acquisition fails, a blocking report must be generated waiting for user ingestion.
+- **Checkpoint Acquisition Rule (M3S02)**: If a baseline depends on pretrained weights, checkpoint must be actively searched and acquired (GitHub Releases, README, HuggingFace Hub, etc.). Skipping or using random initialization as a substitute is prohibited.
 
 **Key Outputs**:
 - `knowledge/M3/M3S01_implementation.md`
@@ -179,7 +189,7 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 
 ### M4 Deep Analysis
 
-> **Goal**: extract reliable conclusions from experimental results, identify patterns, and deepen insights through ablation studies, mechanism analysis, and robustness checks  
+> **Goal**: Extract reliable conclusions from experimental results, identify patterns, and deepen insights through ablation studies, mechanism analysis, and robustness checks  
 > **Agents**: Analysis Agent + Experiment Agent (M4S03)  
 > **Gate**: G4 (Logic + Evidence + Novelty)
 
@@ -191,9 +201,9 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 | **M4S04** | Analysis Results | Analysis results integration and evidence packaging |
 
 **Stage Review Mechanism**:
-- M4S01 → `m4_findings_audit` review
-- M4S02 → `m4_analysis_design_review` review
-- M4S03 → `m4_analysis_execution_review` review
+- M4S01 -> `m4_findings_audit` review
+- M4S02 -> `m4_analysis_design_review` review
+- M4S03 -> `m4_analysis_execution_review` review
 
 **Key Outputs**:
 - `knowledge/M4/M4S01_other_findings.md`
@@ -206,13 +216,13 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 
 ### M5 Writing & Review
 
-> **Goal**: transform research results into a clearly structured, rigorously argued academic paper conforming to venue specifications  
+> **Goal**: Transform research results into a clearly structured, rigorously argued academic paper conforming to venue specifications  
 > **Agents**: Analysis Agent (M5S01) + Writing Agent (M5S02-M5S08) + Build Verifier (M5S08)  
 > **Gate**: G5 (Logic + Writing + Evidence + Novelty + Ethics)
 
 | Stage | Name | Description |
 |:---|:---|:---|
-| **M5S01** | Pre-Write Audit | Pre-writing audit: contribution梳理, evidence chain completeness check, terminology unification |
+| **M5S01** | Pre-Write Audit | Pre-writing audit: contribution articulation, evidence chain completeness check, terminology unification |
 | **M5S02** | Paper Outline | Paper outline: plotting plan, terminology glossary, section budget |
 | **M5S03** | Introduction & Related Work | Introduction and related work |
 | **M5S04** | Methodology | Methodology section + method figures |
@@ -222,14 +232,14 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 | **M5S08** | Final Compilation | Full draft assembly, LaTeX compilation, PDF generation |
 
 **Stage Review Mechanism**:
-- M5S01 → `m5_prewrite_review`
-- M5S02 → `m5_outline_style_review`
-- M5S03 → `m5_intro_relatedwork_review`
-- M5S04 → `m5_method_figure_review`
-- M5S05 → `m5_experiments_results_review`
-- M5S06 → `m5_analysis_discussion_review`
-- M5S07 → `m5_abstract_conclusion_review`
-- M5S08 → `build_verifier` + `m5_final_compilation_review`
+- M5S01 -> `m5_prewrite_review`
+- M5S02 -> `m5_outline_style_review`
+- M5S03 -> `m5_intro_relatedwork_review`
+- M5S04 -> `m5_method_figure_review`
+- M5S05 -> `m5_experiments_results_review`
+- M5S06 -> `m5_analysis_discussion_review`
+- M5S07 -> `m5_abstract_conclusion_review`
+- M5S08 -> `build_verifier` + `m5_final_compilation_review`
 
 **Key Outputs**:
 - `knowledge/M5/M5S01_pre_write_audit.md` ~ `M5S08_final_compilation.md`
@@ -241,7 +251,7 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 
 ### M6 Submission & Rebuttal
 
-> **Goal**: complete pre-submission audit, external review submission, review parsing, backtrack planning, revision execution and validation  
+> **Goal**: Complete pre-submission audit, external review submission, review parsing, backtrack planning, revision execution and validation  
 > **Agents**: Submission Agent (M6S01-M6S02) + Rebuttal Agent (M6S03-M6S06)  
 > **Gate**: G6 (Logic + Evidence + Writing + Resolution)
 
@@ -255,12 +265,12 @@ AutoPaper2 is an **end-to-end autonomous research paper generation framework**. 
 | **M6S06** | Revision Validation | Revision validation and completion verdict |
 
 **Stage Review Mechanism**:
-- M6S01 → `m6_submission_audit`
-- M6S02 → `m6_external_submission_review`
-- M6S03 → `m6_review_parsing_review`
-- M6S04 → `m6_rebuttal_strategy_review`
-- M6S05 → `m6_revision_execution_review`
-- M6S06 → `m6_revision_validation_review`
+- M6S01 -> `m6_submission_audit`
+- M6S02 -> `m6_external_submission_review`
+- M6S03 -> `m6_review_parsing_review`
+- M6S04 -> `m6_rebuttal_strategy_review`
+- M6S05 -> `m6_revision_execution_review`
+- M6S06 -> `m6_revision_validation_review`
 
 **Key Outputs**:
 - `knowledge/M6/M6S01_submission_audit.md` ~ `M6S06_revision_validation.md`
@@ -362,6 +372,34 @@ The review file format is identical to automated stage reviews:
 **Rebuild Mode**:
 - `full_regenerate` (default): subagent must treat old downstream files as historical audit only; no copy-paste allowed
 - `incremental_replay`: subagent may reference old files to reduce redundancy, but all retained content must be re-validated
+
+### Orchestrator Identity Persistence
+
+The main Agent's orchestrator identity **must not rely solely on LLM working memory**. When the conversation is paused and resumed (e.g., user says "continue"), the main Agent must re-establish its orchestrator role through durable mechanisms:
+
+1. **State File Lock** (`pipeline_state.yaml`):
+   - `session.orchestrator_lock`: Always `true` when the main agent is active.
+   - `session.last_agent_mode`: Set to `"orchestrator"` at session start.
+   - Read via `PipelineState.assert_orchestrator_mode()`.
+
+2. **Runtime Boundary Guard** (`scripts/orchestrator_guard.py`):
+   - Before any write operation, the orchestrator must run:
+     ```bash
+     python scripts/orchestrator_guard.py <project_root> <target_path>
+     ```
+   - Exit code 1 means **FORBIDDEN** -- the path belongs to a subagent.
+   - The script is universal and works across Claude Code, KimiCode, Codex, etc.
+
+3. **Skill Manifest Injection**:
+   - Every orchestrator and module Skill begins with an `ORCHESTRATOR MANIFEST` block.
+   - This block is the first content after frontmatter, ensuring it survives context compression.
+
+4. **Context Recovery Protocol** (mandatory after pause):
+   ```bash
+   python scripts/state_manager.py status
+   python scripts/state_manager.py dispatch next --write
+   # Delegate generated packet to subagent -- do NOT execute content yourself
+   ```
 
 ### Auto-Advance Mode
 
@@ -476,7 +514,7 @@ pip install -e ".[dev]"
 pip install pyyaml pydantic requests
 ```
 
-### Creating a New Project
+### Project Onboarding
 
 #### Method 1: Trigger M1 Skill in Chat
 
@@ -514,6 +552,36 @@ code reference: https://github.com/example/repo
 ```
 
 The skill will create the project and write entry information to `state/research_brief.yaml`. Subsequent M1/M2/M5 stages will treat foundation papers as the method inheritance line and reference papers as near-neighbor comparisons and writing references.
+
+**After project creation, Onboarding is automatically triggered**. The framework auto-probes the current environment (GPU, Python, CUDA, etc.) and populates `config/execution_env.yaml`, while generating `state/onboarding_checklist.md`. At this point the project status is `onboarding_pending`, and **you must complete configuration confirmation before entering M1**.
+
+The Agent will show you the Onboarding Checklist:
+
+```markdown
+# Project Onboarding Checklist
+
+## Auto-Probe Results (Please Confirm)
+- Execution mode: ssh / local
+- Python version: 3.x
+- CUDA version: 12.x
+- GPU: NVIDIA RTX xxx
+
+## Manual Input Required
+1. SSH config (required only when mode=ssh): config/execution_env.yaml
+2. Author info: config/author_info.yaml
+3. Target venue confirmation
+```
+
+**Execution Mode**:
+- **`local` mode**: Experiments run locally, SSH config **not required**
+- **`ssh` mode**: Experiments run on remote server, must fill in `ssh.host`, `ssh.user`, etc.
+
+After completing the config, reply **"done"** or **"已填写"**, and the Agent will verify and unblock, allowing entry to M1S01.
+
+```bash
+# You can also mark onboarding done via CLI
+python scripts/state_manager.py onboarding-done projects/XXX
+```
 
 #### Method 2: Minimal CLI
 
@@ -584,6 +652,7 @@ The project is created at `projects/{sanitized_name}-{YYYYMMDD-HHMMSS}/`, automa
 - `state/pipeline_state.yaml` — global state
 - `state/survey_memory.yaml` — survey memory
 - `state/research_brief.yaml` — project entry manifest (keywords, foundation/reference anchors, PDF/URL/GitHub clues)
+- `state/onboarding_checklist.md` — onboarding checklist
 - `knowledge/M1/` ~ `M6/` — module knowledge directories
 - `drafts/M1S01/` ~ `M6S06/` — stage draft directories
 - `artifacts/` — final artifacts (LaTeX/PDF)
@@ -678,8 +747,10 @@ python scripts/state_manager.py <command> [args...]
 | `list-venues` | List supported venues |
 | `set-venue <venue_id>` | Set project venue |
 | `backtrack <from> <to> <reason> [direction]` | Execute backtrack |
+| `onboarding-done <project>` | Mark onboarding complete |
+| `set-auto-advance on/off` | Toggle auto-advance mode |
 | `public-db status/stats/init/import-project/list-papers/search/show-paper/list-tags` | Public literature DB operations |
-| `AutoPaper2_manual_import` (Skill) | Manual import of papers or datasets — triggered by natural language |
+| `AutoPaper2_manual_import` (Skill) | Manual import of papers or datasets -- triggered by natural language |
 
 ### Global Options
 
@@ -711,120 +782,159 @@ The framework includes the following venue templates:
 
 ```
 AutoPaper2/
-├── spiral/                      # Core Python package
-│   ├── __init__.py
-│   ├── conductor.py             # Orchestration core (Conductor)
-│   ├── state.py                 # PipelineState state management
-│   ├── project.py               # ProjectManager lifecycle
-│   ├── survey_memory.py         # SurveyMemory survey memory system
-│   └── public_db/               # Public literature database
-│       ├── config.py
-│       ├── manager.py
-│       ├── models.py
-│       ├── db.py
-│       ├── identifier.py
-│       ├── importer.py
-│       ├── merge.py
-│       ├── query_cache.py
-│       └── tag_engine.py
-├── scripts/
-│   ├── state_manager.py         # CLI entry
-│   ├── conductor_helper.py      # Cross-stage input resolution
-│   ├── test_health_check.py     # Test health check
-│   └── agent_consistency_check.py  # Agent consistency check
-├── utils/
-│   ├── file_guard.py            # Naming & location validation
-│   ├── stage_gate.py            # Stage quality checks
-│   └── source_log_validator.py  # Source log validation
-├── docs/
-│   ├── AGENTS/                  # Agent identity definitions
-│   │   ├── survey/AGENT.md
-│   │   ├── method/AGENT.md
-│   │   ├── experiment/AGENT.md
-│   │   ├── analysis/AGENT.md
-│   │   ├── writing/AGENT.md
-│   │   ├── submission/AGENT.md
-│   │   ├── rebuttal/AGENT.md
-│   │   ├── ideation/AGENT.md
-│   │   ├── conductor/AGENT.md
-│   │   ├── build_verifier/AGENT.md
-│   │   └── critic/              # Critic Agent definitions
-│   │       ├── logic/AGENT.md
-│   │       ├── method/AGENT.md
-│   │       ├── novelty/AGENT.md
-│   │       ├── coverage/AGENT.md
-│   │       ├── writing/AGENT.md
-│   │       ├── ethics/AGENT.md
-│   │       ├── evidence/AGENT.md
-│   │       ├── g6_resolution/AGENT.md
-│   │       ├── source_log_validator/AGENT.md
-│   │       ├── m2_search_quality/AGENT.md
-│   │       ├── m2_migration/AGENT.md
-│   │       ├── m2_design_review/AGENT.md
-│   │       ├── m3_dataset_env_review/AGENT.md
-│   │       ├── m3_baseline_result_review/AGENT.md
-│   │       ├── m3_main_result_review/AGENT.md
-│   │       ├── m4_findings_audit/AGENT.md
-│   │       ├── m4_analysis_design_review/AGENT.md
-│   │       ├── m4_analysis_execution_review/AGENT.md
-│   │       ├── m5_stage_review/AGENT.md
-│   │       └── m6_stage_review/AGENT.md
-│   └── design/                  # Design documents
-│       ├── M2_MODULE_DESIGN.md
-│       ├── M3_MODULE_DESIGN.md
-│       └── public_literature_db_design.md
-├── config/
-│   ├── venue_registry.yaml      # Venue configuration
-│   ├── public_db.yaml           # Public DB configuration
-│   ├── execution_env.yaml       # Execution environment config
-│   ├── figure_style_profiles.yaml
-│   └── author_info.yaml
-├── templates/
-│   ├── stage/                   # Stage Markdown templates (33)
-│   │   ├── M1S01_template.md
-│   │   ├── M1S02_template.md
-│   │   └── ...
-│   └── venue/                   # Venue LaTeX templates
-│       ├── arxiv/
-│       ├── neurips/
-│       ├── icml/
-│       └── ...
-├── skills/                      # Execution skills (M1-M6)
-│   ├── AutoPaper2_m1_survey/SKILL.md
-│   ├── AutoPaper2_m2_method_design/SKILL.md
-│   ├── AutoPaper2_m3_experiment/SKILL.md
-│   ├── AutoPaper2_m4_deep_analysis/SKILL.md
-│   ├── AutoPaper2_m5_writing/SKILL.md
-│   └── AutoPaper2_m6_submission_review/SKILL.md
-├── projects/                    # All research projects
-│   └── {name}-{YYYYMMDD-HHMMSS}/
-│       ├── state/
-│       │   ├── pipeline_state.yaml
-│       │   ├── survey_memory.yaml
-│       │   ├── decision_log.md
-│       │   └── spiral_log.md
-│       ├── knowledge/
-│       │   ├── M1/ ~ M6/
-│       │   ├── reviews/
-│       │   └── handoff_M*.md
-│       ├── drafts/
-│       │   └── M1S01/ ~ M6S06/
-│       ├── artifacts/
-│       │   ├── paper.tex
-│       │   └── paper.pdf
-│       ├── experiments/
-│       └── config/
-├── tests/                       # Test suite
-│   ├── test_public_db/
-│   ├── test_m1_integration.py
-│   ├── test_m4_integration.py
-│   ├── test_m6_integration.py
-│   ├── test_m1_e2e.py
-│   └── test_m1_integration.py
-├── pyproject.toml
-├── README.md
-├── README_CN.md                 # Chinese docs
-└── AGENTS.md                    # Agent global context
+|-- spiral/                      # Core Python package
+|   |-- __init__.py
+|   |-- conductor.py             # Orchestration core (Conductor)
+|   |-- state.py                 # PipelineState state management
+|   |-- project.py               # ProjectManager lifecycle
+|   |-- survey_memory.py         # SurveyMemory survey memory system
+|   |-- dispatch.py              # Subagent dispatch packet generation
+|   |-- verdict_parser.py        # Stage review verdict parser
+|   |-- revision_router.py       # Revision routing logic
+|   |-- project_entry.py         # Project entry & onboarding
+|   |-- public_db/               # Public literature database
+|   |   |-- config.py
+|   |   |-- manager.py
+|   |   |-- models.py
+|   |   |-- db.py
+|   |   |-- identifier.py
+|   |   |-- importer.py
+|   |   |-- merge.py
+|   |   |-- query_cache.py
+|   |   |-- tag_engine.py
+|-- scripts/
+|   |-- state_manager.py         # CLI entry
+|   |-- conductor_helper.py      # Cross-stage input resolution
+|   |-- orchestrator_guard.py    # Runtime boundary guard for orchestrator
+|   |-- env_probe.py             # Environment auto-detection
+|   |-- paperreview_uploader.py  # paperreview.ai auto-submission
+|   |-- email_monitor.py         # IMAP email monitor for review reception
+|   |-- generate_image.py        # Figure generation helper
+|   |-- agent_dispatch.py        # Agent dispatch utilities
+|   |-- test_health_check.py     # Test health check
+|   |-- agent_consistency_check.py  # Agent consistency check
+|-- utils/
+|   |-- file_guard.py            # Naming & location validation
+|   |-- stage_gate.py            # Stage quality checks
+|   |-- gate_rubric.py           # Gate rubric loader
+|   |-- source_log_validator.py  # Source log validation
+|-- docs/
+|   |-- AGENTS/                  # Agent identity definitions
+|   |   |-- survey/AGENT.md
+|   |   |-- method/AGENT.md
+|   |   |-- experiment/AGENT.md
+|   |   |-- analysis/AGENT.md
+|   |   |-- writing/AGENT.md
+|   |   |-- submission/AGENT.md
+|   |   |-- rebuttal/AGENT.md
+|   |   |-- ideation/AGENT.md
+|   |   |-- conductor/AGENT.md
+|   |   |-- build_verifier/AGENT.md
+|   |   |-- review/AGENT.md
+|   |   |-- revision/AGENT.md
+|   |   |-- critic/              # Critic Agent definitions
+|   |       |-- logic/AGENT.md
+|   |       |-- method/AGENT.md
+|   |       |-- novelty/AGENT.md
+|   |       |-- coverage/AGENT.md
+|   |       |-- writing/AGENT.md
+|   |       |-- ethics/AGENT.md
+|   |       |-- evidence/AGENT.md
+|   |       |-- g6_resolution/AGENT.md
+|   |       |-- code_review/AGENT.md
+|   |       |-- data_checker/AGENT.md
+|   |       |-- survey_review/AGENT.md
+|   |       |-- m2_design_review/AGENT.md
+|   |       |-- m4_findings_audit/AGENT.md
+|   |       |-- m4_analysis_execution_review/AGENT.md
+|   |       |-- m5_stage_review/AGENT.md
+|   |       |-- m6_stage_review/AGENT.md
+|   |       |-- m6_internal_peer_review/AGENT.md
+|   |-- design/                  # Design documents
+|   |   |-- M2_MODULE_DESIGN.md
+|   |   |-- M3_MODULE_DESIGN.md
+|   |   |-- public_literature_db_design.md
+|   |   |-- M1_M2_BACKTRACK_DIAGRAM.md
+|   |   |-- M1_M2_M3_BACKTRACK_DIAGRAM.md
+|   |   |-- M2_WORKFLOW_FRAMEWORK.md
+|   |-- 07_MD_PROTOCOL.md        # Markdown output protocol
+|   |-- EXTERNAL_OPEN_SOURCE_COMPARISON.md
+|   |-- AUTOPAPER2_AUDIT_AND_OPTIMIZATION.md
+|-- config/
+|   |-- venue_registry.yaml      # Venue configuration
+|   |-- public_db.yaml           # Public DB configuration
+|   |-- execution_env.yaml       # Execution environment config (gitignored)
+|   |-- figure_style_profiles.yaml
+|   |-- author_info.yaml         # Author info (gitignored)
+|   |-- email_config.yaml.template
+|   |-- user_requirement_trace.yaml
+|-- templates/
+|   |-- stage/                   # Stage Markdown templates (33)
+|   |   |-- M1S01_template.md
+|   |   |-- M1S02_template.md
+|   |   |-- ...
+|   |-- venue/                   # Venue LaTeX templates
+|   |   |-- arxiv/
+|   |   |-- neurips/
+|   |   |-- icml/
+|   |   |-- iclr/
+|   |   |-- acl/
+|   |   |-- cvpr/
+|   |   |-- ieee_trans/
+|-- skills/                      # Execution skills (M1-M6 + project-level)
+|   |-- AutoPaper2_m1_survey/SKILL.md
+|   |-- AutoPaper2_m2_method_design/SKILL.md
+|   |-- AutoPaper2_m3_experiment/SKILL.md
+|   |-- AutoPaper2_m4_deep_analysis/SKILL.md
+|   |-- AutoPaper2_m5_writing/SKILL.md
+|   |-- AutoPaper2_m6_submission_review/SKILL.md
+|   |-- AutoPaper2_project_router/SKILL.md
+|   |-- AutoPaper2_project_auto_run/SKILL.md
+|   |-- AutoPaper2_project_backtrack/SKILL.md
+|   |-- AutoPaper2_project_onboarding/SKILL.md
+|   |-- AutoPaper2_env_probe/SKILL.md
+|   |-- AutoPaper2_manual_import/SKILL.md
+|-- projects/                    # All research projects (gitignored)
+|   |-- {name}-{YYYYMMDD-HHMMSS}/
+|   |   |-- state/
+|   |   |   |-- pipeline_state.yaml
+|   |   |   |-- survey_memory.yaml
+|   |   |   |-- decision_log.md
+|   |   |   |-- spiral_log.md
+|   |   |   |-- onboarding_checklist.md
+|   |   |-- knowledge/
+|   |   |   |-- M1/ ~ M6/
+|   |   |   |-- reviews/
+|   |   |   |-- handoff_M*.md
+|   |   |-- drafts/
+|   |   |   |-- M1S01/ ~ M6S06/
+|   |   |-- artifacts/
+|   |   |   |-- paper.tex
+|   |   |   |-- paper.pdf
+|   |   |   |-- inputs/
+|   |   |-- experiments/
+|   |   |-- config/
+|-- data/                        # Public DB & datasets (gitignored)
+|   |-- public_literature_db/
+|   |-- datasets/
+|-- tests/                       # Test suite
+|   |-- test_public_db/
+|   |-- test_m1_integration.py
+|   |-- test_m3_integration.py
+|   |-- test_m4_integration.py
+|   |-- test_m6_integration.py
+|   |-- test_m1_e2e.py
+|   |-- test_dispatch.py
+|   |-- test_orchestrator_guard.py
+|   |-- test_gate_rubric.py
+|   |-- test_project_entry.py
+|   |-- test_requirement_trace.py
+|   |-- test_full_pipeline_simulation.py
+|-- pyproject.toml
+|-- README.md
+|-- README_CN.md                 # Chinese docs
+|-- AGENTS.md                    # Agent global context
+|-- .gitignore
 ```
 
 ---
@@ -874,7 +984,7 @@ min_hit_threshold: 10
 ### Running Tests
 
 ```bash
-# Run all tests (114+ tests)
+# Run all tests
 python -m unittest discover -s tests -v
 
 # Run public DB tests
