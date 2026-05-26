@@ -540,11 +540,14 @@ ssh -p "$PORT" -i "$KEY_PATH" -o BatchMode=yes "$USER@$HOST" "echo autopaper2-ss
 
 #### 10.2.2 M3S01 远程设置（认证就绪后）
 
+远程采用与本地一致的框架目录结构，`framework_root` 默认 `~/AutoPaper2`，`workspace_path` 位于其下的 `projects/{project_name}`。
+
 ```bash
-# 1. 确保远程工作空间存在
-ssh {user}@{host} "mkdir -p {workspace_path}"
+# 1. 确保远程框架根目录和项目工作空间存在
+ssh {user}@{host} "mkdir -p {framework_root}/data/datasets && mkdir -p {workspace_path}"
 
 # 2. 同步代码到远程（使用项目生成的 sync_remote.sh）
+# 项目代码同步到 {framework_root}/projects/{project_name}/
 ./sync_remote.sh push
 
 # 3. 在远程创建环境（通过SSH执行）
@@ -561,8 +564,12 @@ ssh {user}@{host} "cd {workspace_path} && {python_path} -c 'import torch; print(
 - **禁止**：只在远程跑实验不同步结果回本地——M3S04 的 Analysis Agent 需要在本地读取结果
 
 **同步规则**：
-- Push（本地→远程）：`src/`、`configs/`、`requirements.lock`
-- Pull（远程→本地）：`experiments/results.tsv`、`experiments/runs/*/curves/`、`experiments/runs/*/logs/`
+- **Push（本地→远程）**：仅同步当前项目执行所需内容
+  - 必须同步：`src/`、`configs/`、`requirements.lock`、实验脚本
+  - **不上传**：`skills/`、`docs/`、`templates/`、`tests/`、`*.md`、`.git/`
+  - **不上传**：`data/public_literature_db/`（公共文献数据库仅在本地维护）
+  - 数据集按需同步：仅同步当前实验需要的数据集子集到远程公共缓存，不批量上传全部本地数据
+- **Pull（远程→本地）**：`experiments/results.tsv`、`experiments/runs/*/curves/`、`experiments/runs/*/logs/`
 - **不同步**：`__pycache__`、`.git`、大模型权重（`.pt`、`.pth`、`.ckpt`）
 
 ### 10.3 环境故障处理

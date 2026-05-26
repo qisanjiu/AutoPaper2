@@ -136,7 +136,7 @@ python scripts/state_manager.py create \
 | ssh_port | `--ssh-port` | — | `22` | SSH 端口 |
 | ssh_auth_method | `--ssh-auth-method` | `key` / `password` | `key` | 认证方式 |
 | ssh_password | `--ssh-password` | — | — | 密码（仅 `password` 模式，临时存储） |
-| ssh_workspace | `--ssh-workspace` | — | `~/autopaper2-projects/{name}` | 远程工作空间路径 |
+| ssh_workspace | `--ssh-workspace` | — | `~/AutoPaper2/projects/{name}` | 远程工作空间路径（位于远程框架根目录下的 projects/） |
 | ssh_conda_env | `--ssh-conda-env` | — | — | 远程 conda 环境名 |
 | python_version | `--python-version` | — | `3.10` | Python 版本 |
 | cuda_version | `--cuda-version` | — | `12.1` | CUDA 版本 |
@@ -184,7 +184,7 @@ python scripts/state_manager.py create \
   --ssh-user zhouzhehao \
   --ssh-port 30011 \
   --ssh-auth-method key \
-  --ssh-workspace "~/autopaper2-projects/SemCom-Image-RL" \
+  --ssh-workspace "~/AutoPaper2/projects/SemCom-Image-RL" \
   --ssh-conda-env "semcom-rl" \
   --python-version 3.10 \
   --cuda-version 12.1
@@ -201,7 +201,7 @@ python scripts/state_manager.py create \
   --ssh-port 30011 \
   --ssh-auth-method password \
   --ssh-password "your_password_here" \
-  --ssh-workspace "~/autopaper2-projects/SemCom-Image-RL" \
+  --ssh-workspace "~/AutoPaper2/projects/SemCom-Image-RL" \
   --python-version 3.10 \
   --cuda-version 12.1
 ```

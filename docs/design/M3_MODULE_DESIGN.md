@@ -681,28 +681,28 @@ Step 5: 记录环境快照到 M3S01 产出
 
 #### 10.3.0 SSH 模式数据集准备规范（M3S01 前置步骤）
 
-> **原则**：SSH 模式下，数据集**不通过项目同步脚本传输**（`sync_remote.sh` 排除大文件）。数据集必须在远程服务器上独立准备，优先远程直接下载，次选本地上传。
+> **原则**：SSH 模式下，远程采用与本地一致的框架目录结构（`framework_root` 默认 `~/AutoPaper2`）。数据集优先使用远程服务器上的**公共缓存**（`~/AutoPaper2/data/datasets/`），所有项目共享同一缓存，避免重复存储。数据集**不通过项目同步脚本传输**（`sync_remote.sh` 排除大文件）。
 
 **远程数据集准备流程**：
 
 ```
-Step 1: 检查远程已有缓存
-  ├── ssh user@host "ls -la {remote_dataset_path}/{id}/"
+Step 1: 检查远程公共缓存是否已有该数据集
+  ├── ssh user@host "ls -la {remote_framework_root}/data/datasets/{id}/"
   ├── 如存在且完整 → 创建远程项目软链接 → 完成
   └── 如不存在 → Step 2
 
-Step 2: 远程直接下载（优先）
-  ├── ssh user@host "mkdir -p {remote_dataset_path}/{id}"
-  ├── ssh user@host "cd {remote_dataset_path}/{id} && {download_command}"
+Step 2: 远程公共缓存直接下载（优先）
+  ├── ssh user@host "mkdir -p {remote_framework_root}/data/datasets/{id}"
+  ├── ssh user@host "cd {remote_framework_root}/data/datasets/{id} && {download_command}"
   ├── 后台运行（screen/tmux/nohup）
   ├── 定期 check 进度
-  └── 下载完成 → 校验 → 创建软链接 → 完成
+  └── 下载完成 → 校验 → 创建项目软链接 → 完成
 
-Step 3: 本地→远程上传（当 Step 2 失败时）
+Step 3: 本地→远程公共缓存上传（当 Step 2 失败时）
   ├── 检查本地缓存是否存在
-  ├── rsync -avzP --partial ./data/datasets/{id}/ user@host:{remote_dataset_path}/{id}/
+  ├── rsync -avzP --partial ./data/datasets/{id}/ user@host:{remote_framework_root}/data/datasets/{id}/
   ├── 断点续传，网络中断可恢复
-  └── 上传完成 → 远程校验 → 创建软链接 → 完成
+  └── 上传完成 → 远程校验 → 创建项目软链接 → 完成
 
 Step 4: 用户协助（当 Step 2-3 均失败时）
   ├── 生成数据集获取报告（含官方链接、命令、目标路径）
@@ -714,10 +714,10 @@ Step 4: 用户协助（当 Step 2-3 均失败时）
 
 | 大小 | 推荐方式 | 命令 |
 |------|---------|------|
-| < 1 GB | rsync 直接上传 | `rsync -avzP ./data/datasets/{id}/ user@host:{path}/{id}/` |
-| 1-50 GB | rsync 断点续传 | `rsync -avzP --partial ./data/datasets/{id}/ user@host:{path}/{id}/` |
-| > 50 GB 或远程带宽更高 | 远程直接下载 | `ssh user@host "cd {path} && wget/curl ..."` |
-| > 100 GB 或权限受限 | 用户协助 | 生成报告，等待用户手动放置 |
+| < 1 GB | rsync 直接上传到远程公共缓存 | `rsync -avzP ./data/datasets/{id}/ user@host:{remote_framework_root}/data/datasets/{id}/` |
+| 1-50 GB | rsync 断点续传到远程公共缓存 | `rsync -avzP --partial ./data/datasets/{id}/ user@host:{remote_framework_root}/data/datasets/{id}/` |
+| > 50 GB 或远程带宽更高 | 远程公共缓存直接下载 | `ssh user@host "cd {remote_framework_root}/data/datasets/{id} && wget/curl ..."` |
+| > 100 GB 或权限受限 | 用户协助 | 生成报告，等待用户手动放置到远程公共缓存 |
 
 **禁止**：以"数据集太大"为由拒绝尝试任何传输/下载方式。
 
@@ -772,9 +772,12 @@ M3S04: Result Validation & Evidence Packaging
 ```
 
 **同步规则**：
-- **Push（本地→远程）**：代码、配置、requirements
+- **Push（本地→远程）**：仅同步当前项目执行所需内容（代码、配置、requirements）
+  - **不上传**：`skills/`、`docs/`、`templates/`、`tests/`、`*.md`、`.git/`
+  - **不上传**：`data/public_literature_db/`（公共文献数据库仅在本地维护）
+  - 数据集按需同步：仅同步当前实验需要的数据集子集到远程公共缓存，不批量上传全部本地数据
 - **Pull（远程→本地）**：results.tsv、日志、曲线、metric contract、验证报告
-- **排除项**：`__pycache__`、`*.pyc`、`.git`、大模型权重（`.pt`、`.pth`、`.ckpt`）、**数据集**
+- **排除项**：`__pycache__`、`*.pyc`、`.git`、大模型权重（`.pt`、`.pth`、`.ckpt`）
 - **结果同步策略**：
   - `metrics_only`：只同步指标和日志（推荐，节省带宽）
   - `all`：同步所有结果（包括大文件）

@@ -63,34 +63,48 @@ cd {framework_root} && {{download_command}}
 
 #### 策略 C：SSH 远程模式下的数据集准备
 
-当 `execution.mode == ssh` 时：
+当 `execution.mode == ssh` 时，远程采用与本地一致的框架结构，`framework_root` 默认指向 `~/AutoPaper2`。
 
-**Step 1: 检查远程服务器是否已有数据集**
+> **远程部署精简原则**：远程仅存放**项目代码**和**实验需要用到的数据集**。以下不上传：
+> - `data/public_literature_db/`（公共文献数据库仅在本地使用）
+> - `skills/`、`docs/`、`templates/`、`tests/`、`*.md`
+> - `.git/`、框架级非执行文件
+>
+> 数据集按需同步：仅当实验需要用到某个数据集时，才将其放入远程公共缓存，不批量上传全部本地数据集。
+
+**Step 1: 检查远程公共数据集缓存是否已有该数据集**
 ```bash
-ssh {user}@{host} "ls -la {remote_dataset_path}/{{id}}/ 2>/dev/null || echo 'NOT_FOUND'"
+# 优先检查远程框架公共缓存（~/AutoPaper2/data/datasets/<id>/）
+ssh {user}@{host} "ls -la {remote_framework_root}/data/datasets/{{id}}/ 2>/dev/null || echo 'NOT_FOUND'"
 ```
 
-**Step 2: 远程服务器直接下载（优先）**
+**Step 2: 如远程公共缓存已存在 → 直接创建项目软链接**
 ```bash
-# 在远程服务器上执行下载（利用服务器带宽和存储）
-ssh {user}@{host} "mkdir -p {remote_dataset_path}/{{id}} && cd {remote_dataset_path}/{{id}} && {{download_command}}"
+# 公共缓存命中，直接复用，无需重复下载
+ssh {user}@{host} "cd {workspace_path} && mkdir -p experiments/data && ln -s {remote_framework_root}/data/datasets/{{id}} experiments/data/{{id}}"
 ```
 
-**Step 3: 本地→远程传输（当远程无法直接下载时）**
+**Step 3: 如远程公共缓存不存在 → 远程服务器直接下载（优先）**
 ```bash
-# 使用 rsync 断点续传上传（适合已有本地缓存的场景）
+# 在远程服务器公共缓存目录执行下载（利用服务器带宽和存储，供所有项目复用）
+ssh {user}@{host} "mkdir -p {remote_framework_root}/data/datasets/{{id}} && cd {remote_framework_root}/data/datasets/{{id}} && {{download_command}}"
+
+# 下载完成后创建项目软链接
+ssh {user}@{host} "cd {workspace_path} && mkdir -p experiments/data && ln -s {remote_framework_root}/data/datasets/{{id}} experiments/data/{{id}}"
+```
+
+**Step 4: 本地→远程公共缓存传输（当远程无法直接下载时）**
+```bash
+# 使用 rsync 断点续传上传到远程公共缓存（本地有缓存的场景）
 rsync -avzP --partial \
     ./data/datasets/{{id}}/ \
-    {user}@{host}:{remote_dataset_path}/{{id}}/
+    {user}@{host}:{remote_framework_root}/data/datasets/{{id}}/
 
 # 验证传输完整性
-ssh {user}@{host} "cd {remote_dataset_path}/{{id}} && {{checksum_verify_cmd}}"
-```
+ssh {user}@{host} "cd {remote_framework_root}/data/datasets/{{id}} && {{checksum_verify_cmd}}"
 
-**Step 4: 远程项目配置数据集路径**
-```bash
-# 在远程项目中创建软链接或配置数据路径
-ssh {user}@{host} "cd {workspace_path} && mkdir -p experiments/data && ln -s {remote_dataset_path}/{{id}} experiments/data/{{id}}"
+# 创建项目软链接
+ssh {user}@{host} "cd {workspace_path} && mkdir -p experiments/data && ln -s {remote_framework_root}/data/datasets/{{id}} experiments/data/{{id}}"
 ```
 
 | 数据集大小 | 本地→远程传输方式 | 备注 |
@@ -167,7 +181,7 @@ ls -la experiments/data/{{id}}/
 
    ## 数据入库路径
    - 本地公共缓存: `{framework_root}/data/datasets/<id>/`
-   - SSH远程: `{remote_dataset_path}/<id>/`
+   - SSH远程公共缓存: `{remote_framework_root}/data/datasets/<id>/`（所有项目共享，优先复用）
 
    ## 下一步
    请将数据集放入上述路径后回复确认，我将继续执行 M3S01 后续步骤。

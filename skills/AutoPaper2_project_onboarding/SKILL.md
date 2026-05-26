@@ -88,7 +88,9 @@ Phase 4: 用户确认后验证
 - [ ] `ssh.auth_method`: key 或 password
 - [ ] `ssh.identity_file`: 私钥路径（如使用 key 认证）
 - [ ] `ssh.conda_env_name`: 远程 conda 环境名（如有）
-- [ ] `ssh.workspace_path`: 远程工作路径（默认: ~/autopaper2-projects/{project_name}）
+- [ ] `ssh.framework_root`: 远程框架根目录（默认: ~/AutoPaper2）
+- [ ] `ssh.workspace_path`: 远程工作路径（默认: ~/AutoPaper2/projects/{project_name}）
+- [ ] `ssh.dataset_path`: 远程公共数据集缓存路径（默认: ~/AutoPaper2/data/datasets）
 {{else}}
 当前为 **本地执行模式**，SSH 配置**无需填写**。请确认以下字段：
 - [ ] `local.env_name`: 本地环境名（默认: autopaper2-{project_name}）

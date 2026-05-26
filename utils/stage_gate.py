@@ -1743,7 +1743,9 @@ def _check_m3s01_execution_config(
             required = {
                 "host": "ssh host",
                 "user": "ssh user",
+                "framework_root": "ssh framework_root",
                 "workspace_path": "ssh workspace_path",
+                "dataset_path": "ssh dataset_path",
                 "env_manager": "ssh env_manager",
                 "python_version": "ssh python_version",
             }

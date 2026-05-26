@@ -136,7 +136,9 @@ class TestM3StageGate(unittest.TestCase):
             f"    user: '{ssh_user}'\n"
             "    port: 22\n"
             "    auth_method: key\n"
+            "    framework_root: '~/AutoPaper2'\n"
             f"    workspace_path: '{ssh_workspace_path}'\n"
+            "    dataset_path: '~/AutoPaper2/data/datasets'\n"
             "    env_manager: conda\n"
             "    python_version: '3.11'\n"
             "    sync:\n"
@@ -187,7 +189,7 @@ class TestM3StageGate(unittest.TestCase):
             if execution_mode == "ssh":
                 ledger_rows = (
                     "| dataset: demo | ssh remote | `ssh user@gpu.example 'wget -c https://example.test/demo.zip'` | completed | `experiments/logs/remote_download.log` | timeout=12h; poll_interval=30m; last_checked=2026-05-23T10:00:00 | `ssh user@gpu.example 'wget -c https://example.test/demo.zip'` | approved remote download | checksum passed |\n"
-                    "| sync: code | ssh remote | `rsync -avzP ./ user@gpu.example:/srv/autopaper2/demo/` | completed | `experiments/logs/rsync_push.log` | timeout=2h; poll_interval=10m | `rsync -avzP ./ user@gpu.example:/srv/autopaper2/demo/` | approved rsync upload | remote workspace ready |\n"
+                    "| sync: code | ssh remote | `rsync -avzP ./ user@gpu.example:~/AutoPaper2/projects/demo/` | completed | `experiments/logs/rsync_push.log` | timeout=2h; poll_interval=10m | `rsync -avzP ./ user@gpu.example:~/AutoPaper2/projects/demo/` | approved rsync upload | remote workspace ready |\n"
                 )
             else:
                 ledger_rows = (
@@ -344,7 +346,7 @@ class TestM3StageGate(unittest.TestCase):
             execution_mode="ssh",
             ssh_host="gpu.example",
             ssh_user="user",
-            ssh_workspace_path="/srv/autopaper2/demo",
+            ssh_workspace_path="~/AutoPaper2/projects/demo",
         )
 
         ok, messages = check_stage(self.root, "M3S01")
