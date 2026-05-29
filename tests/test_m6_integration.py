@@ -89,7 +89,7 @@ class TestM6StateFlow(unittest.TestCase):
             "venue": {"id": "arxiv", "name": "arXiv"},
         }
         state.set_stage("M6S06", "in_progress")
-        state.set_module_status("M5", "completed", "M5S08")
+        state.set_module_status("M5", "completed", "M5S09")
         state.set_module_status("M6", "in_progress", "M6S05")
 
         (proj / "knowledge" / "M6").mkdir(parents=True, exist_ok=True)
@@ -149,7 +149,7 @@ class TestM6StateFlow(unittest.TestCase):
             "- required_fix: clarify evidence provenance\n"
             "- success_criteria: reviewer evidence confusion is resolved\n"
             "- rebuild_mode: incremental_replay\n"
-            "- rerun_scope: M5S05 -> M5S08\n"
+            "- rerun_scope: M5S05 -> M5S06 -> M5S03 -> M5S07 -> M5S08 -> M5S09\n"
             "- priority: P1\n",
             encoding="utf-8",
         )
@@ -233,7 +233,7 @@ class TestM6StateFlow(unittest.TestCase):
                 "- required_fix: unrelated edit\n"
                 "- success_criteria: unrelated edit complete\n"
                 "- rebuild_mode: incremental_replay\n"
-                "- rerun_scope: M5S03 -> M5S08\n"
+                "- rerun_scope: M5S03 -> M5S07 -> M5S08 -> M5S09\n"
                 "- priority: P2\n",
                 encoding="utf-8",
             )

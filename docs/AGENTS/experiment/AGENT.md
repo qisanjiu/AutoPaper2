@@ -28,6 +28,7 @@
 - **结果记录**：系统性地保存所有原始结果和 git 历史
 - **错误处理**：识别和修复代码/运行中的问题
 - **可复现性**：确保实验可以被重新运行并得到相同结果
+- **资源调度**：探测 CPU/GPU，生成可执行资源计划，并监控实际利用率，避免多卡/多核闲置
 
 ---
 
@@ -52,6 +53,7 @@ Conductor 会提供：
 - 忠实实现 M2S03/M2S04 的方法设计
 - 搭建可复现的运行环境（依赖锁定）
 - 建立实验沙箱/容器隔离档案：`execution.sandbox` 与 `experiments/configs/sandbox_profile.yaml`
+- 生成 `experiments/configs/resource_plan.yaml`：记录可见硬件、实际分配、DDP/单卡/CPU 并行策略、DataLoader workers、线程数、启动命令模板和利用率阈值
 - 维护 `experiments/logs/m3s01_longrun_ledger.md`，记录长时间下载、上传、环境安装、checkpoint 获取、smoke run 的命令、日志、等待窗口、恢复命令和权限状态
 - 记录实现偏差（如有）
 - 同时把数据集、软链接、执行模式、硬件信息写清楚，供 M3S01 审查
@@ -70,6 +72,7 @@ Conductor 会提供：
 - 推进 Evidence Ladder（minimum → solid）
 - 记录所有尝试（包括失败的）
 - 记录主实验的结果表、与 baseline 的差异、负面结果和最终最优配置
+- 每个正式 run 必须生成 `experiments/runs/<run_id>/resource_monitor.csv` 或等价监控日志；若 GPU/CPU 利用率低于 plan 阈值，必须先优化或写明不可优化原因
 
 > **M3S04 由 Analysis Agent 执行**，Experiment Agent **不执行** M3S04。
 
@@ -201,6 +204,42 @@ checkpoint:
 - 环境快照
 ```
 
+### 5.1 Resource Utilization Contract（M3S01/M3S03 强制）
+
+M3 不允许只记录硬件而不使用硬件。Experiment Agent 必须把资源使用变成可复现的执行合同：
+
+**M3S01 资源规划**
+1. 读取 `config/execution_env.yaml` 中的 `execution.sandbox.resource_limits` 与 `execution.resource_optimization`。
+2. 运行本地或远程资源探测，并生成：
+   ```bash
+   python scripts/resource_planner.py plan --project . --output experiments/configs/resource_plan.yaml
+   ```
+   SSH 模式下应在远程 workspace 执行同等命令，并把 `resource_plan.yaml` 同步回本地。
+3. `resource_plan.yaml` 必须记录：
+   - 可见 GPU 数量、型号、显存；CPU 核数与内存
+   - 实际分配的 `gpu_ids`、`gpu_count`、`cpu_cores`
+   - `distributed_data_parallel` / `single_gpu` / `cpu_parallel` / `task_parallel` 策略
+   - `CUDA_VISIBLE_DEVICES`、`OMP_NUM_THREADS`、`MKL_NUM_THREADS`
+   - DataLoader / input pipeline 参数：`num_workers`、`pin_memory`、`persistent_workers`、`prefetch_factor`
+   - 启动命令模板与监控阈值
+
+**M3S03 执行策略**
+- 如果 `resource_plan.yaml` 显示 `gpu_count >= 2`，默认使用 `torchrun --nproc_per_node=<gpu_count>` / DDP。不得通过多 seed 重复实验来填满资源；如果 DDP 不适用，必须记录替代资源策略和原因。
+- 如果只有 1 张 GPU 但 CPU 核数充足，必须优化 input pipeline：自动设置 `num_workers`、`pin_memory`、`persistent_workers`，并通过 batch size / mixed precision warmup 提高吞吐。
+- 如果 GPU 利用率低但显存未满，优先尝试增大 batch size、启用 AMP、增大 DataLoader workers、预取、缓存预处理结果。
+- 如果 CPU-only，必须使用多进程/多线程或数据加载并行填满 CPU 预算；不得通过多 seed 重复实验来制造并行工作量。
+- Baseline 与 ours 必须使用相同或公平记录的资源策略；如果资源不同，必须在 `M3S03_main_experiment.md` 和 `results.tsv` 中标注。
+
+**利用率监控与处置**
+- 每个正式 run 必须记录 `experiments/runs/<run_id>/resource_monitor.csv`，可用：
+  ```bash
+  python scripts/resource_planner.py run \
+    --output experiments/runs/<run_id>/resource_monitor.csv \
+    --interval 10 -- <resolved training command>
+  ```
+- 如果连续 10 分钟低于阈值（默认 GPU < 70% 或 CPU < 60%），必须执行一次优化 pass；若仍低，写入 `low_utilization_reason`，说明是数据 I/O、模型过小、框架限制、DDP 不兼容、远程配额限制还是实验公平性限制。
+- Stage Review 应把缺失 `resource_plan.yaml`、正式 run 无监控日志、或多 GPU/多核闲置且无原因记录视为 REVISE/BACKTRACK。
+
 ---
 
 ## 6. Evidence Ladder（M3S03）
@@ -210,8 +249,8 @@ checkpoint:
 | 层级 | 目标 | 判定标准 | 后续动作 |
 |------|------|---------|---------|
 | **minimum** | 可执行、可比较 | 代码运行完成，指标可计算，与 baseline 可比 | 继续推进到 solid |
-| **solid** | 足以支撑主声明 | 主指标显著优于 baseline（统计显著 + 实际意义） | 可进入 M3S04 |
-| **maximum** | 全面抛光 | 多 seed（至少 3）、多数据集、完整曲线、消融预留 | 留给 M4/M5，不在 M3 追求 |
+| **solid** | 足以支撑主声明 | 固定 seed=42 下主指标优于 baseline，且差异有实际意义 | 可进入 M3S04 |
+| **maximum** | 全面抛光 | 更多数据集、完整曲线、消融预留 | 留给 M4/M5，不在 M3 追求 |
 
 **规则**：
 - 不在 minimum 达标前追求 maximum
@@ -258,6 +297,7 @@ Iteration Loop:
 |------|------|---------|
 | `data_contract_mismatch` | 数据格式/划分与预期不符 | 检查预处理管道 |
 | `resource_exhausted` | OOM、超时、存储不足 | 降低 batch size、简化模型 |
+| `resource_underutilized` | GPU/CPU 长时间低利用率、多卡/多核闲置 | 按 `resource_plan.yaml` 切换 DDP/任务并行、调 batch/num_workers/AMP；无法优化时记录原因 |
 | `numeric_instability` | NaN/Inf、梯度爆炸 | 检查 loss 设计、添加梯度裁剪 |
 | `implementation_bug` | 代码逻辑错误 | 回溯到 M3S01 修复 |
 | `evaluation_pipeline_failure` | 评估脚本错误 | 检查 evaluate.py |
@@ -291,7 +331,7 @@ Iteration Loop:
 
 1. 根据 required_fix 重新执行主实验或补跑统计：
    - 若问题是 "结果未达 minimum/solid" → 检查实现偏差，调整超参数，重新运行。
-   - 若问题是 "统计不显著" → 增加 seed 数量或调整实验配置。
+   - 若问题是 "固定 seed=42 下结果不支持结论" → 调整实验配置或回溯方法设计，不通过增加 seed 数量补救。
    - 若问题是 "与 baseline 对比不公平" → 检查是否误改了 baseline 代码，修正后重跑。
 2. 保留旧 run 记录（git history + `experiments/runs/`），但以新 run contract / baseline contract 为准。
 3. 更新 `knowledge/M3/M3S03_main_experiment.md` 和 `experiments/results.tsv`。
@@ -442,6 +482,7 @@ Step 4: 需要用户协助的上传/传输场景
 - local 模式必须确认 `execution.local.env_manager` 为 `conda` / `venv` / `uv` / `docker`，且 `execution.local.python_version` 非空
 - ssh 模式必须确认 `execution.ssh.host`、`user`、`workspace_path`、`env_manager`、`python_version`、`sync.method` 非空，且 `sync.method` 为 `rsync` 或 `scp`
 - 确认 `execution.sandbox.enabled == true`，并读取 `sandbox.mode`、网络、文件系统、凭证、资源限制和可复现性策略
+- 确认 `execution.resource_optimization.enabled == true`，并读取 target GPU/CPU、并行策略、DataLoader autotune 和监控阈值
 - ssh 模式必须使用 `sandbox.mode: ssh_remote`；local 模式不得使用 `ssh_remote`
 
 **Step 2: 创建隔离环境**
@@ -468,6 +509,7 @@ Step 4: 需要用户协助的上传/传输场景
 - 检测并记录硬件信息（GPU型号、显存、CPU核心数）
 - 回填 `config/execution_env.yaml` 的 hardware 字段
 - 生成/更新 `experiments/configs/sandbox_profile.yaml`
+- 生成/更新 `experiments/configs/resource_plan.yaml`，并把启动命令模板、DDP/任务并行策略、DataLoader 参数、资源利用率阈值写入 M3S01 产出
 
 ### 10.1.1 实验沙箱 / 容器隔离档案（M3/M4 强制）
 
@@ -484,6 +526,7 @@ experiments/configs/sandbox_profile.yaml
 - `filesystem_policy`: 明确 `allowed_write_paths` 和 `denied_paths`
 - `secrets_policy`: 禁止实验脚本读取或打印 SSH key、API key、token、password
 - `resource_limits`: timeout、CPU、memory、GPU 上限
+- `resource_optimization`: target GPU/CPU、DDP/任务并行策略、DataLoader autotune、利用率监控阈值
 - `reproducibility`: `requirements.lock`、Docker image/digest（如适用）、seed policy
 
 执行原则：
@@ -610,19 +653,19 @@ Ledger 每条记录必须包含 execution mode、command、status、log path、p
 ## 11. 质量标准
 
 - 代码必须能在干净环境中复现运行
-- 随机种子必须固定且记录
+- 随机种子必须固定为 42 且记录
 - 所有超参数必须保存在配置文件中
 - 原始结果数据必须完整保存
 - **git 历史必须清晰**：每个实验尝试都是一个独立的 commit
 - **results.tsv 必须完整**：记录每次尝试的决策和原因
-- 多 seed 实验的原始结果都要保存
+- 固定 seed=42 的原始结果必须保存
 - Baseline 代码在本次 Stage 中只读（M3S03）
 
 ---
 
 ## 12. 常见陷阱
 
-- **陷阱 1**：随机种子未固定 → 每次运行结果不同
+- **陷阱 1**：随机种子未固定为 42 → 结果不可复现
 - **陷阱 2**：数据泄露 → 验证集信息间接用于训练
 - **陷阱 3**：结果未完整保存 → 只保存了平均值，丢了原始数据
 - **陷阱 4**：代码硬编码路径 → 在其他环境无法运行
@@ -640,6 +683,7 @@ Ledger 每条记录必须包含 execution mode、command、status、log path、p
 - **陷阱 16**：**数据集未就绪就开始写代码** → 代码可能在错误假设下编写
 - **陷阱 17**：长时间下载/上传/模型运行没有 ledger → M3S01 审查无法判断是否真正等待、重试、恢复或申请权限
 - **陷阱 18**：没有 sandbox/container profile 就运行 LLM 生成代码 → 无法约束文件写入、网络、凭证和资源，必须补 `execution.sandbox` 与 `sandbox_profile.yaml`
+- **陷阱 19**：多 GPU/多核机器仍串行单进程运行 → 必须生成 `resource_plan.yaml`，使用 DDP 或 seed/config 并行，并记录 `resource_monitor.csv`
 
 ---
 

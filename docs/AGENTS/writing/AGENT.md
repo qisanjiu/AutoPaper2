@@ -2,7 +2,7 @@
 
 > **角色**: 学术论文写作专家
 > **目标**: 将研究成果转化为结构清晰、论证严谨、符合 venue 规范的学术论文
-> **负责阶段**: M5S02-M5S08
+> **负责阶段**: M5S02-M5S08/M5S09（执行顺序为 M5S02 → M5S04 → M5S05 → M5S06 → M5S03 → M5S07 → M5S08 → M5S09）
 > **绝不**: 编造数据、虚构引用、夸大结论、泄露作者信息
 
 ---
@@ -34,7 +34,7 @@
 ### 3.1 输入
 
 Conductor 会提供：
-- 当前 stage（M5S02-M5S08）
+- 当前 stage（M5S02-M5S08/M5S09）
 - 上游输入文档路径（由 conductor_helper.py 解析）
 - **Venue 信息**：从 `state/pipeline_state.yaml` 读取
 - Venue 模板文件位于 `artifacts/latex_template/` 目录下
@@ -52,10 +52,6 @@ Conductor 会提供：
 
 包含：venue 配置、Style & Layout Profile、标题候选、plotting plan、terminology table、section plan、story spine、anticipated objections。
 
-**M5S03: Introduction & Related Work** → `knowledge/M5/M5S03_introduction_relatedwork.md`
-
-使用 LaTeX 格式（section 环境）。
-
 **M5S04: Methodology** → `knowledge/M5/M5S04_methodology.md`
 
 必须包含：问题形式化、方法概述、核心组件、算法框/伪代码、架构图/机制图清单、图像 backend 记录、理论分析（如有）。
@@ -68,6 +64,10 @@ Conductor 会提供：
 
 深入解读（"So what?"）、消融整合、Limitations、负面结果。
 
+**M5S03: Introduction & Related Work** → `knowledge/M5/M5S03_introduction_relatedwork.md`
+
+在 M5S04-M5S06 之后执行，使用 LaTeX 格式（section 环境），故事线必须基于已锁定的 Method/Experiments/Analysis。
+
 **M5S07: Abstract & Conclusion** → `knowledge/M5/M5S07_abstract_conclusion.md`
 
 Abstract 有具体数值。Conclusion 无新内容。
@@ -75,6 +75,10 @@ Abstract 有具体数值。Conclusion 无新内容。
 **M5S08: Full Draft Assembly** → `artifacts/paper.tex` + `artifacts/paper.pdf`
 
 整合所有 section，生成完整 LaTeX，调用 Build Verifier 编译。
+
+**M5S09: Full-Polish & Narrative Coherence Review** → `knowledge/M5/M5S09_full_polish.md`
+
+读取 M5S08 生成的 `artifacts/paper.tex` 和 `artifacts/paper.pdf` 做最终润色。`paper.tex` 是唯一可编辑真源，`paper.pdf` 只用于渲染/版面检查；所有修订必须落到 `paper.tex`，然后重新编译更新 `paper.pdf`。
 
 ---
 
@@ -135,7 +139,7 @@ Profile 至少包含：
 - 图表与 appendix 的布局约束
 - 与目标 venue 模板冲突时的优先级规则
 
-后续 M5S03-M5S08 必须读取并遵循该 Profile。
+后续 M5S03-M5S08/M5S09 必须读取并遵循该 Profile。
 
 ### 5.5 M5S02 必须产出 Figure Style Profile
 
@@ -218,12 +222,12 @@ python scripts/generate_image.py "editable draw.io mechanism diagram for [method
 
 ## 8. 单次多 Section 写作策略
 
-参考 PaperOrchestra 的设计，Writing Agent 在 M5S03-M5S07 阶段可以选择以下两种模式之一：
+参考 PaperOrchestra 的设计，Writing Agent 在 M5S04-M5S06、M5S03、M5S07 阶段可以选择以下两种模式之一：
 
 **模式 A（分阶段）**：每个 stage 写一个 section（推荐，与 AutoPaper2 的 stage 结构一致）
-**模式 B（单次调用）**：在 M5S03-M5S07 的某个 stage 中一次写多个 section（适用于上下文充裕时）
+**模式 B（单次调用）**：在 M5 section-writing stage 中一次写多个 section（适用于上下文充裕时）
 
-默认使用模式 A。如果上下文被压缩，可以在 M5S08 重新整合时统一风格。
+默认使用模式 A。M5S08 负责组装和初次编译完整稿；M5S09 负责基于 `paper.tex` / `paper.pdf` 的最终润色与复编译。
 
 ---
 
@@ -255,7 +259,7 @@ python scripts/generate_image.py "editable draw.io mechanism diagram for [method
 | **Related Work 像文献列表** | 只有罗列没有批判 | 必须有对比和批判 |
 | **结果部分只是表格** | 没有分析和解释 | 必须有对结果的深入解读 |
 | **夸大贡献** | 声称超出实验证据的结论 | 必须诚实评估，claim 必须有证据 |
-| **跳过 M5S03-M5S07** | 直接让 M5S08 "替代"生成 | M5S02-M5S07 是强制阶段，M5S08 只负责整合 |
+| **跳过 M5S03-M5S08/M5S09** | 直接让 M5S09 "替代"生成 | M5S02-M5S09 是强制阶段，M5S08 负责整合，M5S09 负责最终润色 |
 | **分段多次调用导致风格不一致** | 各 section 术语不统一 | 在各 section 中使用统一的术语表和风格指南 |
 | **风格蒸馏变成文本模仿** | 复用参照论文措辞或段落模板 | 只抽取结构和排版规律，禁止原文复用 |
 | **修改后评分反而下降** | 遵循 halt rules，勇于 revert | 严格执行 Accept/Revert 规则（在 Peer Review 阶段） |
@@ -285,11 +289,11 @@ python scripts/generate_image.py "editable draw.io mechanism diagram for [method
    - 检查 `refs.bib` 的完整性和 orphan cite 风险
    - 确认当前处于哪个 stage
 
-5. **读取全局配置文件**（M5S02 和 M5S08 阶段强制）
+5. **读取全局配置文件**（M5S02、M5S08 和 M5S09 阶段强制）
    - Venue 配置：`config/venue_registry.yaml`
    - Venue 模板：`artifacts/latex_template/` 目录下的 `.sty`/`.cls`/`.bst` 文件
    - Style & Layout Profile：`knowledge/M5/M5S02_paper_outline.md`
 
 6. **读取最近的产出文档**
-   - 确认 M5S02-M5S07 各 section 的当前状态
+   - 确认 M5S02-M5S08/M5S09 各 section 的当前状态
    - 如果是修订阶段，确认上一轮修改的内容

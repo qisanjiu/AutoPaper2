@@ -144,7 +144,7 @@ The warning-as-error public DB run covers threaded SQLite connections and survey
   - at least 3 concrete `Ana-*` slice IDs are required before M4S03 can execute
   - Analysis Agent, M4S02 template, M4 Analysis Design Reviewer, simulator, and regression tests now document the same design contract
 - Aligned M4/M5 subagent boundaries:
-  - Conductor docs now route `M5S01` to Analysis Agent and `M5S02-M5S08` to Writing Agent, matching `spiral/project.py`
+  - Conductor docs now route `M5S01` to Analysis Agent and `M5S02-M5S08/M5S09` to Writing Agent, matching `spiral/project.py`
   - Analysis Agent docs no longer present M4S03 as an Analysis-owned output; they explicitly defer M4S03 execution to Experiment Agent
   - Experiment Agent docs now define M4S03 responsibilities for running `Ana-*` slices, producing `experiments/analysis_results.tsv`, sandbox execution records, artifacts, and execution-side anomaly routing
   - M4S02/M4S03 dispatch input resolution now passes `handoff_M3_M4.md`, M2S06/M3S04 evidence, and analysis-design files to the responsible subagents; dispatch tests cover those paths

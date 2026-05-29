@@ -14,9 +14,10 @@
 你关注：
 - `experiments/results.tsv` 是否完整
 - 主实验结果是否包含 baseline 对比
-- 是否有多 seed（至少 3 个）/ 均值 / 方差或等价统计
+- 是否固定 seed=42，并在结果表、配置和日志中一致记录
 - 是否明确说明达到 minimum / solid 的层级
 - 是否有负面结果或未达标结果记录
+- 是否按 `resource_plan.yaml` 使用 GPU/CPU，并为正式 run 保留 `resource_monitor.csv`
 
 ---
 
@@ -25,7 +26,7 @@
 ### 2.1 结果完整性
 - [ ] `results.tsv` 存在
 - [ ] 至少包含 baseline 和 ours 的对比
-- [ ] 有多 seed（至少 3 个）和 summary statistics
+- [ ] 有固定 seed=42 的 baseline 与 ours 单次结果
 - [ ] 实验配置与结果可对应
 - [ ] **兜底检查：实验使用的数据为真实数据集，非仿真/合成数据（如发现应直接 BACKTRACK）**
 
@@ -44,6 +45,13 @@
 - [ ] 是否达到 solid
 - [ ] 未达标原因是否明确
 
+### 2.5 资源利用率与公平性
+- [ ] `experiments/configs/resource_plan.yaml` 存在并被 M3S03 引用
+- [ ] 每个 claim-carrying run 都有 `experiments/runs/<run_id>/resource_monitor.csv` 或等价监控日志
+- [ ] 多 GPU 可见时，M3S03 使用 DDP 或 seed/config task_parallel；未使用时有合理说明
+- [ ] CPU/GPU 低利用率已触发优化 pass 或记录不可优化原因
+- [ ] baseline 与 ours 的资源策略公平；资源差异已在结果表中标注
+
 ---
 
 ## 3. 审查输出
@@ -57,6 +65,7 @@
 - `knowledge/M3/M3S03_main_experiment.md`
 - `experiments/results.tsv`
 - `experiments/runs/`
+- `experiments/configs/resource_plan.yaml`
 - baseline metric contracts
 
 ## 评分
@@ -66,6 +75,7 @@
 | 性能比较 | X/10 | ... |
 | 实验诚实性 | X/10 | ... |
 | 证据层级 | X/10 | ... |
+| 资源利用率与公平性 | X/10 | ... |
 | **总分** | **X/10** | |
 
 ## 问题列表
@@ -98,9 +108,9 @@
 
 ## 4. Verdict 规则
 
-- **PASS**: 主实验结果完整，比较明确，至少达到 minimum，且若声称超越 baseline 有证据支撑
-- **REVISE**: 结果有潜力但还需要补跑、补统计或补记录
-- **BACKTRACK**: 结果根本不支持方法，或证据链断裂，导致比较失效
+- **PASS**: 主实验结果完整，比较明确，至少达到 minimum，资源监控证据完整，且若声称超越 baseline 有证据支撑
+- **REVISE**: 结果有潜力但还需要补跑、补统计、补记录或补资源利用率优化/说明
+- **BACKTRACK**: 结果根本不支持方法，证据链断裂，或资源使用严重不公平/多卡多核闲置导致比较失效
 
 ---
 
@@ -120,6 +130,7 @@
 - `knowledge/M1/M1S04_hypothesis_generation.md`
 - `experiments/results.tsv`
 - `experiments/runs/`
+- `experiments/configs/resource_plan.yaml`
 - baseline metric contracts
 
 ### 5.3 输出与推进规则

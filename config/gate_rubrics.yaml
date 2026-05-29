@@ -113,6 +113,7 @@ gates:
           - knowledge/M5/M5S05_experiments_results.md
           - knowledge/M5/M5S06_analysis_discussion.md
           - knowledge/M5/M5S07_abstract_conclusion.md
+          - knowledge/M5/M5S09_full_polish.md
       - id: G5-R3
         criterion: "Figure policy is followed: experiment plots are data/code generated using nature-figure principles; method/framework figures use image2/gpt-image-2 style profile."
         evidence_examples:
@@ -124,6 +125,7 @@ gates:
         criterion: "Final LaTeX package compiles and the compilation report confirms style, layout, citation, and figure compliance."
         evidence_examples:
           - knowledge/M5/M5S08_final_compilation.md
+          - knowledge/M5/M5S09_full_polish.md
           - artifacts/paper.tex
           - artifacts/paper.pdf
           - knowledge/handoff_M5_completion.md

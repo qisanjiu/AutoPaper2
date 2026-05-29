@@ -3,7 +3,7 @@
 > **Stage**: M3S01
 > **Agent**: Experiment Agent
 > **输入**: `knowledge/handoff_M2_M3.md`, `knowledge/M2/M2S03_method_architecture.md`, `knowledge/M2/M2S04_algorithm_theory.md`, `knowledge/M2/M2S05_experiment_setup.md`（旧项目可使用等价的 `M2S03_methodology_design.md`, `M2S04_experiment_setup.md`, `M2S05_full_experiment_plan.md`）
-> **输出**: `knowledge/M3/M3S01_implementation.md` + `experiments/src/*.py` + `experiments/configs/*.yaml` + `experiments/requirements.lock` + `experiments/logs/m3s01_longrun_ledger.md`
+> **输出**: `knowledge/M3/M3S01_implementation.md` + `experiments/src/*.py` + `experiments/configs/*.yaml` + `experiments/configs/resource_plan.yaml` + `experiments/requirements.lock` + `experiments/logs/m3s01_longrun_ledger.md`
 >
 > **审查重点**: 数据集可获取性、公共缓存/软链接、执行环境、依赖锁定、硬件回填、运行命令与配置完整性
 
@@ -218,6 +218,9 @@ ls -la experiments/data/{{id}}/
 | sandbox.mode | docker / conda / venv / uv / ssh_remote | local 不得为 ssh_remote；ssh 必须为 ssh_remote |
 | sandbox.network_policy | disabled / restricted / open | ... |
 | sandbox.resource_limits | timeout / CPU / memory / GPU | ... |
+| resource_optimization.enabled | true / false | 必须为 true |
+| resource_optimization.gpu_strategy | auto / ddp / task_parallel / single | ... |
+| resource_optimization.monitoring | interval / GPU阈值 / CPU阈值 | ... |
 
 ### 1.2 远程配置（如 mode = ssh）
 
@@ -275,12 +278,31 @@ sandbox:
     timeout_hours: 24
     max_cpu_cores: 16
     max_memory_gb: 64
-    max_gpu_count: 1
+    max_gpu_count: all_visible
   reproducibility:
     requirements_lock: experiments/requirements.lock
     image: ""          # docker 模式必须填写
     image_digest: ""   # docker 模式建议填写
-    seed_policy: fixed_multi_seed
+    seed_policy: fixed_seed_42
+resource_optimization:
+  enabled: true
+  target_gpu_count: all_visible
+  target_cpu_cores: auto
+  gpu_strategy: auto
+  cpu_strategy: dataloader_and_task_parallel
+  dataloader:
+    auto_num_workers: true
+    max_workers: 16
+    pin_memory: auto
+    persistent_workers: auto
+    prefetch_factor: 2
+  monitoring:
+    enabled: true
+    interval_seconds: 10
+    min_gpu_utilization_pct: 70
+    min_cpu_utilization_pct: 60
+    plan_path: experiments/configs/resource_plan.yaml
+    monitor_path_template: experiments/runs/{run_id}/resource_monitor.csv
 ```
 
 记录到 `knowledge/M3/M3S01_implementation.md`：
@@ -291,7 +313,36 @@ sandbox:
 - CPU/GPU/内存/timeout 限制
 - Docker image / conda env / venv / uv / ssh_remote workspace 的可复现标识
 
-### 1.5 长任务、权限与等待策略（必须记录）
+### 1.5 资源规划（必须记录）
+
+M3S01 必须生成 `experiments/configs/resource_plan.yaml`，让 M3S03 有明确的资源执行合同，而不是临时手写命令。
+
+```bash
+python scripts/resource_planner.py plan --project . --output experiments/configs/resource_plan.yaml
+```
+
+SSH 模式下应在远程 workspace 运行同等命令，并将结果同步回本地。
+
+**Resource Plan 摘要**:
+
+| 项目 | 内容 |
+|------|------|
+| 可见 GPU | 数量 / 型号 / 显存 |
+| 分配 GPU | `gpu_count`, `gpu_ids` |
+| 分配 CPU | `cpu_cores` |
+| 设备策略 | distributed_data_parallel / single_gpu / cpu_parallel / task_parallel |
+| DataLoader | `num_workers`, `pin_memory`, `persistent_workers`, `prefetch_factor` |
+| 线程环境变量 | `OMP_NUM_THREADS`, `MKL_NUM_THREADS` |
+| 启动命令模板 | `torchrun ...` / `python ...` |
+| 监控阈值 | GPU 利用率阈值 / CPU 利用率阈值 |
+
+**如未使用全部可见 GPU/CPU，必须说明原因**:
+
+| 未使用资源 | 原因 | 对公平性的影响 | 后续策略 |
+|-----------|------|----------------|----------|
+| GPU {{id}} / CPU cores | DDP 不兼容 / 显存不足 / 配额限制 / baseline 公平性 | ... | task_parallel / 降级单卡 / 等待用户 |
+
+### 1.6 长任务、权限与等待策略（必须记录）
 
 M3S01 必须创建并维护 `experiments/logs/m3s01_longrun_ledger.md`。凡是数据下载、远程上传、环境创建、依赖安装、checkpoint 拉取、smoke run 等可能超过 10 分钟的任务，都必须写入 ledger；不得以"太大"、"太慢"、"需要等待"为由跳过。
 
@@ -388,7 +439,7 @@ cpu_cores: 16
 
 ## 5. 可复现性检查清单
 
-- [ ] 随机种子已固定（`random.seed`, `np.random.seed`, `torch.manual_seed`, `torch.cuda.manual_seed_all`）
+- [ ] 随机种子已固定为 42（`random.seed(42)`, `np.random.seed(42)`, `torch.manual_seed(42)`, `torch.cuda.manual_seed_all(42)`）
 - [ ] 所有超参数保存在配置文件中，无硬编码
 - [ ] 代码通过语法检查（可导入，无 NameError）
 - [ ] README 包含完整的运行命令

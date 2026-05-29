@@ -112,7 +112,7 @@ Phase 0: 进入 M3 前置检查
 
 Phase 1: M3S01 Dataset & Environment Review / Setup
   → Experiment Agent 执行
-  → 产出: knowledge/M3/M3S01_implementation.md + experiments/src/ + experiments/configs/ + experiments/requirements.lock + experiments/configs/sandbox_profile.yaml + experiments/logs/m3s01_longrun_ledger.md
+  → 产出: knowledge/M3/M3S01_implementation.md + experiments/src/ + experiments/configs/ + experiments/requirements.lock + experiments/configs/sandbox_profile.yaml + experiments/configs/resource_plan.yaml + experiments/logs/m3s01_longrun_ledger.md
   → Stage Review: m3_dataset_env_review → knowledge/reviews/M3S01_dataset_env_review.md
   → Review verdict 必须为 PASS；否则 Conductor 调用 backtrack() 后，**必须重新调用 Experiment Agent subagent 修正/重新执行 M3S01；主 agent 禁止直接修改**
   → Conductor advance: M3S01 → M3S02
@@ -126,7 +126,7 @@ Phase 2: M3S02 Baseline Result Review
 
 Phase 3: M3S03 Main Experiment Result Review
   → Experiment Agent 执行
-  → 产出: knowledge/M3/M3S03_main_experiment.md + experiments/results.tsv + experiments/runs/
+  → 产出: knowledge/M3/M3S03_main_experiment.md + experiments/results.tsv + experiments/runs/ + 每个正式 run 的 resource_monitor.csv
   → Stage Review: m3_main_result_review → knowledge/reviews/M3S03_main_result_review.md
   → Review verdict 必须为 PASS；否则 Conductor 调用 backtrack() 后，**必须重新调用 Experiment Agent subagent 修正/重新执行 M3S03；主 agent 禁止直接修改**
   → Conductor advance: M3S03 → M3S04
@@ -197,20 +197,21 @@ Phase 6: Handoff & 完成
 1. **数据集获取铁律（M3S01）**: **真实数据是唯一合法输入**。绝对禁止用仿真/合成/随机数据替代真实数据集。大数据集同样必须尝试下载或传输。无法自动获取时必须生成报告阻塞等待用户，严禁绕过。
 2. **长任务等待与权限 Ledger（M3S01）**: 任何长时间下载、上传、远程环境创建、依赖安装、checkpoint 获取或 smoke run 都必须记录到 `experiments/logs/m3s01_longrun_ledger.md`，包含命令、状态、日志路径、等待/轮询策略、恢复命令、权限/批准状态和完成标准；禁止以"太大/太慢/需要等"为由跳过。
 3. **Sandbox / Container Profile（M3/M4）**: `execution.sandbox.enabled` 必须为 true，且必须生成 `experiments/configs/sandbox_profile.yaml`，记录网络、文件系统、凭证、资源限制和可复现性边界；禁止无隔离运行 LLM 生成实验代码。
-4. **Comparator-First（M3S02）**: 优先 attach/import/verify-local-existing，非必要不 reproduce。Baseline 若依赖预训练权重，必须主动搜索并获取 checkpoint（GitHub Releases、README、HuggingFace、自动下载等），禁止跳过或用随机初始化替代。
-5. **Baseline 只读（M3S03）**: 主实验阶段 baseline 代码只读，确保比较公平
-6. **Run Contract 锁定（M3S03）**: 实验开始前明确记录问题、假设、指标、停止条件
-7. **Evidence Ladder（M3S03）**: 明确区分 minimum/solid/maximum，不超前追求
-8. **诚实性（M3S04）**: KEEP 是唯一通过决策，结果不支持假设时必须 FIX/BACKTRACK
-9. **负面结果记录**: 所有迭代尝试（包括失败的）都必须记录
-10. **回溯连续性**: 前序 stage 被修改后，后续依赖它的实验上下文必须重新生成；局部修复可增量复用，方向偏差大时必须全量重建
+4. **Resource Utilization Contract（M3S01/M3S03）**: 必须生成 `experiments/configs/resource_plan.yaml`，把可见 GPU/CPU 转成 DDP/单卡/CPU 并行/任务并行策略；M3S03 每个正式 run 必须记录 `resource_monitor.csv`，低利用率必须优化或说明不可优化原因。
+5. **Comparator-First（M3S02）**: 优先 attach/import/verify-local-existing，非必要不 reproduce。Baseline 若依赖预训练权重，必须主动搜索并获取 checkpoint（GitHub Releases、README、HuggingFace、自动下载等），禁止跳过或用随机初始化替代。
+6. **Baseline 只读（M3S03）**: 主实验阶段 baseline 代码只读，确保比较公平
+7. **Run Contract 锁定（M3S03）**: 实验开始前明确记录问题、假设、指标、停止条件
+8. **Evidence Ladder（M3S03）**: 明确区分 minimum/solid/maximum，不超前追求
+9. **诚实性（M3S04）**: KEEP 是唯一通过决策，结果不支持假设时必须 FIX/BACKTRACK
+10. **负面结果记录**: 所有迭代尝试（包括失败的）都必须记录
+11. **回溯连续性**: 前序 stage 被修改后，后续依赖它的实验上下文必须重新生成；局部修复可增量复用，方向偏差大时必须全量重建
 
 ## Handoff 文档
 
 M3 完成后必须产出 `knowledge/handoff_M3_M4.md`，核心内容：
 - 已完成的工作摘要
 - 关键决策记录（实现框架、baseline 路径、最终配置、M3S04 决策）
-- 传递给 M4 的核心信息（主实验结果、假设验证状态、统计显著性、evidence artifact 路径、关键发现、已知限制、建议的 M4 分析方向）
+- 传递给 M4 的核心信息（固定 seed=42 主实验结果、假设验证状态、evidence artifact 路径、关键发现、已知限制、建议的 M4 分析方向）
 - 回溯历史
 
 ## 状态管理规范
@@ -237,9 +238,9 @@ state.set_stage("M3S02", "in_progress")
 
 | 节点 | 检查项 | 失败处理 |
 |------|--------|---------|
-| M3S01 完成后 | 数据集、环境、依赖、硬件信息完整；review PASS | REVISE / BACKTRACK → M3S01 |
+| M3S01 完成后 | 数据集、环境、依赖、硬件信息、sandbox profile、resource plan 完整；review PASS | REVISE / BACKTRACK → M3S01 |
 | M3S02 完成后 | baseline 本地验证、metric contract、smoke test、review PASS | REVISE / BACKTRACK → M3S02 / M3S01 |
-| M3S03 完成后 | `results.tsv` 完整、3 seeds、baseline 对比、review PASS | REVISE / BACKTRACK → M3S03 / M3S02 |
+| M3S03 完成后 | `results.tsv` 完整、固定 seed=42、baseline 对比、resource_monitor 完整、review PASS | REVISE / BACKTRACK → M3S03 / M3S02 |
 | M3S04 完成后 | 统计分析、最终决策、回溯建议完整 | FIX / BACKTRACK → M3S03 / M3S02 / M3S01 |
 | Gate G3 | Method Critic + Evidence Critic 双 PASS | BACKTRACK → 指定 M3 stage |
 

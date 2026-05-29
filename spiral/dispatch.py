@@ -284,6 +284,7 @@ def _m6_internal_review_inputs(root: Path, base_inputs: list[str]) -> list[str]:
         root / "knowledge" / "M3" / "M3S03_main_experiment.md",
         root / "knowledge" / "M3" / "M3S04_result_validation.md",
         root / "knowledge" / "M4" / "M4S04_analysis_results.md",
+        root / "knowledge" / "M5" / "M5S09_full_polish.md",
         root / "knowledge" / "M5" / "M5S08_final_compilation.md",
         root / "knowledge" / "handoff_M5_completion.md",
     ]

@@ -79,6 +79,9 @@ _STAGE_REVIEW_REQUIREMENTS: dict[str, dict[str, str]] = {
     "M5S07": {
         "m5_abstract_conclusion_review": "knowledge/reviews/M5S07_abstract_conclusion_review.md",
     },
+    "M5S09": {
+        "m5_full_polish_review": "knowledge/reviews/M5S09_full_polish_review.md",
+    },
     "M5S08": {
         "m5_final_compilation_review": "knowledge/reviews/M5S08_final_compilation_review.md",
     },
@@ -943,8 +946,8 @@ def _check_m2s05_experiment_design(text: str) -> tuple[bool, list[str]]:
         "related-work protocol reference": ("相关工作实验设置", "related work experiment", "reference protocol", "参考论文"),
         "per-experiment purpose/hypothesis": ("目的", "purpose", "目标假设", "实验目标"),
         "fairness constraints": ("相同的数据划分", "same split", "公平", "fairness", "相同的评估指标"),
-        "random seeds": ("随机种子", "seed"),
-        "statistical test": ("统计检验", "t-test", "wilcoxon", "bootstrap", "显著性"),
+        "fixed seed": ("随机种子", "seed", "42"),
+        "single-run validation": ("单次", "fixed seed", "seed=42", "42"),
         "reproducibility checklist": ("可复现", "reproducibility", "requirements", "git commit"),
     }
     for label, terms in required_signals.items():
@@ -953,6 +956,12 @@ def _check_m2s05_experiment_design(text: str) -> tuple[bool, list[str]]:
             ok = False
         else:
             messages.append(f"[PASS] M2S05: includes {label}")
+
+    if not re.search(r"(?i)(?:seed|随机种子)[^\n]{0,80}\b42\b|\b42\b[^\n]{0,80}(?:seed|随机种子)", text):
+        messages.append("[FAIL] M2S05: experiment design must fix random seed to 42")
+        ok = False
+    else:
+        messages.append("[PASS] M2S05: random seed fixed to 42")
 
     if not _contains_table_with_headers(text, ("数据集", "规模", "选择理由", "获取方式", "许可证")):
         messages.append("[FAIL] M2S05: dataset table missing dataset/size/reason/acquisition/license fields")
@@ -1009,6 +1018,12 @@ def _check_m2s06_experiment_plan(text: str) -> tuple[bool, list[str]]:
             ok = False
         else:
             messages.append(f"[PASS] M2S06: includes {label}")
+
+    if not re.search(r"(?i)(?:seed|随机种子)[^\n]{0,80}\b42\b|\b42\b[^\n]{0,80}(?:seed|随机种子)", text):
+        messages.append("[FAIL] M2S06: full experiment plan must fix random seed to 42")
+        ok = False
+    else:
+        messages.append("[PASS] M2S06: random seed fixed to 42")
 
     if not _contains_table_with_headers(text, ("实验 ID", "目的", "预估时间", "依赖", "优先级")):
         messages.append("[FAIL] M2S06: plan overview table missing id/purpose/time/dependency/priority fields")
@@ -1067,7 +1082,7 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
     required_sections = {
         "experiment stop reason": ("实验停止原因", "停止条件", "stop reason", "Evidence Ladder", "best 指标"),
         "data quality checks": ("数据质量", "过拟合", "数据泄露", "训练稳定性", "可复现", "data quality"),
-        "statistical validation": ("统计显著性", "p-value", "effect size", "效应量", "置信区间", "多重比较"),
+        "single-seed validation": ("seed", "42", "固定种子", "单次运行", "single"),
         "hypothesis mapping": ("与假设的对应验证", "假设", "预期结果", "实际结果", "支持程度", "hypothesis"),
         "root-cause analysis": ("潜在问题", "根因", "critical", "major", "minor", "root cause"),
         "negative result handling": ("负面结果", "negative result", "failure"),
@@ -1158,18 +1173,24 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
             messages.append("[FAIL] M3S04: manifest.yaml missing primary_metric")
             ok = False
         else:
-            missing_metric = [field for field in ("key", "value", "std") if not _nonempty(primary.get(field))]
+            missing_metric = [field for field in ("key", "value") if not _nonempty(primary.get(field))]
             if missing_metric:
                 messages.append(f"[FAIL] M3S04: manifest.yaml primary_metric missing {', '.join(missing_metric)}")
                 ok = False
             else:
-                messages.append("[PASS] M3S04: manifest.yaml primary_metric includes key/value/std")
+                messages.append("[PASS] M3S04: manifest.yaml primary_metric includes key/value")
         seeds = manifest.get("seeds")
-        if not isinstance(seeds, list) or len({str(seed) for seed in seeds if _nonempty(seed)}) < 3:
-            messages.append("[FAIL] M3S04: manifest.yaml must record at least 3 seeds")
+        seed_value = manifest.get("seed")
+        seed_values = set()
+        if isinstance(seeds, list):
+            seed_values.update(str(seed).strip() for seed in seeds if _nonempty(seed))
+        if _nonempty(seed_value):
+            seed_values.add(str(seed_value).strip())
+        if "42" not in seed_values:
+            messages.append("[FAIL] M3S04: manifest.yaml must record fixed seed 42")
             ok = False
         else:
-            messages.append("[PASS] M3S04: manifest.yaml records at least 3 seeds")
+            messages.append("[PASS] M3S04: manifest.yaml records fixed seed 42")
 
     contract_path = required_files["metric contract"]
     if contract_path.exists():
@@ -1196,12 +1217,12 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
             messages.append("[FAIL] M3S04: metric_contract.yaml missing primary metric")
             ok = False
         else:
-            missing_metric = [field for field in ("key", "value", "std") if not _nonempty(primary.get(field))]
+            missing_metric = [field for field in ("key", "value") if not _nonempty(primary.get(field))]
             if missing_metric:
                 messages.append(f"[FAIL] M3S04: metric_contract.yaml primary metric missing {', '.join(missing_metric)}")
                 ok = False
             else:
-                messages.append("[PASS] M3S04: metric_contract.yaml primary metric includes key/value/std")
+                messages.append("[PASS] M3S04: metric_contract.yaml primary metric includes key/value")
 
     comparison_path = required_files["comparison table"]
     if comparison_path.exists():
@@ -1230,11 +1251,17 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
             else:
                 messages.append("[PASS] M3S04: comparison_table.csv includes ours/proposed row")
             headers = {str(header).lower() for header in rows[0].keys()}
-            if not any(header in headers for header in ("std", "stderr", "ci", "confidence_interval")):
-                messages.append("[FAIL] M3S04: comparison_table.csv missing uncertainty column")
+            if "seed" not in headers:
+                messages.append("[FAIL] M3S04: comparison_table.csv missing fixed seed column")
                 ok = False
             else:
-                messages.append("[PASS] M3S04: comparison_table.csv includes uncertainty column")
+                seed_key = next((key for key in rows[0].keys() if str(key).lower() == "seed"), "seed")
+                has_seed_42 = any(str(row.get(seed_key, "")).strip() == "42" for row in rows)
+                if not has_seed_42:
+                    messages.append("[FAIL] M3S04: comparison_table.csv must record fixed seed 42")
+                    ok = False
+                else:
+                    messages.append("[PASS] M3S04: comparison_table.csv records fixed seed 42")
 
     handoff = root / "knowledge" / "handoff_M3_M4.md"
     if not handoff.exists() or not handoff.read_text(encoding="utf-8").strip():
@@ -1310,7 +1337,6 @@ def _check_m5s08_final_compilation(root: Path) -> tuple[bool, list[str]]:
     tex = artifacts / "paper.tex"
     refs = artifacts / "refs.bib"
     report = root / "knowledge" / "M5" / "M5S08_final_compilation.md"
-    handoff = root / "knowledge" / "handoff_M5_completion.md"
     messages: list[str] = []
     ok = True
 
@@ -1446,23 +1472,6 @@ def _check_m5s08_final_compilation(root: Path) -> tuple[bool, list[str]]:
                 ok = False
             else:
                 messages.append(f"[PASS] M5S08: final compilation report includes {label}")
-
-    if not handoff.exists() or not handoff.read_text(encoding="utf-8").strip():
-        messages.append("[FAIL] M5S08: handoff_M5_completion.md missing or empty")
-        ok = False
-    else:
-        handoff_text = handoff.read_text(encoding="utf-8")
-        handoff_terms = {
-            "M6 readiness": ("M6", "submission", "投稿", "ready"),
-            "paper artifacts": ("artifacts/paper.pdf", "artifacts/paper.tex", "refs.bib"),
-            "compilation status": ("PASS", "compiled", "编译", "verdict"),
-        }
-        for label, terms in handoff_terms.items():
-            if not _contains_any(handoff_text, terms):
-                messages.append(f"[FAIL] M5S08: handoff_M5_completion.md missing {label}")
-                ok = False
-            else:
-                messages.append(f"[PASS] M5S08: handoff_M5_completion.md includes {label}")
 
     return ok, messages
 
@@ -1930,6 +1939,195 @@ def _check_experiment_sandbox_profile(
                 ok = False
             else:
                 messages.append("[PASS] M4S03: sandbox/container execution record present")
+
+    return ok, messages
+
+
+def _check_m3s01_resource_plan(
+    root: Path,
+    *,
+    env_data: dict[str, Any] | None = None,
+    doc_text: str = "",
+) -> tuple[bool, list[str]]:
+    """Validate the M3S01 resource optimization contract."""
+    messages: list[str] = []
+    ok = True
+
+    execution = env_data.get("execution", {}) if isinstance(env_data, dict) else {}
+    optimization = execution.get("resource_optimization", {}) if isinstance(execution, dict) else {}
+    if not isinstance(optimization, dict) or not optimization:
+        messages.append("[FAIL] M3S01: execution.resource_optimization missing")
+        ok = False
+    elif optimization.get("enabled") is not True:
+        messages.append("[FAIL] M3S01: execution.resource_optimization.enabled must be true")
+        ok = False
+    else:
+        messages.append("[PASS] M3S01: resource optimization enabled")
+
+    plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
+    if not plan_path.exists():
+        messages.append("[FAIL] M3S01: experiments/configs/resource_plan.yaml not found")
+        return False, messages
+
+    try:
+        import yaml
+
+        plan = yaml.safe_load(plan_path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        messages.append(f"[FAIL] M3S01: resource_plan.yaml unreadable: {exc}")
+        return False, messages
+
+    if not isinstance(plan, dict):
+        messages.append("[FAIL] M3S01: resource_plan.yaml must contain a mapping")
+        return False, messages
+
+    messages.append("[PASS] M3S01: resource_plan.yaml readable")
+    plan_text = json.dumps(plan, ensure_ascii=False, sort_keys=True).lower()
+    required = {
+        "available hardware": ("available", "cpu", "gpus"),
+        "resource allocation": ("allocation", "gpu_count", "cpu_cores"),
+        "execution strategy": ("strategy", "device_mode", "dataloader"),
+        "launch command": ("launch", "command_template"),
+        "monitoring policy": ("monitoring", "min_gpu_utilization_pct", "min_cpu_utilization_pct"),
+    }
+    for label, terms in required.items():
+        if not all(term.lower() in plan_text for term in terms):
+            messages.append(f"[FAIL] M3S01: resource_plan.yaml missing {label}")
+            ok = False
+        else:
+            messages.append(f"[PASS] M3S01: resource_plan.yaml includes {label}")
+
+    available = plan.get("available", {}) if isinstance(plan.get("available"), dict) else {}
+    allocation = plan.get("allocation", {}) if isinstance(plan.get("allocation"), dict) else {}
+    strategy = plan.get("strategy", {}) if isinstance(plan.get("strategy"), dict) else {}
+    launch = plan.get("launch", {}) if isinstance(plan.get("launch"), dict) else {}
+    gpus = available.get("gpus", [])
+    visible_gpu_count = len(gpus) if isinstance(gpus, list) else 0
+    allocated_gpu_count = _safe_int(allocation.get("gpu_count"), default=0)
+    allocated_cpu = _safe_int(allocation.get("cpu_cores"), default=0)
+    cpu = available.get("cpu", {}) if isinstance(available.get("cpu"), dict) else {}
+    visible_cpu = _safe_int(cpu.get("cores"), default=0)
+
+    if visible_gpu_count >= 2 and allocated_gpu_count < 2:
+        explanation_terms = (
+            "ddp not supported",
+            "task_parallel",
+            "fairness",
+            "quota",
+            "显存不足",
+            "不兼容",
+            "配额",
+            "公平",
+        )
+        if not _contains_any(doc_text + plan_text, explanation_terms):
+            messages.append("[FAIL] M3S01: multiple GPUs visible but resource plan does not allocate/use them or explain why")
+            ok = False
+        else:
+            messages.append("[PASS] M3S01: partial GPU allocation has documented rationale")
+    elif visible_gpu_count >= 2:
+        strategy_text = json.dumps(strategy, ensure_ascii=False).lower()
+        launch_text = json.dumps(launch, ensure_ascii=False).lower()
+        if not _contains_any(strategy_text + launch_text, ("ddp", "distributed", "torchrun", "task_parallel")):
+            messages.append("[FAIL] M3S01: multiple GPUs allocated without DDP/task-parallel strategy")
+            ok = False
+        else:
+            messages.append("[PASS] M3S01: multi-GPU strategy present")
+
+    dataloader = strategy.get("dataloader", {}) if isinstance(strategy.get("dataloader"), dict) else {}
+    num_workers = _safe_int(dataloader.get("num_workers"), default=-1)
+    if visible_cpu >= 4 and allocated_cpu >= 4 and num_workers <= 0:
+        messages.append("[FAIL] M3S01: multi-core CPU available but dataloader num_workers is not planned")
+        ok = False
+    elif visible_cpu >= 4 and allocated_cpu >= 4:
+        messages.append(f"[PASS] M3S01: dataloader num_workers planned ({num_workers})")
+
+    return ok, messages
+
+
+def _safe_int(value: Any, *, default: int = 0) -> int:
+    try:
+        if value is None or isinstance(value, bool):
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _resource_monitor_summary(path: Path) -> tuple[bool, str]:
+    try:
+        import csv
+
+        rows = list(csv.DictReader(path.read_text(encoding="utf-8").splitlines()))
+    except Exception as exc:
+        return False, f"unreadable ({exc})"
+    if not rows:
+        return False, "empty"
+    headers = set(rows[0].keys())
+    if "timestamp" not in headers or ("cpu_load_pct" not in headers and "gpu_util_pct" not in headers):
+        return False, "missing timestamp/cpu/gpu utilization columns"
+    return True, f"{len(rows)} sample row(s)"
+
+
+def _check_m3s03_resource_execution(root: Path, *, doc_text: str = "") -> tuple[bool, list[str]]:
+    """Validate resource utilization evidence for M3S03."""
+    messages: list[str] = []
+    ok = True
+    plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
+    if not plan_path.exists():
+        messages.append("[FAIL] M3S03: resource_plan.yaml not found")
+        ok = False
+        plan: dict[str, Any] = {}
+    else:
+        try:
+            import yaml
+
+            plan = yaml.safe_load(plan_path.read_text(encoding="utf-8")) or {}
+            messages.append("[PASS] M3S03: resource_plan.yaml found")
+        except Exception as exc:
+            messages.append(f"[FAIL] M3S03: resource_plan.yaml unreadable: {exc}")
+            ok = False
+            plan = {}
+
+    if not _contains_any(doc_text, ("resource_plan", "resource plan", "资源执行", "资源利用", "resource_monitor")):
+        messages.append("[FAIL] M3S03: main experiment doc missing resource utilization record")
+        ok = False
+    else:
+        messages.append("[PASS] M3S03: main experiment doc records resource utilization")
+
+    monitors = sorted((root / "experiments" / "runs").rglob("resource_monitor.csv")) if (root / "experiments" / "runs").exists() else []
+    if not monitors:
+        messages.append("[FAIL] M3S03: no resource_monitor.csv found under experiments/runs/")
+        ok = False
+    else:
+        valid = 0
+        for monitor in monitors:
+            monitor_ok, summary = _resource_monitor_summary(monitor)
+            if monitor_ok:
+                valid += 1
+                messages.append(f"[PASS] M3S03: {monitor.relative_to(root)} has {summary}")
+            else:
+                messages.append(f"[FAIL] M3S03: {monitor.relative_to(root)} {summary}")
+                ok = False
+        if valid:
+            messages.append(f"[PASS] M3S03: {valid} resource monitor file(s) found")
+
+    allocation = plan.get("allocation", {}) if isinstance(plan.get("allocation"), dict) else {}
+    strategy = plan.get("strategy", {}) if isinstance(plan.get("strategy"), dict) else {}
+    allocated_gpu_count = _safe_int(allocation.get("gpu_count"), default=0)
+    if allocated_gpu_count >= 2:
+        combined = doc_text + "\n" + json.dumps(strategy, ensure_ascii=False)
+        if not _contains_any(combined, ("ddp", "distributed", "torchrun", "task_parallel", "多卡", "任务并行")):
+            messages.append("[FAIL] M3S03: multi-GPU allocation lacks DDP/task-parallel execution evidence")
+            ok = False
+        else:
+            messages.append("[PASS] M3S03: multi-GPU execution strategy documented")
+
+    if _contains_any(doc_text, ("low utilization", "低利用率", "underutilized")):
+        if not _contains_any(doc_text, ("optimized", "documented blocker", "not observed", "none", "不可优化", "已调", "原因", "无")):
+            messages.append("[FAIL] M3S03: low utilization mentioned without optimize-or-document outcome")
+            ok = False
+        else:
+            messages.append("[PASS] M3S03: low utilization has optimize-or-document outcome")
 
     return ok, messages
 
@@ -2429,6 +2627,14 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
         messages.extend(sandbox_msgs)
         ok = ok and sandbox_ok
 
+        resource_ok, resource_msgs = _check_m3s01_resource_plan(
+            root,
+            env_data=env_data,
+            doc_text=m3s01_text,
+        )
+        messages.extend(resource_msgs)
+        ok = ok and resource_ok
+
         if not req_lock.exists() and not req_txt.exists():
             messages.append("[FAIL] M3S01: requirements.lock / requirements.txt not found")
             ok = False
@@ -2553,6 +2759,10 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 else:
                     messages.append(f"[PASS] M3S03: main experiment doc includes {marker}")
 
+            resource_ok, resource_msgs = _check_m3s03_resource_execution(root, doc_text=text)
+            messages.extend(resource_msgs)
+            ok = ok and resource_ok
+
         if not runs_dir.exists():
             messages.append("[FAIL] M3S03: experiments/runs/ not found")
             ok = False
@@ -2589,11 +2799,11 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                             if str(row.get(seed_key, "")).strip()
                         }
                         seed_values = {s for s in seed_values if s.lower() not in {"mean", "std", "mean±std", "mean/std"}}
-                        if len(seed_values) < 3:
-                            messages.append(f"[FAIL] M3S03: results.tsv seed coverage insufficient (<3 unique seeds, got {len(seed_values)})")
+                        if "42" not in seed_values:
+                            messages.append("[FAIL] M3S03: results.tsv must use fixed seed 42")
                             ok = False
                         else:
-                            messages.append(f"[PASS] M3S03: results.tsv includes {len(seed_values)} unique seeds")
+                            messages.append("[PASS] M3S03: results.tsv records fixed seed 42")
                 except Exception as exc:
                     messages.append(f"[FAIL] M3S03: results.tsv seed parsing failed: {exc}")
                     ok = False
@@ -2608,11 +2818,11 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                     ok = False
                 else:
                     messages.append("[PASS] M3S03: our-method row found")
-                if "mean" not in text and "std" not in text:
-                    messages.append("[FAIL] M3S03: results.tsv missing summary statistics")
+                if "42" not in text:
+                    messages.append("[FAIL] M3S03: results.tsv missing fixed seed 42 evidence")
                     ok = False
                 else:
-                    messages.append("[PASS] M3S03: summary statistics found")
+                    messages.append("[PASS] M3S03: fixed seed 42 evidence found")
                 messages.append("[PASS] M3S03: results.tsv exists")
 
         review_ok, review_msgs = _check_stage_reviews(root, stage)
@@ -2991,6 +3201,57 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 ok = False
             else:
                 messages.append("[PASS] M5S07: numerical consistency check documented")
+        review_ok, review_msgs = _check_stage_reviews(root, stage)
+        messages.extend(review_msgs)
+        ok = ok and review_ok
+
+    # M5S09: Full-Polish & Narrative Coherence Review
+    if stage == "M5S09":
+        doc = root / "knowledge" / "M5" / "M5S09_full_polish.md"
+        tex = root / "artifacts" / "paper.tex"
+        pdf = root / "artifacts" / "paper.pdf"
+        refs = root / "artifacts" / "refs.bib"
+        handoff = root / "knowledge" / "handoff_M5_completion.md"
+        if not doc.exists():
+            messages.append("[FAIL] M5S09: knowledge/M5/M5S09_full_polish.md missing")
+            ok = False
+        else:
+            text = doc.read_text(encoding="utf-8")
+            required = [
+                ("narrative coherence", "叙事连贯", "承诺兑现"),
+                ("Intro-Method", "Introduction-Method", "Intro Method"),
+                ("Method-Experiments", "Method Experiments"),
+                ("Experiments-Analysis", "Experiments Analysis", "M5S05", "M5S06"),
+                ("terminology consistency", "术语一致"),
+                ("numerical consistency", "数值一致"),
+                ("language refinement", "语言精炼", "润色"),
+                ("paper.tex", "LaTeX", "latex"),
+                ("paper.pdf", "PDF"),
+                ("recompile", "重新编译", "compile"),
+                ("Anti-Leakage", "anti leakage", "防泄露"),
+            ]
+            for terms in required:
+                if not _contains_any(text, terms):
+                    messages.append(f"[FAIL] M5S09: missing required polish signal: {terms[0]}")
+                    ok = False
+                else:
+                    messages.append(f"[PASS] M5S09: includes {terms[0]}")
+        for label, path in {
+            "artifacts/paper.tex": tex,
+            "artifacts/paper.pdf": pdf,
+            "artifacts/refs.bib": refs,
+            "knowledge/handoff_M5_completion.md": handoff,
+        }.items():
+            if not path.exists() or not path.read_bytes():
+                messages.append(f"[FAIL] M5S09: required final artifact missing or empty: {label}")
+                ok = False
+            else:
+                messages.append(f"[PASS] M5S09: required final artifact present: {label}")
+        if pdf.exists() and pdf.read_bytes() and not pdf.read_bytes().startswith(b"%PDF"):
+            messages.append("[FAIL] M5S09: artifacts/paper.pdf does not look like a PDF")
+            ok = False
+        elif pdf.exists() and pdf.read_bytes():
+            messages.append("[PASS] M5S09: paper.pdf exists and has PDF header")
         review_ok, review_msgs = _check_stage_reviews(root, stage)
         messages.extend(review_msgs)
         ok = ok and review_ok

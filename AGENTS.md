@@ -167,6 +167,7 @@ When a backtrack is triggered (by stage review, gate critic, or human review):
 | `{project}/knowledge/M5/M5S06_analysis_discussion.md` | Analysis & Discussion section |
 | `{project}/knowledge/M5/M5S07_abstract_conclusion.md` | Abstract & Conclusion |
 | `{project}/knowledge/M5/M5S08_final_compilation.md` | Full draft assembly & compilation report |
+| `{project}/knowledge/M5/M5S09_full_polish.md` | Full-Polish & Narrative Coherence Review |
 | `{project}/artifacts/paper.tex` | Final LaTeX source |
 | `{project}/artifacts/paper.pdf` | Compiled PDF |
 | `{project}/knowledge/handoff_M5_completion.md` | M5 completion handoff |

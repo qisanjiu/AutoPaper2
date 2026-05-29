@@ -50,12 +50,13 @@ CROSS_STAGE_INPUTS: dict[str, list[str]] = {
         "M4S04_analysis_results.md",
     ],
     "M5S02": ["M5S01_pre_write_audit.md", "M1S02_literature_deepdive.md", "M1_source_log.yaml", "M1S04_hypothesis_generation.md", "M2S03_method_architecture.md"],
-    "M5S03": ["M5S02_paper_outline.md", "M1S02_literature_deepdive.md", "M5S01_pre_write_audit.md"],
-    "M5S04": ["M5S02_paper_outline.md", "M2S03_method_architecture.md", "M2S04_algorithm_theory.md", "M5S03_introduction_relatedwork.md"],
+    "M5S04": ["M5S02_paper_outline.md", "M2S03_method_architecture.md", "M2S04_algorithm_theory.md", "M5S01_pre_write_audit.md"],
     "M5S05": ["M5S02_paper_outline.md", "M3S03_main_experiment.md", "M3S04_result_validation.md", "M3S02_baseline_lock.md", "M5S04_methodology.md"],
     "M5S06": ["M5S02_paper_outline.md", "M4S04_analysis_results.md", "M4S03_analysis_experiment.md", "M5S05_experiments_results.md"],
+    "M5S03": ["M5S02_paper_outline.md", "M1S02_literature_deepdive.md", "M5S01_pre_write_audit.md", "M5S04_methodology.md", "M5S05_experiments_results.md", "M5S06_analysis_discussion.md"],
     "M5S07": ["M5S02_paper_outline.md", "M5S03_introduction_relatedwork.md", "M5S04_methodology.md", "M5S05_experiments_results.md", "M5S06_analysis_discussion.md"],
     "M5S08": ["M5S02_paper_outline.md", "M5S03_introduction_relatedwork.md", "M5S04_methodology.md", "M5S05_experiments_results.md", "M5S06_analysis_discussion.md", "M5S07_abstract_conclusion.md"],
+    "M5S09": ["M5S02_paper_outline.md", "M5S03_introduction_relatedwork.md", "M5S04_methodology.md", "M5S05_experiments_results.md", "M5S06_analysis_discussion.md", "M5S07_abstract_conclusion.md", "M5S08_final_compilation.md"],
     # M6: Submission Review & Revision Loop
     "M6S01": ["handoff_M5_completion.md"],
     "M6S02": ["M6S01_submission_audit.md", "M6S01_internal_peer_review.md"],
@@ -148,6 +149,9 @@ STAGE_REVIEW_OUTPUTS: dict[str, dict[str, str]] = {
     "M5S07": {
         "m5_abstract_conclusion_review": "knowledge/reviews/M5S07_abstract_conclusion_review.md",
     },
+    "M5S09": {
+        "m5_full_polish_review": "knowledge/reviews/M5S09_full_polish_review.md",
+    },
     "M5S08": {
         "m5_final_compilation_review": "knowledge/reviews/M5S08_final_compilation_review.md",
     },
@@ -221,6 +225,16 @@ def get_input_docs(project_root: Path, stage: str) -> list[Path]:
         if candidate and candidate not in seen:
             inputs.append(candidate)
             seen.add(candidate)
+
+    if stage == "M5S09":
+        for artifact in (
+            project_root / "artifacts" / "paper.tex",
+            project_root / "artifacts" / "paper.pdf",
+            project_root / "artifacts" / "refs.bib",
+        ):
+            if artifact not in seen:
+                inputs.append(artifact)
+                seen.add(artifact)
 
     # Always include survey_memory for M1 stages (after S01)
     if stage.startswith("M1") and stage != "M1S01":

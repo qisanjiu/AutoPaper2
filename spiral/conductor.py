@@ -42,6 +42,7 @@ STAGE_CHECKERS = {
     "M5S05": ["m5_experiments_results_review"],
     "M5S06": ["m5_analysis_discussion_review"],
     "M5S07": ["m5_abstract_conclusion_review"],
+    "M5S09": ["m5_full_polish_review"],
     # M5: build verification runs after full draft assembly, not after abstract/conclusion.
     "M5S08": ["build_verifier", "m5_final_compilation_review"],
     # M6: internal review, submission + rebuttal stage reviews
@@ -235,6 +236,7 @@ class Conductor:
             "m5_experiments_results_review": "critic/m5_stage_review/AGENT.md",
             "m5_analysis_discussion_review": "critic/m5_stage_review/AGENT.md",
             "m5_abstract_conclusion_review": "critic/m5_stage_review/AGENT.md",
+            "m5_full_polish_review": "critic/m5_stage_review/AGENT.md",
             "m5_final_compilation_review": "critic/m5_stage_review/AGENT.md",
             # M6 stage-level reviews
             "m6_internal_peer_review": "critic/m6_internal_peer_review/AGENT.md",

@@ -114,12 +114,13 @@ AutoPaper2 treats paper writing as a **software pipeline**:
 |-------|---------|
 | **M5S01** | Pre-Write Audit – articulate contributions and pick style-reference papers. |
 | **M5S02** | Paper Outline – plotting plan, terminology table, section budget. |
-| **M5S03** | Introduction & Related Work |
 | **M5S04** | Methodology |
 | **M5S05** | Experiments & Results |
-| **M5S06** | Analysis & Discussion |
+| **M5S06** | Analysis & Discussion – one-to-one mapping with experiments. |
+| **M5S03** | Introduction & Related Work – written after experiments to lock the story. |
 | **M5S07** | Abstract & Conclusion |
 | **M5S08** | Full Draft Assembly & Compilation – LaTeX build, figure/table checks. |
+| **M5S09** | Full-Polish & Narrative Coherence Review – final LaTeX/PDF polish and cross-section consistency. |
 
 **Gate G5** – Logic + Writing + Evidence + Novelty + Ethics Critic. Optional peer-review simulation.
 

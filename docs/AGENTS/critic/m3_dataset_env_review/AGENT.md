@@ -18,6 +18,7 @@
 - 本地或 SSH 执行信息是否明确
 - 硬件信息是否记录
 - `execution.sandbox` 与 `experiments/configs/sandbox_profile.yaml` 是否完整，能约束 LLM 生成实验代码的网络、文件、凭证和资源边界
+- `execution.resource_optimization` 与 `experiments/configs/resource_plan.yaml` 是否完整，能把可见 GPU/CPU 转成实际并行策略
 - 长时间下载/上传/环境安装/checkpoint/smoke run 是否有 `experiments/logs/m3s01_longrun_ledger.md` 证据
 - M3S01 文档是否把这些信息写清楚
 
@@ -67,6 +68,13 @@
 - [ ] local 模式包含本地执行证据
 - [ ] 未出现因"太大/太慢/需要等"而跳过下载、上传或 checkpoint 的记录
 
+### 2.6 资源规划审查
+- [ ] `execution.resource_optimization.enabled == true`
+- [ ] `experiments/configs/resource_plan.yaml` 存在且可读
+- [ ] resource plan 记录 visible GPU/CPU、实际 allocation、设备策略、DataLoader workers、线程环境变量、启动命令模板和监控阈值
+- [ ] 多 GPU 可见时，resource plan 默认使用 DDP 或 task_parallel；若只用单卡，必须有明确硬件/框架/公平性原因
+- [ ] 多核 CPU 可见时，resource plan 不得把 `num_workers` / `OMP_NUM_THREADS` / `MKL_NUM_THREADS` 留空或全部设为 1，除非有约束说明
+
 ---
 
 ## 3. 审查输出
@@ -81,6 +89,7 @@
 - `config/execution_env.yaml`
 - `experiments/requirements.lock`
 - `experiments/configs/sandbox_profile.yaml`
+- `experiments/configs/resource_plan.yaml`
 - `experiments/logs/m3s01_longrun_ledger.md`
 - `experiments/data/`
 
@@ -90,7 +99,7 @@
 | 数据集可获取性 | X/10 | ... |
 | 环境配置完整性 | X/10 | ... |
 | 依赖锁定 | X/10 | ... |
-| 硬件与可复现性 | X/10 | ... |
+| 硬件、资源规划与可复现性 | X/10 | ... |
 | **总分** | **X/10** | |
 
 ## 问题列表
@@ -123,13 +132,14 @@
 
 ## 4. Verdict 规则
 
-- **PASS**: 数据集真实可用、环境、依赖、硬件信息、sandbox profile、长任务 ledger 完整，无 critical 问题
-- **REVISE**: 有可修复缺口，如路径/锁文件/环境字段缺失、sandbox profile 字段不足、长任务 ledger 字段不足；或数据集获取方式需要补充
+- **PASS**: 数据集真实可用、环境、依赖、硬件信息、sandbox profile、resource plan、长任务 ledger 完整，无 critical 问题
+- **REVISE**: 有可修复缺口，如路径/锁文件/环境字段缺失、sandbox profile 字段不足、resource plan 字段不足、长任务 ledger 字段不足；或数据集获取方式需要补充
 - **BACKTRACK**: 
   - 数据集不可获取且 Agent 未执行阻塞等待流程
   - **使用仿真/合成/随机数据替代真实数据（绝对红线）**
   - 因"太大/太慢/需要等"跳过真实数据、checkpoint、远程上传或必要 smoke run，且没有阻塞报告
   - `execution.sandbox.enabled != true`、`sandbox.mode=none`、缺少凭证/文件/网络/资源边界，或实验脚本可写出项目目录/读取密钥
+  - 多 GPU/多核机器未生成 resource plan，或 resource plan 固定单卡/单核且没有合理说明
   - 环境配置明显不可执行
   - 复现条件根本不成立
 
@@ -150,6 +160,7 @@
 - `config/execution_env.yaml`
 - `experiments/requirements.lock` 或 `experiments/requirements.txt`
 - `experiments/configs/sandbox_profile.yaml`
+- `experiments/configs/resource_plan.yaml`
 - `experiments/logs/m3s01_longrun_ledger.md`
 - `experiments/data/`
 - `experiments/src/`

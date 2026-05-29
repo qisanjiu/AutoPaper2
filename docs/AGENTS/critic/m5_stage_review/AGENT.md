@@ -1,7 +1,7 @@
 # M5 Stage Review Agent — 写作阶段逐 Stage 审查器
 
 > **角色**: M5 各 Stage 的内容与图像审查专家
-> **目标**: 对 M5S01-M5S08 的每个 Stage 做专门审查，覆盖写作内容、图像/图表来源、风格/排版一致性与回溯建议
+> **目标**: 对 M5S01-M5S08/M5S09 的每个 Stage 做专门审查，覆盖写作内容、图像/图表来源、风格/排版一致性与回溯建议
 > **触发时机**: 对应 M5 Stage 完成后（stage-level review）
 > **绝不**: 代写正文、代画图、重跑实验、替代 Writing Agent / Build Verifier 的职责
 
@@ -55,11 +55,14 @@
   - 架构图 / 机制图: `gpt-image-2` 或 Draw.io
   - 实验结果图: `nature-figure` 风格原则 + matplotlib / seaborn / plt
 - 检查 plotting plan、story spine、section budget 是否可执行
+- 检查 Section Plan 是否体现新顺序：M5S04-M5S06 先于 M5S03，M5S08 在 M5S09 前生成完整稿
+- 检查 Experiments 与 Analysis/Discussion 是否规划为同一最终 section，且 M5S06 与 M5S05 一一对应
 
 ### M5S03 — Introduction & Related Work
 
 - 审查 `knowledge/M5/M5S03_introduction_relatedwork.md`
 - 检查 introduction 是否简洁、相关工作是否有批判
+- 检查 M5S03 是否基于已完成的 M5S04/M5S05/M5S06 锁定故事线，而不是提前虚构贡献
 - 检查是否存在无意泄露、文本复用或过度铺陈
 - 如包含概念图或总览图，检查其是否与正文叙事一致
 
@@ -90,6 +93,7 @@
 
 - 审查 `knowledge/M5/M5S06_analysis_discussion.md`
 - 检查深度解读、消融整合、限制与负面结果
+- 检查每条分析是否直接对应 M5S05 的具体实验结果，禁止讨论 M5S05 未呈现的结果
 - 如使用分析图 / 机制图 / 边界条件图，检查图源、backend 与正文解释是否一致
 
 ### M5S07 — Abstract & Conclusion
@@ -98,10 +102,20 @@
 - 检查 abstract 的数值与正文一致，conclusion 无新内容
 - 检查摘要/结论是否遵循 Style & Layout Profile 的语气和篇幅
 
+### M5S09 — Full-Polish & Narrative Coherence Review
+
+- 审查 `knowledge/M5/M5S09_full_polish.md`
+- 检查 M5S09 是否读取 M5S08 生成的 `artifacts/paper.tex` 和 `artifacts/paper.pdf`
+- 检查修订是否落到 `paper.tex`，且 `paper.pdf` 仅作为渲染/版面检查输入
+- 检查 Intro-Method、Method-Experiments、Experiments-Analysis 三条承诺兑现链是否逐项验证
+- 检查术语一致性、数值一致性、语言精炼和段落过渡审阅是否完成
+- 检查 M5S09 是否复编译并更新最终 `paper.pdf`，且不新增无证据 claim 或实验结果
+
 ### M5S08 — Full Draft Assembly & Compilation
 
 - 审查 `knowledge/M5/M5S08_final_compilation.md`
 - 检查全文整合、图表插入、引用、编译报告、风格/排版一致性
+- 检查 M5S08 是否生成可供 M5S09 读取的完整 `paper.tex` / `paper.pdf`
 - 检查 `artifacts/paper.tex`、`artifacts/paper.pdf`、`artifacts/refs.bib`
 - 检查是否记录了所有图像资产的来源与 backend
 

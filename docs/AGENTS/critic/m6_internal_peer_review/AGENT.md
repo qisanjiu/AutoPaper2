@@ -89,7 +89,7 @@ Map issues to the earliest responsible stage:
 | missing dataset/metric/baseline design | M2S05 or M2S06 |
 | implementation/runtime/reproducibility flaw | M3S01-M3S04 |
 | missing ablation/mechanism/robustness analysis | M4S02-M4S04 |
-| writing, structure, figure, LaTeX packaging flaw | M5S02-M5S08 |
+| writing, structure, figure, LaTeX packaging flaw | M5S02-M5S08/M5S09 |
 
 For every High issue, include a concrete `target_stage`, `required_fix`, `success_criteria`, `rebuild_mode`, and `rerun_scope`.
 
@@ -130,7 +130,7 @@ Use this structure:
 ## Issue Routing Table
 | Issue ID | Severity | Class | target_stage | required_fix | success_criteria | rebuild_mode | rerun_scope |
 |----------|----------|-------|--------------|--------------|------------------|--------------|-------------|
-| IR-1 | High | experiment_gap | M2S06 | ... | ... | full_regenerate | M2S06 -> M3S03 -> M4S04 -> M5S08 |
+| IR-1 | High | experiment_gap | M2S06 | ... | ... | full_regenerate | M2S06 -> M3S03 -> M4S04 -> M5S08 -> M5S09 |
 
 ## Revision Loop Decision
 - Continue internal revision loop: yes/no

@@ -20,7 +20,7 @@ MODULE_STAGES = {
     "M2": ["M2S01", "M2S02", "M2S03", "M2S04", "M2S05", "M2S06"],
     "M3": ["M3S01", "M3S02", "M3S03", "M3S04"],
     "M4": ["M4S01", "M4S02", "M4S03", "M4S04"],
-    "M5": ["M5S01", "M5S02", "M5S03", "M5S04", "M5S05", "M5S06", "M5S07", "M5S08"],
+    "M5": ["M5S01", "M5S02", "M5S04", "M5S05", "M5S06", "M5S03", "M5S07", "M5S08", "M5S09"],
     "M6": ["M6S01", "M6S02", "M6S03", "M6S04", "M6S05", "M6S06"],
 }
 
@@ -29,7 +29,7 @@ GATE_STAGES = {
     "G2": "M2S06",
     "G3": "M3S04",
     "G4": "M4S04",
-    "G5": "M5S08",
+    "G5": "M5S09",
     "G6": "M6S06",
 }
 
@@ -66,6 +66,7 @@ AGENT_FOR_STAGE = {
     "M5S05": "writing",
     "M5S06": "writing",
     "M5S07": "writing",
+    "M5S09": "writing",
     "M5S08": "writing",
     # M6: Submission Review & Revision Loop
     "M6S01": "submission",

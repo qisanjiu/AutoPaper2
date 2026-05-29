@@ -46,29 +46,30 @@
 
 | 检查项 | 结果 | 备注 |
 |--------|------|------|
-| 同 seed 重复运行一致性 | ... | ... |
+| 固定 seed 配置 | seed=42 已记录 / 未记录 | ... |
 
 ---
 
-## 3. 统计显著性检验
+## 3. 固定 Seed 单次结果验证
 
-### 3.1 检验方法选择
+### 3.1 验证方法
 
-- **选择的方法**: [t-test / Wilcoxon signed-rank / Bootstrap / 其他]
-- **选择理由**: [数据分布、样本量、对比类型]
+- **选择的方法**: fixed-seed single-run validation
+- **固定 seed**: 42
+- **选择理由**: 本框架不再要求多 seed 重复实验，结论基于 seed=42 的单次可复现实验
 
-### 3.2 检验结果
+### 3.2 验证结果
 
-| 对比 | 检验方法 | p-value | 效应量 | 95% 置信区间 | 结论 |
-|------|---------|---------|--------|------------|------|
-| Ours vs Baseline-1 | ... | ... | Cohen's d = ... | [...] | 显著优于 / 不显著 |
-| Ours vs Baseline-2 | ... | ... | Cohen's d = ... | [...] | 显著优于 / 不显著 |
+| 对比 | Seed | 主指标差异 | 相对提升 | 结论 |
+|------|------|------------|----------|------|
+| Ours vs Baseline-1 | 42 | ... | ... | 优于 / 持平 / 低于 |
+| Ours vs Baseline-2 | 42 | ... | ... | 优于 / 持平 / 低于 |
 
-### 3.3 多重比较校正
+### 3.3 统计限制说明
 
-- **比较次数**: ...
-- **校正方法**: [Bonferroni / FDR / Holm / 无]
-- **校正后显著性**: ...
+- **统计显著性**: 不声称（未做多 seed 重复实验）
+- **不确定性估计**: 不要求 std / CI
+- **报告边界**: 只能报告固定 seed=42 下的结果，不得声称跨随机种子稳定
 
 ---
 
@@ -100,9 +101,9 @@
 
 KEEP 只能在以下材料同时完成时使用：
 
-- `experiments/artifacts/main_experiment/manifest.yaml`：包含 `experiment_id`, `method`, `dataset`, `baseline_refs`, `primary_metric.key/value/std`, 至少 3 个 `seeds`, `environment`
-- `experiments/artifacts/main_experiment/metric_contract.yaml`：包含本文方法名称与 primary metric 的 `key/value/std`
-- `experiments/artifacts/main_experiment/comparison_table.csv`：包含 baseline 与 ours/proposed 行，并给出不确定性列（如 `std` / `ci`）
+- `experiments/artifacts/main_experiment/manifest.yaml`：包含 `experiment_id`, `method`, `dataset`, `baseline_refs`, `primary_metric.key/value`, `seed: 42`, `environment`
+- `experiments/artifacts/main_experiment/metric_contract.yaml`：包含本文方法名称与 primary metric 的 `key/value`
+- `experiments/artifacts/main_experiment/comparison_table.csv`：包含 baseline 与 ours/proposed 行，并记录 `seed=42`
 - `experiments/artifacts/main_experiment/reproduction.md`：记录复现实验命令与关键配置
 - `knowledge/handoff_M3_M4.md`：包含 KEEP 决策、claim/evidence 映射、M3S04 来源、artifact 路径、M4 分析方向
 
@@ -164,8 +165,7 @@ baseline_refs:
 primary_metric:
   key: "..."
   value: ...
-  std: ...
-seeds: [42, 123, 2024]
+seed: 42
 environment:
   python: "..."
   torch: "..."
@@ -189,7 +189,7 @@ run_date: "YYYY-MM-DD"
 ## 10. 传递给下游的信息
 
 - **核心假设验证状态**: ...
-- **统计显著性**: p-value = ..., 效应量 = ...
+- **固定 seed 结果边界**: seed=42，主指标差异 = ...，不声称统计显著
 - **Evidence Artifact 路径**: `experiments/artifacts/main_experiment/`
 - **关键发现（预期内）**: ...
 - **意外发现**: ...

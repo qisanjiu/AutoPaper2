@@ -220,7 +220,7 @@ Phase 1: 自动执行循环（WHILE 未到达终点或用户未中断）
        - M3S01-M3S03 → Experiment Agent subagent
          * M3S01 必须产出 `experiments/logs/m3s01_longrun_ledger.md`
        - M3S04/M4S01/M4S02/M4S04/M5S01 → Analysis Agent subagent
-       - M5S02-M5S08 → Writing Agent subagent
+       - M5S02-M5S08/M5S09 → Writing Agent subagent
        - M6S01-M6S02 → Submission Agent subagent
        - M6S01 internal review → `critic/m6_internal_peer_review/AGENT.md` reviewer subagent; must reach ≥8/10 before M6S02
        - M6S03/M6S04/M6S06 → Rebuttal Agent subagent

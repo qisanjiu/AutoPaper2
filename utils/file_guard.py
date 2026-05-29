@@ -53,6 +53,7 @@ def _get_canonical_name(stage: str) -> str:
         "M5S05": "experiments_results",
         "M5S06": "analysis_discussion",
         "M5S07": "abstract_conclusion",
+        "M5S09": "full_polish",
         "M5S08": "final_compilation",
         # M6
         "M6S01": "submission_audit",

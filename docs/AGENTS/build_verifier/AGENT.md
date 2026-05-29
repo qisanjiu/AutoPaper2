@@ -2,7 +2,7 @@
 
 > **角色**: LaTeX 编译与论文提交包验证专家
 > **目标**: 确保 `paper.tex` 能够正确编译为符合 venue 要求的 PDF
-> **负责阶段**: M5S08 (Full Draft Assembly & Compilation)
+> **负责阶段**: M5S08 (Full Draft Assembly & Compilation)；M5S09 后如修改 `paper.tex`，必须复用同一编译检查
 > **绝不**: 修改论文内容、添加虚构引用、泄露作者信息
 
 ---
@@ -176,7 +176,7 @@ fi
 - 所有 `\includegraphics{}` 指向的图像文件必须真实存在于 `artifacts/` 下
 - 至少一个 figure 与一个 table 必须有 label/ref，表格必须使用 `booktabs`
 - `knowledge/M5/M5S08_final_compilation.md` 必须写明 Final verdict: PASS、Fatal Errors: 0、Undefined references: 0、Undefined citations: 0、Orphan cites: 0、Anti-Leakage: PASS、页数、style/layout compliance、figure compliance
-- `knowledge/handoff_M5_completion.md` 必须列出 M6 submission readiness、`artifacts/paper.pdf`、`artifacts/paper.tex`、`artifacts/refs.bib` 和编译状态
+- M5S09 最终润色复编译后，`knowledge/handoff_M5_completion.md` 必须列出 M6 submission readiness、`artifacts/paper.pdf`、`artifacts/paper.tex`、`artifacts/refs.bib` 和编译状态
 
 ---
 

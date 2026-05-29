@@ -4,6 +4,20 @@
 
 ---
 
+## 写作顺序说明
+
+本 Stage 在 Methodology（M5S04）、Experiments（M5S05）和 Analysis（M5S06）**之后**执行。这是学术写作的最佳实践：只有在完整呈现方法、实验和分析后，才能准确提炼出论文的故事线，并写出与后文严格对应的 Introduction。
+
+## 结构灵活性
+
+根据目标 venue 的惯例和 M5S02 的 Section Plan，Introduction 与 Related Work 可采用以下两种组织方式之一：
+- **分离式**: Section 1 — Introduction；Section 2 — Related Work（适用于多数 ML/CV 顶会）
+- **合并式**: Section 1 — Introduction and Related Work（适用于某些期刊或特定 venue）
+
+无论采用哪种方式，Related Work 必须在 Introduction 的贡献声明之前或之后完整呈现，且必须包含对比与批判。
+
+---
+
 ## 1. Introduction
 
 ### 1.1 背景（1-2 段）

@@ -487,7 +487,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "| Exp-1 | 实验目标 main purpose | H1 | main comparison | baseline | accuracy metric | 必需 |\n"
             "| Exp-2 | 实验目标 component purpose | H2 | component check | baseline | accuracy metric | 必需 |\n"
             "| Exp-3 | 实验目标 robustness purpose | H3 | robustness | baseline | accuracy metric | 可选 |\n\n"
-            "随机种子 seed: 1, 2, 3. 统计检验 t-test bootstrap. 可复现 reproducibility requirements git commit.\n",
+            "随机种子 seed: 42. 单次固定 seed 实验，不要求多 seed 统计检验。可复现 reproducibility requirements git commit.\n",
         )
     elif stage == "M2S06":
         _write(
@@ -515,7 +515,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "- 数据集与划分: DemoSet dataset split\n"
             "- Baselines / 对照组: baseline\n"
             "- 评价指标: accuracy metric\n"
-            "- 运行协议: seed epoch hardware 超参\n"
+            "- 运行协议: seed=42 epoch hardware 超参\n"
             "- 预期结果形态: table plot\n"
             "- 成功标准: ...\n"
             "- 失败时诊断路径: implementation / design / hypothesis / data / baseline\n"
@@ -529,7 +529,9 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "## Dataset Review\nReal dataset under experiments/data/demo.\n\n"
             "## 环境 Review\nconfig/execution_env.yaml uses local mode.\n\n"
             "## Long-running execution policy\n"
-            "Long-running jobs are recorded in experiments/logs/m3s01_longrun_ledger.md with 权限, patience, and resume evidence.\n",
+            "Long-running jobs are recorded in experiments/logs/m3s01_longrun_ledger.md with 权限, patience, and resume evidence.\n\n"
+            "## Resource utilization plan\n"
+            "experiments/configs/resource_plan.yaml records CPU allocation, cpu_parallel strategy, dataloader workers, launch command, and utilization thresholds.\n",
         )
         sandbox_profile = {
             "sandbox": {
@@ -555,12 +557,57 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                     "requirements_lock": "experiments/requirements.lock",
                     "image": "",
                     "image_digest": "",
-                    "seed_policy": "fixed_multi_seed",
+                    "seed_policy": "fixed_seed_42",
                 },
             }
         }
-        _write_yaml(root / "config" / "execution_env.yaml", {"execution": {"mode": "local", "local": {"env_manager": "venv", "python_version": "3.11"}, **sandbox_profile}})
+        resource_optimization = {
+            "enabled": True,
+            "target_gpu_count": "all_visible",
+            "target_cpu_cores": "auto",
+            "gpu_strategy": "auto",
+            "cpu_strategy": "dataloader_and_task_parallel",
+            "dataloader": {"auto_num_workers": True, "max_workers": 16},
+            "monitoring": {
+                "enabled": True,
+                "interval_seconds": 10,
+                "min_gpu_utilization_pct": 70,
+                "min_cpu_utilization_pct": 60,
+                "plan_path": "experiments/configs/resource_plan.yaml",
+                "monitor_path_template": "experiments/runs/{run_id}/resource_monitor.csv",
+            },
+        }
+        _write_yaml(
+            root / "config" / "execution_env.yaml",
+            {
+                "execution": {
+                    "mode": "local",
+                    "local": {"env_manager": "venv", "python_version": "3.11"},
+                    **sandbox_profile,
+                    "resource_optimization": resource_optimization,
+                }
+            },
+        )
         _write_yaml(root / "experiments" / "configs" / "sandbox_profile.yaml", sandbox_profile)
+        _write_yaml(
+            root / "experiments" / "configs" / "resource_plan.yaml",
+            {
+                "schema_version": 1,
+                "available": {"cpu": {"cores": 4, "memory_total_mb": 16384}, "gpus": []},
+                "allocation": {"cpu_cores": 4, "gpu_count": 0, "gpu_ids": []},
+                "strategy": {
+                    "device_mode": "cpu_parallel",
+                    "gpu_parallelism": "none",
+                    "config_or_task_parallelism": True,
+                    "dataloader": {"num_workers": 2, "pin_memory": False, "persistent_workers": True},
+                },
+                "launch": {
+                    "env": {"OMP_NUM_THREADS": "4", "MKL_NUM_THREADS": "4"},
+                    "command_template": "python experiments/src/train.py --config experiments/configs/main_exp.yaml --device cpu",
+                },
+                "monitoring": {"enabled": True, "min_gpu_utilization_pct": 70, "min_cpu_utilization_pct": 60},
+            },
+        )
         _write(root / "experiments" / "requirements.lock", "numpy==1.26.4\n")
         _write(root / "experiments" / "data" / "demo" / "values.txt", "1\n2\n3\n")
         _write(root / "experiments" / "src" / "train.py", _code_with_enough_lines())
@@ -578,11 +625,25 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             {"verification_verdict": "verified_match", "metrics": {"primary": {"key": "accuracy", "value": 0.75}}},
         )
     elif stage == "M3S03":
-        _write(out, "# M3S03 Main Experiment\n\n## Run Contract\ncontract.\n\n## 迭代循环记录\niterations.\n\n## Evidence Ladder\nsolid.\n\n## 随机种子\n1,2,3.\n")
+        _write(
+            out,
+            "# M3S03 Main Experiment\n\n"
+            "## Run Contract\ncontract. Resource Plan: experiments/configs/resource_plan.yaml.\n\n"
+            "## 资源利用率执行记录\n"
+            "Run run1 uses cpu_parallel task_parallel and records experiments/runs/run1/resource_monitor.csv; average CPU utilization 72%; low utilization none.\n\n"
+            "## 迭代循环记录\niterations with resource_monitor.csv.\n\n"
+            "## Evidence Ladder\nsolid.\n\n"
+            "## 随机种子\n42.\n",
+        )
         _write(root / "experiments" / "runs" / "run1" / "log.txt", "ok\n")
         _write(
+            root / "experiments" / "runs" / "run1" / "resource_monitor.csv",
+            "timestamp,command_pid,cpu_load_pct,mem_available_mb,gpu_index,gpu_util_pct,gpu_mem_used_mb,gpu_mem_total_mb\n"
+            "2026-05-29T12:00:00,123,72,8000,,,,\n",
+        )
+        _write(
             root / "experiments" / "results.tsv",
-            "method\tseed\taccuracy\nbaseline\t1\t0.75\nbaseline\t2\t0.76\nbaseline\t3\t0.75\nours\t1\t0.80\nours\t2\t0.81\nours\t3\t0.80\nours_mean\tmean\t0.803\nours_std\tstd\t0.006\n",
+            "method\tseed\taccuracy\tresource_monitor\nbaseline\t42\t0.75\texperiments/runs/run1/resource_monitor.csv\nours\t42\t0.80\texperiments/runs/run1/resource_monitor.csv\n",
         )
     elif stage == "M3S04":
         _write(
@@ -591,9 +652,9 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "## 实验停止原因\n"
             "停止条件: budget complete. 当前 best 指标: accuracy=0.803 vs baseline=0.753. Evidence Ladder: solid.\n\n"
             "## 数据质量检查\n"
-            "过拟合: normal. 数据泄露: none. 训练稳定性: stable. 可复现: three fixed seeds matched expected variance.\n\n"
-            "## 统计显著性检验\n"
-            "Wilcoxon paired test; p-value=0.018; effect size=0.82; 95% 置信区间=[0.038,0.061]; 多重比较: none.\n\n"
+            "过拟合: normal. 数据泄露: none. 训练稳定性: stable. 可复现: fixed seed=42 command/config/logs are recorded.\n\n"
+            "## 固定 Seed 单次结果验证\n"
+            "fixed seed=42 single-run validation; no p-value, std, or CI is claimed. Ours improves accuracy by 0.05 at seed 42.\n\n"
             "## 与假设的对应验证\n"
             "| 假设 | 预期结果 | 实际结果 | 支持程度 |\n"
             "|---|---|---|---|\n"
@@ -605,7 +666,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "## 最终决策\n"
             "Decision: KEEP\n\n"
             "## 负面结果\n"
-            "negative result: one seed has smaller gain, retained for M4 failure analysis.\n\n"
+            "negative result: cross-seed stability is not claimed because only fixed seed=42 is used.\n\n"
             "## Evidence Artifact 打包\n"
             "Artifact 清单 includes manifest.yaml, metric_contract.yaml, comparison_table.csv, and reproduction.md under "
             "`experiments/artifacts/main_experiment/`.\n\n"
@@ -621,8 +682,8 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                 "method": "ours",
                 "dataset": "demo",
                 "baseline_refs": ["experiments/baselines/baseline_1/metric_contract.yaml"],
-                "primary_metric": {"key": "accuracy", "value": 0.803, "std": 0.006},
-                "seeds": [1, 2, 3],
+                "primary_metric": {"key": "accuracy", "value": 0.803},
+                "seed": 42,
                 "environment": {"python": "3.11", "hardware": "cpu"},
                 "run_date": "2026-05-23",
             },
@@ -631,16 +692,16 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             root / "experiments" / "artifacts" / "main_experiment" / "metric_contract.yaml",
             {
                 "method": "ours",
-                "metrics": {"primary": {"key": "accuracy", "value": 0.803, "std": 0.006}},
+                "metrics": {"primary": {"key": "accuracy", "value": 0.803}},
             },
         )
         _write(
             root / "experiments" / "artifacts" / "main_experiment" / "comparison_table.csv",
-            "method,metric,mean,std,seed_count\nbaseline,accuracy,0.753,0.006,3\nours,accuracy,0.803,0.006,3\n",
+            "method,seed,metric,value\nbaseline,42,accuracy,0.753\nours,42,accuracy,0.803\n",
         )
         _write(
             root / "experiments" / "artifacts" / "main_experiment" / "reproduction.md",
-            "# Reproduction\n\nRun `python experiments/src/train.py` with seeds 1, 2, 3.\n",
+            "# Reproduction\n\nRun `python experiments/src/train.py --seed 42`.\n",
         )
         _write(
             root / "knowledge" / "handoff_M3_M4.md",
@@ -793,7 +854,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "Experiment plots use matplotlib seaborn plt and nature-figure.\n",
         )
     elif stage == "M5S03":
-        _write(out, "# M5S03\n\n## Introduction\ncontribution.\n\n## Related Work\nrelated work.\n")
+        _write(out, "# M5S03\n\n## Introduction\ncontribution based on locked M5S04 Method, M5S05 Experiments, and M5S06 Analysis.\n\n## Related Work\nrelated work.\n")
     elif stage == "M5S04":
         _write(out, "# M5S04\n\nproblem formulation 问题定义\nmethod 方法\nalgorithm 算法\narchitecture figure generated-images via image2 gpt-image-2. figure style profile venue palette visual richness. paper-framework-figure-studio-pro c-narcissus. allowed labels and forbidden invented labels; no invented components.\n")
     elif stage == "M5S05":
@@ -802,6 +863,39 @@ def _write_stage_output(root: Path, stage: str) -> Path:
         _write(out, "# M5S06\n\nanalysis 分析\ndiscussion 讨论\nlimitations 局限\nnegative failure 边界\n图来源 backend matplotlib plt no analysis figure.\n")
     elif stage == "M5S07":
         _write(out, "# M5S07\n\nabstract 摘要\nconclusion 结论\n数值一致 consistency check.\n")
+    elif stage == "M5S09":
+        _write(
+            out,
+            "# M5S09 Full-Polish & Narrative Coherence Review\n\n"
+            "## LaTeX/PDF Inputs\n"
+            "Read artifacts/paper.tex as the editable LaTeX source and artifacts/paper.pdf as the rendered PDF check. "
+            "Do not edit PDF directly; all edits are applied to paper.tex.\n\n"
+            "## Narrative Coherence Audit\n"
+            "Intro-Method promise chain: Introduction promises are implemented in Method.\n"
+            "Method-Experiments validation chain: Method components are validated in Experiments.\n"
+            "Experiments-Analysis interpretation chain: M5S05 findings map one-to-one to M5S06 analysis.\n\n"
+            "## Terminology Consistency\n"
+            "terminology consistency 术语一致 check passed across Introduction, Method, Exp, Analysis, and Conclusion.\n\n"
+            "## Numerical Consistency\n"
+            "numerical consistency 数值一致 check passed for Abstract, Exp, Analysis, and Conclusion.\n\n"
+            "## Language Refinement\n"
+            "language refinement 语言精炼 and 润色 completed; transitions improved; no new claims added.\n\n"
+            "## Recompile\n"
+            "recompile 重新编译 compile completed after polishing paper.tex; final paper.pdf updated.\n\n"
+            "## Anti-Leakage\n"
+            "Anti-Leakage prompt applied; no author identity or copied exemplar text.\n",
+        )
+        _write(root / "artifacts" / "paper.pdf", "%PDF simulated final polished\n")
+        _write(
+            root / "knowledge" / "handoff_M5_completion.md",
+            "# Handoff M5 Completion\n\n"
+            "M6 submission ready: M5S09 final polish and recompile verdict PASS.\n\n"
+            "## Paper Artifacts\n"
+            "- artifacts/paper.pdf\n"
+            "- artifacts/paper.tex\n"
+            "- artifacts/refs.bib\n\n"
+            "The final polished package is compiled and ready for submission audit.\n",
+        )
     elif stage == "M5S08":
         _write(
             out,
@@ -868,7 +962,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "\\label{fig:arch}\n"
             "\\end{figure}\n"
             "\\section{Experiments and Results}\n"
-            "Table~\\ref{tab:main} reports the main comparison across three seeds. "
+            "Table~\\ref{tab:main} reports the main comparison with fixed seed 42. "
             "The proposed method improves accuracy over the baseline with matched data and metric definitions.\n"
             "\\begin{table}[t]\n"
             "\\centering\n"
@@ -961,7 +1055,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "- required_fix: clarify evidence provenance and comparison table\n"
             "- success_criteria: M5S05 cites the evidence artifact and reviewer confusion is resolved\n"
             "- rebuild_mode: incremental_replay\n"
-            "- rerun_scope: M5S05 -> M5S08\n"
+            "- rerun_scope: M5S05 -> M5S06 -> M5S03 -> M5S07 -> M5S08 -> M5S09\n"
             "- priority: P1\n",
         )
     elif stage == "M6S05":

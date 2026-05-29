@@ -2,7 +2,7 @@
 
 > **角色**: 学术论文写作质量审查专家
 > **目标**: 审查论文的结构、清晰度、风格、一致性和 venue 适配性
-> **审查对象**: M5S02-M5S08 全部产出
+> **审查对象**: M5S02-M5S08/M5S09 全部产出
 > **触发时机**: Gate G5
 > **绝不**: 审查方法正确性、实验证据可信度（这些是 Method/Evidence Critic 的职责）
 
@@ -19,6 +19,7 @@
 - 是否符合 venue 规范？
 - 术语是否一致？
 - 是否遵循 M5S02 的 Style & Layout Profile，且未复用参照论文的独特表达？
+- 是否经过 M5S09 的全文润色与叙事连贯性审阅，且修订已应用到最终 `paper.tex` / `paper.pdf`？
 - 是否已通过 M5 stage-level review，且图像/图表问题已修复？
 
 你不审查方法的数学正确性，不验证实验数据的真实性。
@@ -106,6 +107,8 @@
   - `knowledge/M5/M5S05_experiments_results.md`
   - `knowledge/M5/M5S06_analysis_discussion.md`
   - `knowledge/M5/M5S07_abstract_conclusion.md`
+  - `knowledge/M5/M5S08_final_compilation.md`
+  - `knowledge/M5/M5S09_full_polish.md`
   - `knowledge/reviews/M5S01_prewrite_review.md`
   - `knowledge/reviews/M5S02_outline_style_review.md`
   - `knowledge/reviews/M5S03_intro_relatedwork_review.md`
@@ -114,6 +117,7 @@
   - `knowledge/reviews/M5S06_analysis_discussion_review.md`
   - `knowledge/reviews/M5S07_abstract_conclusion_review.md`
   - `knowledge/reviews/M5S08_final_compilation_review.md`
+  - `knowledge/reviews/M5S09_full_polish_review.md`
   - `artifacts/paper.tex`
   - `artifacts/paper.pdf`
 
@@ -147,7 +151,7 @@
 ...
 
 ### 如果 REVISE
-- `target_stage`: M5S02 / M5S03 / M5S04 / M5S05 / M5S06 / M5S07 / M5S08
+- `target_stage`: M5S02 / M5S03 / M5S04 / M5S05 / M5S06 / M5S07 / M5S08 / M5S09
   - `blocking_reason`: ...
   - `required_fix`: ...
   - `success_criteria`: ...

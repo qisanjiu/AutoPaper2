@@ -16,7 +16,7 @@
 
 ## 2. 核心能力
 
-- **统计分析**：均值/方差、显著性检验、置信区间、效应量
+- **结果分析**：固定 seed=42 的指标差异、误差检查、质量审查和结论边界
 - **模式识别**：从多个实验结果中识别一致的模式和异常
 - **因果推断**：区分相关性与因果性，识别混淆变量
 - **洞察提炼**：回答 "这些结果意味着什么？"
@@ -57,10 +57,10 @@ Conductor 会提供：
 - **数据泄露检查**: 预处理管道隔离性
 - **训练稳定性检查**: loss 曲线, NaN/inf
 
-## 3. 统计显著性
-| 对比 | 指标 | p-value | 效应量 | 结论 |
-|------|------|---------|--------|------|
-| Ours vs Baseline-1 | Acc | 0.003 | Cohen's d = 0.8 | 显著优于 |
+## 3. 固定 Seed 单次结果验证
+| 对比 | Seed | 指标 | 差异 | 结论 |
+|------|------|------|------|------|
+| Ours vs Baseline-1 | 42 | Acc | +0.05 | 优于 |
 
 ## 4. 潜在问题与根因分析
 - 问题 1: ... → 严重程度: critical/major/minor
@@ -78,7 +78,7 @@ Conductor 会提供：
 ### 6.2 修改方向/建议
 | 问题 | 建议修改方向 | 回溯目标 | 预期效果 |
 |------|------------|---------|---------|
-| 结果不可复现 | 检查随机种子 | M3S01 | 结果稳定 |
+| 结果不可复现 | 检查是否固定 seed=42 | M3S01 | 配置和日志可追溯 |
 | 统计不显著 | 增加实验规模 | M2S03 | 效应可检测 |
 | 效果不达预期（代码问题） | 检查/修复模型实现 | M3S01 | 方法正常工作 |
 | 效果不达预期（方法问题） | 重新设计核心架构 | M2S01 | 方法有效 |
@@ -114,13 +114,13 @@ Conductor 会提供：
 ## 1. 数据质量审计
 - 过拟合检查: train/val gap, 学习曲线
 - 数据泄露检查: 预处理管道隔离性
-- 训练稳定性: loss 曲线, NaN/inf, seed 间方差
-- 可复现性: 3+ seeds 结果一致性
+- 训练稳定性: loss 曲线, NaN/inf
+- 可复现性: 配置、命令、日志均记录 seed=42
 
 ## 2. 主实验结果摘要
-| 指标 | Ours | Best Baseline | Delta | 统计显著性 |
-|------|------|---------------|-------|-----------|
-| ...  | ...  | ...           | ...   | ...       |
+| 指标 | Seed | Ours | Best Baseline | Delta |
+|------|------|------|---------------|-------|
+| ...  | 42   | ...  | ...           | ...   |
 
 ## 3. 意外发现
 （实验过程中观察到的、未在假设中预见的模式）
@@ -186,8 +186,8 @@ Conductor 会提供：
 - **baseline_inclusion**: required，纳入 active baseline 的同一 metric/split/seed contract；若不可运行，说明替代对照
 - **literature_basis**: 参考 M1/M2 数据库中类似消融或诊断方法，列出 source id / title
 - **expected_pattern**: Full > w/o A，且 drop 大于最小效应阈值
-- **evidence_criteria**: 3 seeds、均值/方差、效应量、可比性成立
-- **stop_condition**: 3 seeds 完成
+- **evidence_criteria**: 固定 seed=42、主指标差异、可比性成立
+- **stop_condition**: seed=42 单次实验完成
 - **paper_role**: main_text
 - **claim_links**: C1
 
@@ -240,11 +240,11 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 ```markdown
 # Analysis Results Integration & Evidence Packaging
 
-## 1. 统计分析
-| 对比 | 指标 | p-value | 效应量 | 置信区间 | 结论 |
-|------|------|---------|--------|---------|------|
-| Ours vs Baseline | Acc | 0.003 | Cohen's d = 0.8 | [0.5, 1.1] | 显著优于 |
-| Full vs w/o Comp A | Acc | 0.01 | Cohen's d = 0.6 | [0.3, 0.9] | 组件 A 显著贡献 |
+## 1. 固定 Seed 分析
+| 对比 | Seed | 指标 | 差异 | 结论 |
+|------|------|------|------|------|
+| Ours vs Baseline | 42 | Acc | +0.05 | 优于 |
+| Full vs w/o Comp A | 42 | Acc | -0.03 | 组件 A 有贡献 |
 
 ## 2. Claim Ledger
 | Claim ID | Claim Text | Evidence | Status | Caveats | Paper Role |
@@ -348,21 +348,21 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 - **建议的 M5S02 重点关注**: ...
 ```
 
-> M5S02-M5S08 由 Writing Agent 执行。Analysis Agent 不直接撰写论文段落，只把可用证据、贡献边界、gap 和写作风险移交给 Writing Agent。
+> M5S02-M5S08/M5S09 由 Writing Agent 执行。Analysis Agent 不直接撰写论文段落，只把可用证据、贡献边界、gap 和写作风险移交给 Writing Agent。
 
 ---
 
 ## 4. 质量标准
 
 - 所有结论必须有数据支撑
-- 统计检验必须选择合适的检验方法
-- 必须报告效应量（不只是 p-value）
-- 必须考虑零假设（结果可能不是真的）
+- 固定 seed=42 的结果边界必须清楚，不得声称统计显著或跨 seed 稳定
+- 必须报告实际差异（绝对/相对提升）
+- 必须考虑替代解释（结果可能来自实现、数据或配置因素）
 - 局限性分析必须诚实，不能回避
 - 声明必须有证据映射（每个 claim 对应哪些证据）
 - **M3S04 必须给出明确的 KEEP / FIX / BACKTRACK 决策**（不允许模糊结论）
 - **M3S04 写 KEEP 时必须同步完成证据包与 M3→M4 handoff**：`manifest.yaml`, `metric_contract.yaml`, `comparison_table.csv`, `reproduction.md`, `knowledge/handoff_M3_M4.md`
-- **M3S04 KEEP 必须包含统计验证、数据质量检查、假设映射、根因分析、负面结果、局限性和下游分析方向**
+- **M3S04 KEEP 必须包含固定 seed=42 结果验证、数据质量检查、假设映射、根因分析、负面结果、局限性和下游分析方向**
 - **M3S04 若决策为 BACKTRACK，必须产出「回溯修改方向」章节**
 - **M4S01/M4S02 必须覆盖消融、机制、鲁棒性，并显式处理失败/负面分析**
 - **M4S02 的 claim-carrying slice 必须包含 `literature_basis`、`baseline_inclusion`、`evidence_criteria`**
@@ -379,9 +379,9 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 
 ## 5. 常见陷阱
 
-- **陷阱 1**：p-hacking → 必须进行多重比较校正
+- **陷阱 1**：选择性报告 → 必须报告不利配置和负面结果
 - **陷阱 2**：过度解读相关性 → 区分相关与因果
-- **陷阱 3**：忽视效应量 → 统计显著 ≠ 实际重要
+- **陷阱 3**：把 seed=42 单次结果写成统计显著或跨 seed 稳定 → 必须收窄声明
 - **陷阱 4**：选择性报告 → 必须报告负面结果
 - **陷阱 5**：S3S03 决策模糊 → 不写 KEEP/FIX/BACKTRACK 会导致验证失败
 - **陷阱 6**：BACKTRACK 时缺少「回溯修改方向」→ 下游 Agent 不知道修什么
@@ -401,7 +401,7 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 ### 6.1 回溯到 M3S04
 
 1. 读取 `backtrack_advice`，确认 blocking_reason 和 required_fix。
-2. 若原因是 "统计分析错误" → 重新计算显著性、效应量、置信区间。
+2. 若原因是 "结果边界错误" → 重新核对 seed=42、指标差异和声明措辞。
 3. 若原因是 "决策理由不足" → 补充 KEEP/FIX/BACKTRACK 的论证，明确证据链。
 4. 若原因是 "遗漏负面结果" → 重新审查所有实验记录，补充失败案例和异常分析。
 5. 重新产出 `knowledge/M3/M3S04_result_validation.md`，旧文件只能作为历史审计。

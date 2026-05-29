@@ -287,7 +287,7 @@ class TestDispatchPackets(unittest.TestCase):
             "| Exp-1 | main purpose | H1 | main comparison | baseline | accuracy metric | 必需 |\n"
             "| Exp-2 | component purpose | H2 | component check | baseline | accuracy metric | 必需 |\n"
             "| Exp-3 | robustness purpose | H3 | robustness | baseline | accuracy metric | 可选 |\n\n"
-            "随机种子 seed: 1, 2, 3. 统计检验 t-test bootstrap. "
+            "随机种子 seed: 42. 单次固定 seed 实验。 "
             "可复现 reproducibility requirements include git commit and environment lock.\n",
             encoding="utf-8",
         )
@@ -317,7 +317,7 @@ class TestDispatchPackets(unittest.TestCase):
             "- 数据集与划分: DemoSet dataset split\n"
             "- Baselines / 对照组: baseline\n"
             "- 评价指标: accuracy metric\n"
-            "- 运行协议: seed epoch hardware 超参\n"
+            "- 运行协议: seed=42 epoch hardware 超参\n"
             "- 预期结果形态: table plot\n"
             "- 成功标准: ...\n"
             "- 失败时诊断路径: implementation / design / hypothesis / data / baseline\n"
@@ -428,7 +428,7 @@ class TestDispatchPackets(unittest.TestCase):
         state_path = self.root / "state" / "pipeline_state.yaml"
         state = yaml.safe_load(state_path.read_text(encoding="utf-8"))
         state["current"] = {"module": "M6", "stage": "M6S05", "status": "in_progress"}
-        state["modules"]["M5"] = {"status": "completed", "completed_at": None, "last_stage": "M5S08"}
+        state["modules"]["M5"] = {"status": "completed", "completed_at": None, "last_stage": "M5S09"}
         state["modules"]["M6"] = {"status": "in_progress", "completed_at": None, "last_stage": "M6S04"}
         state_path.write_text(yaml.safe_dump(state, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
@@ -442,7 +442,7 @@ class TestDispatchPackets(unittest.TestCase):
             "- **required_fix**: Add ablation design for component X\n"
             "- **success_criteria**: M4S02 includes an executable ablation slice\n"
             "- **rebuild_mode**: incremental_replay\n"
-            "- **rerun_scope**: M4S02 -> M4S03 -> M4S04 -> M5S08\n"
+            "- **rerun_scope**: M4S02 -> M4S03 -> M4S04 -> M5S08 -> M5S09\n"
             "- **priority**: P0\n\n"
             "### PR-A2\n"
             "- **class**: text_only\n"
@@ -451,7 +451,7 @@ class TestDispatchPackets(unittest.TestCase):
             "- **required_fix**: Clarify motivation in introduction\n"
             "- **success_criteria**: M5S03 addresses reviewer confusion\n"
             "- **rebuild_mode**: incremental_replay\n"
-            "- **rerun_scope**: M5S03 -> M5S08\n"
+            "- **rerun_scope**: M5S03 -> M5S07 -> M5S08 -> M5S09\n"
             "- **priority**: P1\n",
             encoding="utf-8",
         )
@@ -488,7 +488,7 @@ class TestDispatchPackets(unittest.TestCase):
         state = yaml.safe_load(state_path.read_text(encoding="utf-8"))
         state["current"] = {"module": "M6", "stage": "M6S05", "status": "in_progress"}
         state["modules"]["M4"] = {"status": "completed", "completed_at": None, "last_stage": "M4S04"}
-        state["modules"]["M5"] = {"status": "completed", "completed_at": None, "last_stage": "M5S08"}
+        state["modules"]["M5"] = {"status": "completed", "completed_at": None, "last_stage": "M5S09"}
         state["modules"]["M6"] = {"status": "in_progress", "completed_at": None, "last_stage": "M6S04"}
         state_path.write_text(yaml.safe_dump(state, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
@@ -503,7 +503,7 @@ class TestDispatchPackets(unittest.TestCase):
             "- **success_criteria**: M4S02 includes an executable ablation slice\n"
             "- **evidence_paths**: knowledge/M6/M6S03_review_matrix.md\n"
             "- **rebuild_mode**: incremental_replay\n"
-            "- **rerun_scope**: M4S02 -> M4S03 -> M4S04 -> M5S08\n"
+            "- **rerun_scope**: M4S02 -> M4S03 -> M4S04 -> M5S08 -> M5S09\n"
             "- **handoff_updates**: knowledge/handoff_M4_M5.md\n"
             "- **priority**: P0\n\n"
             "### PR-A2\n"
@@ -513,7 +513,7 @@ class TestDispatchPackets(unittest.TestCase):
             "- **required_fix**: Clarify motivation in introduction\n"
             "- **success_criteria**: M5S03 addresses reviewer confusion\n"
             "- **rebuild_mode**: incremental_replay\n"
-            "- **rerun_scope**: M5S03 -> M5S08\n"
+            "- **rerun_scope**: M5S03 -> M5S07 -> M5S08 -> M5S09\n"
             "- **priority**: P1\n",
             encoding="utf-8",
         )
@@ -531,11 +531,13 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertIn("M4S02", advice_map)
         self.assertIn("M4S03", advice_map)
         self.assertIn("M5S03", advice_map)
+        self.assertIn("M5S09", advice_map)
         self.assertIn("M5S08", advice_map)
         self.assertEqual(advice_map["M4S02"]["direct_item_ids"], ["PR-A1"])
         self.assertEqual(advice_map["M4S03"]["downstream_item_ids"], ["PR-A1"])
         self.assertEqual(advice_map["M5S03"]["direct_item_ids"], ["PR-A2"])
         self.assertEqual(set(advice_map["M5S08"]["downstream_item_ids"]), {"PR-A1", "PR-A2"})
+        self.assertEqual(set(advice_map["M5S09"]["downstream_item_ids"]), {"PR-A1", "PR-A2"})
 
         packet = build_stage_execution_packet(self.root, "M5S08")
         packet_advice = packet["backtrack_advice"]

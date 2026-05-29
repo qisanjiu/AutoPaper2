@@ -126,8 +126,8 @@ requirements:
       figures with image2 using paper-framework-figure-studio-pro style, and
       generate experiment figures from real data using Nature-style plotting.
     enforced_by:
-      stage_gates: [M5S01, M5S02, M5S03, M5S04, M5S05, M5S06, M5S07, M5S08]
-      reviews: [m5_prewrite_review, m5_outline_style_review, m5_method_figure_review, m5_final_compilation_review]
+      stage_gates: [M5S01, M5S02, M5S04, M5S05, M5S06, M5S03, M5S07, M5S08, M5S09]
+      reviews: [m5_prewrite_review, m5_outline_style_review, m5_method_figure_review, m5_experiments_results_review, m5_analysis_discussion_review, m5_intro_relatedwork_review, m5_abstract_conclusion_review, m5_final_compilation_review, m5_full_polish_review]
     evidence_paths:
       - docs/AGENTS/analysis/AGENT.md
       - docs/AGENTS/writing/AGENT.md
@@ -137,6 +137,8 @@ requirements:
       - templates/stage/M5S02_template.md
       - templates/stage/M5S04_template.md
       - templates/stage/M5S05_template.md
+      - templates/stage/M5S06_template.md
+      - templates/stage/M5S09_template.md
       - templates/stage/M5S08_template.md
       - config/figure_style_profiles.yaml
       - config/image_generation.yaml

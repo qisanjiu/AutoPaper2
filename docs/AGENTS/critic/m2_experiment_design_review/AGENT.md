@@ -27,7 +27,7 @@ requirements:
   baseline/control group, metric, and required/optional status
 - metrics include definition, calculation, direction, statistical test, and
   reporting format
-- at least three seeds and reproducibility requirements are specified
+- fixed seed=42 and reproducibility requirements are specified
 
 ## Output Format
 

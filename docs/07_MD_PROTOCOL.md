@@ -39,7 +39,7 @@
 | Method (M2S01-M2S06) | 问题形式化（符号+目标函数）、伪代码/算法框、复杂度分析 |
 | Experiment (M3S01-M3S03) | 环境配置锁定、Run Contract、Baseline 公平性声明 |
 | Analysis (M3S04/M4S01-M4S04/M5S01) | Claim Ledger、Evidence Ladder、统计显著性 |
-| Writing (M5S02-M5S08) | Style & Layout Profile 引用、Figure/Table 清单、Anti-Leakage 自检 |
+| Writing (M5S02-M5S08/M5S09) | Style & Layout Profile 引用、Figure/Table 清单、Anti-Leakage 自检、Full-Polish 叙事连贯性审阅 |
 | Submission (M6S01-M6S02) | Venue 合规性检查表、投稿包清单 |
 | Rebuttal (M6S03-M6S06) | Review Matrix 引用、Action Plan、逐条解决度验证 |
 

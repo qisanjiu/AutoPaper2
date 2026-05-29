@@ -182,8 +182,8 @@ Handoff M2→M3                      [Conductor]     → knowledge/handoff_M2_M3
 - [ ] 预处理清晰、可复现
 - [ ] Baseline 覆盖主要竞争方法、公平性保证
 - [ ] 超参数固定且有选择依据
-- [ ] 随机种子：至少 3 个不同种子
-- [ ] 评估指标明确，含统计检验方法
+- [ ] 随机种子：固定为 42
+- [ ] 评估指标明确；不要求多 seed 统计检验
 - [ ] 可复现检查清单完整
 
 **Baseline 代码可用性分级**:
@@ -448,7 +448,7 @@ spiral_count:
 | M2S01 完成后 | 产出文件非空、有形式化描述、有设计决策记录 | 重试一次，仍失败则 BACKTRACK → M1S04 |
 | M2S02 完成后 | 数据集可获取、许可证合规、适配性分析完整 | BACKTRACK → M2S01 |
 | M2S04 完成后 | baseline 与消融无冲突、代码可用性评估完整 | 要求补充 |
-| M2S05 完成后 | 数据集获取/校验、baseline、公平性、指标/统计检验、相关工作协议、逐实验目的/假设、随机种子、可复现清单、m2_experiment_design_review PASS | BACKTRACK → M2S05 |
+| M2S05 完成后 | 数据集获取/校验、baseline、公平性、指标、相关工作协议、逐实验目的/假设、固定随机种子=42、可复现清单、m2_experiment_design_review PASS | BACKTRACK → M2S05 |
 | M2S06 完成后 | 执行顺序、分支/回溯逻辑、成功/失败标准、风险/资源预算、逐实验完整报告蓝图、证据保存协议、m2_experiment_plan_review PASS | BACKTRACK → M2S06 |
 | Gate G2 | Logic ≥7.0 AND Method ≥7.0 AND Novelty ≥7.0 | BACKTRACK 或 REVISE |
 | Handoff 前 | 所有 M2 产出文件存在 | 阻止完成 |

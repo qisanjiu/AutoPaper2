@@ -50,7 +50,7 @@ class TestFullPipelineSimulation(unittest.TestCase):
             second.mkdir()
 
             first_state = PipelineState(first)
-            first_state.set_module_status("M5", "completed", "M5S08")
+            first_state.set_module_status("M5", "completed", "M5S09")
 
             second_state = PipelineState(second)
 
@@ -61,14 +61,14 @@ class TestFullPipelineSimulation(unittest.TestCase):
             summary = run_simulation(Path(tmp), keep_project=True)
 
             self.assertTrue(summary["ok"])
-            self.assertEqual(summary["stage_advances"], 33)
+            self.assertEqual(summary["stage_advances"], 34)
             self.assertEqual(summary["gate_advances"], 6)
             self.assertTrue(summary["backtrack_exercised"])
             self.assertEqual(summary["final_stage"], "M6S06")
             self.assertEqual(summary["final_status"], "completed")
             self.assertEqual(summary["auto_starts"], ["M2S01", "M3S01", "M4S01", "M5S01", "M6S01"])
-            self.assertGreaterEqual(summary["dispatch_packets"], 33)
-            self.assertGreaterEqual(summary["history_entries"], 39)
+            self.assertGreaterEqual(summary["dispatch_packets"], 34)
+            self.assertGreaterEqual(summary["history_entries"], 40)
             self.assertEqual(summary["backtrack_entries"], 1)
 
 

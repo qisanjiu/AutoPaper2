@@ -101,7 +101,7 @@ python scripts/email_monitor.py \
 
 | 意见类别 | 典型回溯目标 | 负责 Agent |
 |----------|-------------|-----------|
-| editorial / text_only | M5S03-M5S08 | Writing Agent |
+| editorial / text_only | M5S03 / M5S08 / M5S09 | Writing Agent |
 | evidence_gap（现有证据不足） | M4S02-M4S04 | Analysis Agent |
 | experiment_gap（需新实验） | M3S03 / M4S03 | Experiment Agent |
 | claim_scope（声明过宽） | M5S02-M5S06 | Writing Agent + Analysis Agent |
@@ -123,7 +123,7 @@ Action Plan 必须包含：
 - **required_fix**: 补充消融实验，验证 X 组件对整体性能的贡献
 - **success_criteria**: 新增消融表格，显示 ±X 组件的 performance delta
 - **rebuild_mode**: incremental_replay
-- **rerun_scope**: M4S02 → M4S03 → M4S04 → M5S05 → M5S08
+- **rerun_scope**: M4S02 → M4S03 → M4S04 → M5S05 → M5S06 → M5S03 → M5S07 → M5S08 → M5S09
 - **priority**: P0
 ```
 
@@ -228,7 +228,7 @@ resolution_rate = (已解决 High 数 / 总 High 数) * 0.5 + (已解决 Medium 
 - **required_fix**: ...
 - **success_criteria**: ...
 - **rebuild_mode**: incremental_replay
-- **rerun_scope**: M5S03 → M5S08
+- **rerun_scope**: M5S03 → M5S07 → M5S08 → M5S09
 
 ## 诚实限制声明
 - PR-A5: 因资源限制无法补充大规模实验，将在 Limitations 中说明

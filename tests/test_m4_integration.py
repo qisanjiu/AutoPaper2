@@ -617,6 +617,19 @@ class TestM5StageGate(unittest.TestCase):
             return
 
         cite_key = "missing2026" if orphan_cite else "smith2024demo"
+        (root / "knowledge" / "M5" / "M5S09_full_polish.md").write_text(
+            "# M5S09 Full-Polish\n\n"
+            "Narrative coherence 叙事连贯 audit passed.\n"
+            "Intro-Method chain, Method-Experiments chain, and Experiments-Analysis mapping are complete.\n"
+            "M5S05 findings map one-to-one to M5S06 analysis.\n"
+            "terminology consistency 术语一致 passed.\n"
+            "numerical consistency 数值一致 passed.\n"
+            "language refinement 语言精炼 and 润色 completed.\n"
+            "paper.tex LaTeX source edited; paper.pdf PDF rendering checked.\n"
+            "recompile 重新编译 compile completed after polish.\n"
+            "Anti-Leakage prompt applied.\n",
+            encoding="utf-8",
+        )
         (root / "artifacts" / "figures" / "architecture.pdf").write_bytes(b"%PDF figure\n")
         (root / "artifacts" / "refs.bib").write_text(
             "@article{smith2024demo,\n"
@@ -650,7 +663,7 @@ class TestM5StageGate(unittest.TestCase):
             "\\label{fig:arch}\n"
             "\\end{figure}\n"
             "\\section{Experiments and Results}\n"
-            "Table~\\ref{tab:main} reports the main metric comparison with uncertainty across seeds.\n"
+            "Table~\\ref{tab:main} reports the main metric comparison for seed 42.\n"
             "\\begin{table}[t]\n"
             "\\centering\n"
             "\\caption{Main comparison.}\n"
@@ -729,6 +742,43 @@ class TestM5StageGate(unittest.TestCase):
 
             self.assertFalse(ok)
             self.assertTrue(any("orphan citation keys: missing2026" in m for m in messages))
+
+    def test_m5s09_stage_gate_accepts_complete_polish_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "test_project"
+            (proj / "knowledge" / "M5").mkdir(parents=True, exist_ok=True)
+            (proj / "knowledge" / "reviews").mkdir(parents=True, exist_ok=True)
+            (proj / "artifacts").mkdir(parents=True, exist_ok=True)
+            (proj / "artifacts" / "paper.tex").write_text("\\documentclass{article}\\begin{document}ok\\end{document}\n", encoding="utf-8")
+            (proj / "artifacts" / "paper.pdf").write_bytes(b"%PDF polished\n")
+            (proj / "artifacts" / "refs.bib").write_text("@article{x, title={x}, year={2026}}\n", encoding="utf-8")
+            (proj / "knowledge" / "handoff_M5_completion.md").write_text(
+                "# Handoff\n\nM6 submission ready. Artifacts: artifacts/paper.pdf, artifacts/paper.tex, refs.bib.\n",
+                encoding="utf-8",
+            )
+            (proj / "knowledge" / "M5" / "M5S09_full_polish.md").write_text(
+                "# M5S09 Full-Polish & Narrative Coherence Review\n\n"
+                "Narrative coherence 叙事连贯 audit passed.\n"
+                "Intro-Method chain is complete.\n"
+                "Method-Experiments chain is complete.\n"
+                "Experiments-Analysis chain maps M5S05 to M5S06 one-to-one.\n"
+                "terminology consistency 术语一致 passed.\n"
+                "numerical consistency 数值一致 passed.\n"
+                "language refinement 语言精炼 and 润色 completed.\n"
+                "paper.tex LaTeX source edited; paper.pdf PDF rendering checked.\n"
+                "recompile 重新编译 compile completed after polish.\n"
+                "Anti-Leakage prompt applied.\n",
+                encoding="utf-8",
+            )
+            (proj / "knowledge" / "reviews" / "M5S09_full_polish_review.md").write_text(
+                "# M5S09 Review\n\nVerdict: PASS\n",
+                encoding="utf-8",
+            )
+
+            ok, messages = check_stage(proj, "M5S09")
+
+            self.assertTrue(ok, "\n".join(messages))
+            self.assertTrue(any("includes narrative coherence" in m for m in messages))
 
 
 class TestM4Templates(unittest.TestCase):

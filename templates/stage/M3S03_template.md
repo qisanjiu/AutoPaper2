@@ -24,12 +24,13 @@
 | 次指标 | ... |
 | 停止条件 | 预算: X GPU-hours / 迭代: N 轮 / 收敛: 连续 3 轮 < 1% 提升 |
 | 放弃条件 | smoke test 级别结果连续 2 轮低于 baseline |
+| 资源执行合同 | `experiments/configs/resource_plan.yaml` |
 
 ### 1.2 证据层级目标
 
 - **minimum**: [目标，如"代码运行完成，指标可计算"]
 - **solid**: [目标，如"主指标显著优于 baseline"]
-- **maximum**: [目标，如"多 seed、完整曲线"]
+- **maximum**: [目标，如"完整曲线、更多数据集或更完整日志"]
 
 > 本实验当前追求层级: minimum → solid（maximum 留给 M4）
 
@@ -42,8 +43,14 @@
 - **PyTorch**: ...
 - **CUDA**: ...
 - **硬件**: ...
+- **Resource Plan**: `experiments/configs/resource_plan.yaml`
+- **设备策略**: distributed_data_parallel / single_gpu / cpu_parallel / task_parallel
+- **分配 GPU**: `gpu_ids=[...]`, `gpu_count=...`
+- **分配 CPU**: `cpu_cores=...`
+- **DataLoader**: `num_workers=...`, `pin_memory=...`, `persistent_workers=...`, `prefetch_factor=...`
+- **线程环境变量**: `OMP_NUM_THREADS=...`, `MKL_NUM_THREADS=...`
 - **Git 分支**: `exp/main`
-- **随机种子**: [42, 123, 2024, ...]
+- **随机种子**: 42（固定单次实验；不做多 seed 重复实验）
 
 ### 2.1 远程执行配置（如适用）
 
@@ -55,12 +62,22 @@
 
 ---
 
+## 2.2 资源利用率执行记录（必须）
+
+| Run ID | 启动命令 | Resource monitor | 平均 GPU 利用率 | 平均 CPU 利用率 | 低利用率处理 |
+|--------|----------|------------------|----------------|----------------|--------------|
+| run_001 | `python scripts/resource_planner.py run --output experiments/runs/run_001/resource_monitor.csv --interval 10 -- ...` | `experiments/runs/run_001/resource_monitor.csv` | ...% | ...% | optimized / documented blocker |
+
+如 `resource_plan.yaml` 分配多 GPU，则默认命令必须使用 `torchrun --nproc_per_node=<gpu_count>` 或等价 DDP。若未使用 DDP，必须写明替代资源策略和原因；不得通过多 seed 重复实验来填满资源。
+
+---
+
 ## 3. Baseline 结果（本地运行）
 
-| Baseline | 主指标 | 次指标 | Seed | 运行时间 | 备注 |
-|----------|--------|--------|------|---------|------|
-| Baseline-1 | ... | ... | 42 | ... | 官方代码 |
-| Baseline-2 | ... | ... | 42 | ... | 自行实现 |
+| Baseline | 主指标 | 次指标 | Seed | 运行时间 | 资源策略 | Monitor | 备注 |
+|----------|--------|--------|------|---------|----------|---------|------|
+| Baseline-1 | ... | ... | 42 | ... | resource_plan / fair override | `experiments/runs/.../resource_monitor.csv` | 官方代码 |
+| Baseline-2 | ... | ... | 42 | ... | resource_plan / fair override | `experiments/runs/.../resource_monitor.csv` | 自行实现 |
 
 ---
 
@@ -74,6 +91,8 @@
   | 方法 | 主指标 | 次指标 | vs Baseline-1 | vs Baseline-2 |
   |------|--------|--------|--------------|--------------|
   | Ours | ... | ... | ... | ... |
+- **资源监控**: `experiments/runs/<run_id>/resource_monitor.csv`；平均 GPU 利用率 ...%；平均 CPU 利用率 ...%
+- **低利用率处置**: 无 / 已调 batch size / 已调 num_workers / 已切换 DDP / 已改 task_parallel / 不可优化原因 ...
 - **结论**: [改善/持平/恶化]
 - **决策**: [继续 / 调整方向 / 诊断]
 - **远程同步**（如适用）: push / pull 状态
@@ -87,16 +106,10 @@
 
 ### 5.1 主结果表
 
-| 方法 | Seed | 主指标 | 次指标 | 运行时间 |
-|------|------|--------|--------|---------|
-| Baseline-1 | 42 | ... | ... | ... |
-| Baseline-1 | 123 | ... | ... | ... |
-| Baseline-1 | 2024 | ... | ... | ... |
-| Baseline-1 | **Mean±Std** | **...** | **...** | — |
-| Ours | 42 | ... | ... | ... |
-| Ours | 123 | ... | ... | ... |
-| Ours | 2024 | ... | ... | ... |
-| Ours | **Mean±Std** | **...** | **...** | — |
+| 方法 | Seed | 主指标 | 次指标 | 运行时间 | 资源策略 | Monitor |
+|------|------|--------|--------|---------|----------|---------|
+| Baseline-1 | 42 | ... | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
+| Ours | 42 | ... | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
 
 ### 5.2 与 Baseline 的对比
 
@@ -148,6 +161,9 @@
 
 - **总 GPU 时间**: ...
 - **总 Wall-clock 时间**: ...
+- **平均 GPU 利用率**: ...%
+- **平均 CPU 利用率**: ...%
+- **低利用率原因/优化记录**: ...
 - **存储占用**: ...
 - **与预算对比**: 未超支 / 超支 X%
 

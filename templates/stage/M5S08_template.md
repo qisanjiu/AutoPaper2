@@ -11,12 +11,14 @@
 | Section | 源文件 | 已合并 | 状态 |
 |---------|--------|--------|------|
 | Abstract | M5S07 | ☐ | |
-| Introduction | M5S03 | ☐ | |
-| Related Work | M5S03 | ☐ | |
+| Introduction & Related Work | M5S03 | ☐ | |
 | Methodology | M5S04 | ☐ | |
-| Experiments | M5S05 | ☐ | |
-| Analysis & Discussion | M5S06 | ☐ | |
+| Experiments, Results and Analysis/Discussion | M5S05 + M5S06 | ☐ | |
 | Conclusion | M5S07 | ☐ | |
+**Section 合并规则**:
+- M5S05（Experiments & Results）与 M5S06（Analysis & Discussion）必须合并为同一 section（如 "4. Experiments, Results and Analysis"），M5S06 的内容作为该 section 的子节
+- M5S03 中的 Introduction 与 Related Work 根据 M5S02 的 Section Plan，可作为独立 section 或合并为单一 section
+- M5S08 生成完整可编译初稿；M5S09 将在此基础上读取 `paper.tex` / `paper.pdf` 做最终润色与复编译
 
 ### 1.2 Style/Layout Compliance
 
@@ -98,20 +100,24 @@ pdflatex paper.tex
 - [ ] `artifacts/paper.pdf` — 编译后的 PDF
 - [ ] `artifacts/refs.bib` — 参考文献数据库
 - [ ] `knowledge/M5/M5S08_final_compilation.md` — 本编译报告
-- [ ] `knowledge/handoff_M5_completion.md` — M5→M6 完成交接
 
-### 3.1 Deterministic Gate Requirements
+### 3.2 Section 合并验证
+
+- [ ] M5S05 与 M5S06 已合并为同一 section，子节一一对应
+- [ ] M5S03 的 Introduction 与 Related Work 结构符合 M5S02 的 Section Plan（分离式或合并式）
+- [ ] 已为 M5S09 生成可读取的 `artifacts/paper.tex` 与 `artifacts/paper.pdf`
+
+### 3.3 Deterministic Gate Requirements
 
 M5S08 通过前必须满足：
 
-- `paper.tex` 不是占位文件，包含 abstract、Introduction、Related Work、Method、Experiments/Results、Analysis/Discussion、Conclusion、bibliography
+- `paper.tex` 不是占位文件，包含 abstract、Introduction/Related Work、Method、Experiments/Results/Analysis、Conclusion、bibliography
 - `paper.tex` 不包含 `TODO`, `TBD`, `[INSERT ...]`, `placeholder`, `待补充`, `占位` 等占位文本
 - 所有 `\includegraphics{}` 路径在 `artifacts/` 下真实存在
 - 至少有一个 figure 引用、一个 table 引用，表格使用 `booktabs`
 - `refs.bib` 非空，所有 `\cite{}` key 都能在 `refs.bib` 中找到
 - `paper.pdf` 存在且是 PDF 文件
 - 编译报告必须记录 `pdflatex` 与 `bibtex`/`biber` 命令、Final verdict: PASS、Fatal Errors: 0、Undefined references: 0、Undefined citations: 0、Orphan cites: 0、Anti-Leakage: PASS、页数、style/layout 和 figure compliance
-- `handoff_M5_completion.md` 必须说明 M6 submission readiness、paper artifacts、compilation status
 
 ---
 

@@ -113,7 +113,7 @@
 - **学习率调度**: {{lr_schedule}}
 - **早停条件**: {{early_stop}}
 - **正则化**: {{regularization}}
-- **随机种子**: {{seed_1}}, {{seed_2}}, {{seed_3}}（至少 3 个）
+- **随机种子**: 42（固定单次实验；不做多 seed 重复实验）
 - **硬件环境**: {{hardware}}
 
 ### 3.4 评估协议
@@ -124,9 +124,9 @@
   | {{metric_1}} | ... | ... | 高/低 |
 
 - **统计检验**:
-  - 检验方法: {{test_method}} (t-test / Wilcoxon / bootstrap)
-  - 显著性水平: α = {{alpha}}
-  - 报告方式: mean ± std across N runs
+  - 检验方法: 不适用（固定 seed=42 的单次实验）
+  - 显著性水平: 不适用
+  - 报告方式: single run result with seed=42
 
 ---
 

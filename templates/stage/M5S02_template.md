@@ -107,14 +107,17 @@
 | Section | 页数预算 | 关键内容 | 依赖上游文档 |
 |---------|---------|---------|------------|
 | Abstract | 0.3 | 一句话概括、问题、方法、结果、贡献 | M5S07 |
-| 1. Introduction | 1.5 | 背景、动机、贡献声明、论文组织 | M1S02, M1S03 |
-| 2. Related Work | 1.0 | 主题分类、对比批判 | M1S02 |
-| 3. Methodology | 2-3 | 问题定义、方法概述、核心组件、伪代码 | M2S03, M2S04 |
-| 4. Experiments | 2-3 | 设置、主结果、对比 | M3S03, M3S04 |
-| 5. Analysis & Discussion | 1-2 | 深入解读、消融、Limitations | M4S03, M4S04 |
-| 6. Conclusion | 0.3 | 总结、未来工作 | — |
+| 1. Introduction & Related Work | 1.5-2.5 | 背景、动机、贡献声明、论文组织、主题分类、对比批判 | M1S02, M1S03 |
+| 2. Methodology | 2-3 | 问题定义、方法概述、核心组件、伪代码 | M2S03, M2S04 |
+| 3. Experiments, Results and Analysis/Discussion | 3-4 | 设置、主结果、对比、深入解读、消融、Limitations | M3S03, M3S04, M4S03, M4S04 |
+| 4. Conclusion | 0.3 | 总结、未来工作 | — |
 | References | — | — | M1S02 + 新增 |
 | Appendix（如有）| — | 补充实验、证明、实现细节 | M2S04, M4S03 |
+
+**Section 结构灵活性说明**:
+- 根据目标 venue 的惯例，Introduction 与 Related Work 可作为两个独立 section（如 "1. Introduction" 和 "2. Related Work"），或合并为单一 section（如 "1. Introduction and Related Work"）
+- Experiments 与 Analysis/Discussion 必须在同一 section 内，Analysis/Discussion 作为该 section 的子节（如 3.3 Analysis and Discussion）
+- 上述页数预算为推荐值，最终服从 venue 模板和页数限制
 
 **总页数预算**: N 页
 
