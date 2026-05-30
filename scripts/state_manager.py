@@ -202,6 +202,11 @@ def _parse_create_args(args: list[str]) -> dict[str, Any]:
     venue: Optional[str] = None
     auto_advance: bool = False
     execution_env: dict[str, Any] = {}
+    ssh_server_id: Optional[str] = None
+    ssh_lease_hours: Optional[int] = None
+    ssh_min_gpu_count: int = 0
+    ssh_min_vram_gb: Optional[float] = None
+    ssh_server_tags: list[str] = []
 
     i = 0
     while i < len(args):
@@ -214,6 +219,39 @@ def _parse_create_args(args: list[str]) -> dict[str, Any]:
             if i + 1 >= len(args):
                 raise SystemExit("[ERROR] --env-mode requires a value (local|ssh)")
             execution_env["execution.mode"] = args[i + 1]
+            i += 2
+            continue
+        if arg == "--server-id":
+            if i + 1 >= len(args):
+                raise SystemExit("[ERROR] --server-id requires a value (server id or auto)")
+            ssh_server_id = args[i + 1]
+            execution_env["execution.mode"] = "ssh"
+            execution_env["execution.server_id"] = ssh_server_id
+            execution_env["execution.ssh.server_id"] = ssh_server_id
+            i += 2
+            continue
+        if arg == "--lease-hours":
+            if i + 1 >= len(args):
+                raise SystemExit("[ERROR] --lease-hours requires a value")
+            ssh_lease_hours = int(args[i + 1])
+            i += 2
+            continue
+        if arg == "--min-gpu-count":
+            if i + 1 >= len(args):
+                raise SystemExit("[ERROR] --min-gpu-count requires a value")
+            ssh_min_gpu_count = int(args[i + 1])
+            i += 2
+            continue
+        if arg == "--min-vram-gb":
+            if i + 1 >= len(args):
+                raise SystemExit("[ERROR] --min-vram-gb requires a value")
+            ssh_min_vram_gb = float(args[i + 1])
+            i += 2
+            continue
+        if arg == "--server-tags":
+            if i + 1 >= len(args):
+                raise SystemExit("[ERROR] --server-tags requires a comma-separated value")
+            ssh_server_tags = _split_value_items(args[i + 1])
             i += 2
             continue
         if arg == "--ssh-host":
@@ -351,6 +389,11 @@ def _parse_create_args(args: list[str]) -> dict[str, Any]:
         "notes": " ".join(part for part in notes if part).strip(),
         "auto_advance": auto_advance,
         "execution_env": execution_env,
+        "ssh_server_id": ssh_server_id,
+        "ssh_lease_hours": ssh_lease_hours,
+        "ssh_min_gpu_count": ssh_min_gpu_count,
+        "ssh_min_vram_gb": ssh_min_vram_gb,
+        "ssh_server_tags": ssh_server_tags,
     }
 
 
@@ -470,6 +513,11 @@ def cmd_create(
     notes: str = "",
     auto_advance: bool = False,
     execution_env: Optional[dict[str, Any]] = None,
+    ssh_server_id: Optional[str] = None,
+    ssh_lease_hours: Optional[int] = None,
+    ssh_min_gpu_count: int = 0,
+    ssh_min_vram_gb: Optional[float] = None,
+    ssh_server_tags: Optional[list[str]] = None,
 ) -> str:
     from spiral.project import ProjectManager
 
@@ -495,6 +543,39 @@ def cmd_create(
         state = PipelineState(proj)
         state.set_auto_advance(True)
         print(f"[SETTINGS] Auto-advance modules: enabled")
+
+    if ssh_server_id:
+        from spiral.ssh_registry import SSHRegistryError, allocate_server, apply_lease_to_project
+
+        try:
+            lease = allocate_server(
+                Path(__file__).parent.parent.resolve(),
+                proj,
+                server_id=ssh_server_id,
+                min_gpu_count=ssh_min_gpu_count,
+                min_vram_gb=ssh_min_vram_gb,
+                tags=ssh_server_tags or [],
+                lease_hours=ssh_lease_hours,
+                stage_scope="project",
+                reason="project creation",
+            )
+            apply_lease_to_project(Path(__file__).parent.parent.resolve(), proj, lease["lease_id"])
+            checklist = proj / "state" / "onboarding_checklist.md"
+            if checklist.exists():
+                with checklist.open("a", encoding="utf-8") as handle:
+                    handle.write(
+                        "\n## Managed SSH Allocation\n\n"
+                        f"- server_id: `{lease['server_id']}`\n"
+                        f"- lease_id: `{lease['lease_id']}`\n"
+                        f"- workspace_path: `{lease['workspace_path']}`\n"
+                        f"- expires_at: `{lease['expires_at']}`\n"
+                    )
+            print(f"[SSH] Allocated server {lease['server_id']} with lease {lease['lease_id']}")
+            print(f"      Applied to: config/execution_env.yaml")
+        except SSHRegistryError as exc:
+            print(f"[SSH][ERROR] Failed to allocate managed SSH server: {exc}")
+            print(f"            Project remains created at: {proj}")
+            raise SystemExit(1)
 
     if execution_env:
         print(f"[SETTINGS] Execution environment overrides applied:")
@@ -536,11 +617,25 @@ def cmd_onboarding_done(project_dir: str) -> None:
     if exec_mode == "ssh":
         try:
             env_data = _load(env_file)
+            execution = env_data.get("execution", {})
             ssh = env_data.get("execution", {}).get("ssh", {})
-            if not ssh.get("host"):
-                missing_fields.append("ssh.host")
-            if not ssh.get("user"):
-                missing_fields.append("ssh.user")
+            managed = bool(
+                execution.get("server_id")
+                or execution.get("lease_id")
+                or ssh.get("server_id")
+                or ssh.get("lease_id")
+            )
+            if managed:
+                from spiral.ssh_registry import validate_project_lease
+
+                ok, message = validate_project_lease(Path(__file__).parent.parent.resolve(), proj)
+                if not ok:
+                    missing_fields.append(f"managed_ssh_lease ({message})")
+            else:
+                if not ssh.get("host"):
+                    missing_fields.append("ssh.host")
+                if not ssh.get("user"):
+                    missing_fields.append("ssh.user")
         except Exception:
             pass
 
@@ -1640,6 +1735,8 @@ def main(argv: list[str] | None = None) -> None:
         print("  [--auto-advance] [--env-mode local|ssh]")
         print("  [--ssh-host HOST] [--ssh-user USER] [--ssh-port PORT]")
         print("  [--ssh-workspace PATH] [--ssh-conda-env NAME]")
+        print("  [--server-id ID|auto] [--lease-hours N] [--min-gpu-count N]")
+        print("  [--min-vram-gb GB] [--server-tags tag1,tag2]")
         print("  [--python-version VER] [--cuda-version VER] [--env-manager TOOL]")
         print("  [--keywords ...] [--reference ...] [--foundation ...] [--anchor ...]")
         print("")
@@ -1651,7 +1748,7 @@ def main(argv: list[str] | None = None) -> None:
         print("")
         print("Auto-run:")
         print("  set-auto-advance <on|off>     Enable/disable automatic module transition")
-        print("  dispatch next|stage|reviews|gate [target] [--write] [--format json|markdown]")
+        print("  dispatch next|stage|reviews|gate|ssh [target] [--write] [--format json|markdown]")
         print("")
         print("Public DB subcommands:")
         print("  public-db status              Show database location and size")
@@ -1690,6 +1787,11 @@ def main(argv: list[str] | None = None) -> None:
             notes=parsed["notes"],
             auto_advance=parsed.get("auto_advance", False),
             execution_env=parsed.get("execution_env"),
+            ssh_server_id=parsed.get("ssh_server_id"),
+            ssh_lease_hours=parsed.get("ssh_lease_hours"),
+            ssh_min_gpu_count=parsed.get("ssh_min_gpu_count", 0),
+            ssh_min_vram_gb=parsed.get("ssh_min_vram_gb"),
+            ssh_server_tags=parsed.get("ssh_server_tags"),
         )
 
     elif cmd == "status":
@@ -1791,7 +1893,7 @@ def main(argv: list[str] | None = None) -> None:
             while flag in remaining:
                 i = remaining.index(flag)
                 if i + 1 >= len(remaining):
-                    print(f"Usage: dispatch next|stage|reviews|gate [target] [{flag} VALUE]")
+                    print(f"Usage: dispatch next|stage|reviews|gate|ssh [target] [{flag} VALUE]")
                     sys.exit(1)
                 value = remaining[i + 1]
                 del remaining[i:i + 2]
@@ -1811,7 +1913,7 @@ def main(argv: list[str] | None = None) -> None:
         scope = remaining[0] if remaining else "next"
         target = remaining[1] if len(remaining) > 1 else ""
         if len(remaining) > 2:
-            print("Usage: dispatch next|stage|reviews|gate [target] [--write] [--format json|markdown]")
+            print("Usage: dispatch next|stage|reviews|gate|ssh [target] [--write] [--format json|markdown]")
             sys.exit(1)
         cmd_dispatch(proj, scope, target, fmt=fmt, write=write, out_dir=out_dir)
 

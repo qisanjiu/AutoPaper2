@@ -218,6 +218,13 @@ When a backtrack is triggered (by stage review, gate critic, or human review):
 | `{framework}/docs/AGENTS/critic/m6_stage_review/AGENT.md` | M6 Stage Reviewer |
 | `{framework}/scripts/paperreview_uploader.py` | paperreview.ai auto-submission script |
 | `{framework}/scripts/email_monitor.py` | IMAP email monitor for review reception |
+| `{framework}/config/ssh_servers.yaml` | Framework-level SSH server registry |
+| `{framework}/state/ssh_leases.yaml` | Framework-level SSH project leases |
+| `{framework}/state/ssh_events.jsonl` | Redacted SSH operation event stream |
+| `{framework}/scripts/ssh_manager.py` | SSH server, lease, probe, sync, and remote command manager |
+| `{framework}/docs/AGENTS/ssh/AGENT.md` | SSH Ops Agent |
+| `{framework}/skills/AutoPaper2_ssh_ops/SKILL.md` | SSH Ops orchestration skill |
+| `{framework}/skills/AutoPaper2_ssh_server_onboarding/SKILL.md` | Guided SSH server creation skill |
 
 ---
 

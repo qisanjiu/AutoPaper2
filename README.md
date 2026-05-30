@@ -275,9 +275,9 @@ Supported venues are defined in `config/venue_registry.yaml`:
 
 `config/execution_env.yaml` (auto-generated per project) supports:
 - **local** mode – run on the current machine.
-- **ssh** mode – dispatch experiments to a remote GPU server.
+- **ssh** mode – dispatch experiments to a managed remote GPU server lease.
 
-Environment is auto-probed on project creation (`scripts/env_probe.py` detects CUDA, Python version, GPU count, and framework versions).
+Environment is auto-probed on project creation (`scripts/env_probe.py` detects CUDA, Python version, GPU count, and framework versions). SSH servers are registered in `config/ssh_servers.yaml` and managed with `scripts/ssh_manager.py`; onboarding can use a one-time password to push a dedicated SSH key, then `probe` records GPU/software capabilities and the datasets already present under the remote dataset cache. Project creation can allocate a server with `--server-id auto` or a concrete server id.
 
 ---
 
@@ -290,6 +290,8 @@ AutoPaper2 is designed to run as a set of **Claude Code Skills** under `.claude/
 | Skill | Purpose |
 |-------|---------|
 | `AutoPaper2_env_probe` | Detect local GPU/Python/CUDA and fill `execution_env.yaml`. |
+| `AutoPaper2_ssh_ops` | Manage SSH server registry, leases, probes, remote sync, and SSH Ops dispatch. |
+| `AutoPaper2_ssh_server_onboarding` | Guided creation and validation of new SSH server entries. |
 | `AutoPaper2_m1_survey` | Full M1 pipeline: topic scoping → literature search → ideation → G1. |
 | `AutoPaper2_m2_method_design` | Full M2 pipeline: cross-domain search → migration → architecture → G2. |
 | `AutoPaper2_m3_experiment` | Full M3 pipeline: env setup → baselines → main experiments → G3. |

@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 
 from spiral.conductor import Conductor
-from spiral.dispatch import build_packets, build_stage_execution_packet, build_stage_review_packets
+from spiral.dispatch import build_packets, build_stage_execution_packet, build_stage_review_packets, build_ssh_ops_packet
 from spiral.revision_router import build_revision_routes
 from spiral.state import PipelineState
 from utils.stage_gate import check_stage
@@ -150,6 +150,19 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertTrue(packet["agent_md"].endswith("docs/AGENTS/method/AGENT.md"))
         self.assertTrue(packet["output_path"].endswith("knowledge/M2/M2S01_cross_domain_search.md"))
         self.assertIn("must not edit knowledge/", "\n".join(packet["main_agent_boundaries"]))
+
+    def test_ssh_ops_packet_targets_ssh_agent(self) -> None:
+        (self.root / "config").mkdir(exist_ok=True)
+        (self.root / "config" / "execution_env.yaml").write_text("execution:\n  mode: ssh\n", encoding="utf-8")
+
+        packet = build_ssh_ops_packet(self.root, "alloc")
+
+        self.assertEqual(packet["task_type"], "ssh_ops")
+        self.assertTrue(packet["delegation_required"])
+        self.assertEqual(packet["role"], "ssh")
+        self.assertTrue(packet["agent_md"].endswith("docs/AGENTS/ssh/AGENT.md"))
+        self.assertIn("SSH operation: alloc", packet["subagent_prompt"])
+        self.assertIn("Do not store passwords", packet["subagent_prompt"])
 
     def test_m4_dispatch_packets_include_analysis_handoff_inputs(self) -> None:
         for rel_path in (

@@ -38,7 +38,8 @@
 - [ ] `execution_env.yaml` 存在且可读
 - [ ] `execution.mode` 明确为 `local` 或 `ssh`；其他值必须阻断
 - [ ] local 模式必须包含可执行的 `local.env_manager` (`conda` / `venv` / `uv` / `docker`) 和 `local.python_version`
-- [ ] ssh 模式必须包含 `ssh.host`、`ssh.user`、`ssh.workspace_path`、`ssh.env_manager`、`ssh.python_version`、`ssh.sync.method`
+- [ ] ssh 模式优先包含托管租约 `execution.server_id`、`execution.lease_id`、`ssh.server_id`、`ssh.lease_id`，且项目 `state/ssh_allocation.yaml` 可读
+- [ ] legacy/manual ssh 模式必须包含 `ssh.host`、`ssh.user`、`ssh.workspace_path`、`ssh.env_manager`、`ssh.python_version`、`ssh.sync.method`
 - [ ] ssh 模式的 `ssh.sync.method` 必须是 `rsync` 或 `scp`
 - [ ] M3S01 文档必须与配置模式一致：local 写本地环境证据，ssh 写远程/rsync/ssh 证据
 
@@ -184,7 +185,8 @@ Reviewer 必须验证以下红线：
    - 检查远程数据集路径是否已配置
    - 检查是否记录了远程数据集准备方式（下载/上传/已有缓存）
    - 检查 long-running ledger 是否记录了 SSH/rsync 命令、日志路径、断点续传/恢复命令和轮询状态
-   - 缺少 host/user/workspace_path/env_manager/python_version/sync.method 任一项时，必须给出 REVISE/BACKTRACK，不得 PASS
+   - 托管模式缺少 server_id/lease_id 或 `state/ssh_allocation.yaml` 时，必须给出 REVISE/BACKTRACK，不得 PASS
+   - legacy/manual 模式缺少 host/user/workspace_path/env_manager/python_version/sync.method 任一项时，必须给出 REVISE/BACKTRACK，不得 PASS
 
 ### 5.3 输出与推进规则
 - 必须写入：`knowledge/reviews/M3S01_dataset_env_review.md`

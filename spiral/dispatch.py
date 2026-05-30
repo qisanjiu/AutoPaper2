@@ -57,6 +57,7 @@ DELEGATED_TASK_TYPES = {
     "stage_review",
     "gate_review",
     "revision_routing",
+    "ssh_ops",
 }
 
 
@@ -65,6 +66,15 @@ REVISION_ROUTING_BOUNDARIES = [
     "Do not edit routed target-stage outputs directly from the main agent/conductor.",
     "Delegate each routed target stage to its responsible subagent before asking the revision agent to write M6S05_revision_execution.md.",
     "If routed work is incomplete, record it as blocked/partial; do not invent completion evidence.",
+]
+
+
+SSH_OPS_BOUNDARIES = [
+    "Manage SSH registry, health checks, leases, remote workspace setup, sync, and remote command evidence only.",
+    "Do not write knowledge/ or drafts/ stage outputs.",
+    "Do not write stage-review or gate-review verdicts.",
+    "Do not store passwords, private keys, API tokens, or unredacted secrets in registry, leases, logs, or project files.",
+    "Record allocation and operational evidence under state/ and config/ only unless a stage executor explicitly owns the target path.",
 ]
 
 
@@ -231,6 +241,7 @@ def build_stage_review_packets(project_root: str | Path, stage: str) -> list[dic
         extra_expected.extend(
             [
                 root / "config" / "execution_env.yaml",
+                root / "state" / "ssh_allocation.yaml",
                 root / "experiments" / "logs" / "m3s01_longrun_ledger.md",
                 root / "experiments" / "requirements.lock",
                 root / "experiments" / "requirements.txt",
@@ -390,6 +401,42 @@ def build_gate_review_packets(
     return packets
 
 
+def build_ssh_ops_packet(project_root: str | Path, operation: str | None = None) -> dict[str, Any]:
+    root = Path(project_root)
+    framework_root = Path(__file__).parent.parent
+    op = operation or "alloc"
+    task_id = _slug(f"ssh_{op}")
+    output = root / "state" / "ssh_allocation.yaml" if op in {"alloc", "allocate", "apply"} else None
+    input_docs = _existing_or_expected(
+        [
+            root / "config" / "execution_env.yaml",
+            root / "state" / "ssh_allocation.yaml",
+            framework_root / "config" / "ssh_servers.yaml",
+            framework_root / "state" / "ssh_leases.yaml",
+            framework_root / "state" / "ssh_events.jsonl",
+        ]
+    )
+    return _packet(
+        task_type="ssh_ops",
+        task_id=task_id,
+        project_root=root,
+        role="ssh",
+        agent_md=framework_root / "docs" / "AGENTS" / "ssh" / "AGENT.md",
+        output_path=output,
+        input_docs=input_docs,
+        extra={
+            "ssh_operation": op,
+            "framework_root": str(framework_root),
+            "subagent_boundaries": SSH_OPS_BOUNDARIES,
+            "after_completion": [
+                "Return server_id, lease_id, changed config/state paths, and concise operation evidence.",
+                "If allocation is requested, ensure config/execution_env.yaml references execution.server_id and execution.lease_id.",
+                "If a remote command was run, report its command class, return code, and redacted log path or output summary.",
+            ],
+        },
+    )
+
+
 def build_next_action_packets(project_root: str | Path) -> list[dict[str, Any]]:
     root = Path(project_root)
     conductor = Conductor(root)
@@ -427,6 +474,8 @@ def build_packets(project_root: str | Path, scope: str, target: str | None = Non
         return build_stage_review_packets(project_root, target)
     if normalized == "gate":
         return build_gate_review_packets(project_root, target)
+    if normalized in {"ssh", "ssh-ops", "infra"}:
+        return [build_ssh_ops_packet(project_root, target)]
     raise ValueError(f"Unknown dispatch scope: {scope}")
 
 
@@ -443,7 +492,11 @@ def render_subagent_prompt(packet: dict[str, Any]) -> str:
         lines.append(f"Round: {packet['round']}")
     if packet.get("gate_id"):
         lines.append(f"Gate: {packet['gate_id']} ({packet.get('gate_stage', '')})")
+    if packet.get("ssh_operation"):
+        lines.append(f"SSH operation: {packet['ssh_operation']}")
     lines.append(f"Project root: {packet.get('project_root')}")
+    if packet.get("framework_root"):
+        lines.append(f"Framework root: {packet.get('framework_root')}")
     lines.append(f"Role instructions: {packet.get('agent_md')}")
     if packet.get("md_protocol"):
         lines.append(f"Markdown protocol: {packet.get('md_protocol')}")
@@ -555,6 +608,8 @@ def packet_to_markdown(packet: dict[str, Any]) -> str:
         lines.append(f"- stage: `{packet['stage']}`")
     if packet.get("gate_id"):
         lines.append(f"- gate_id: `{packet['gate_id']}`")
+    if packet.get("ssh_operation"):
+        lines.append(f"- ssh_operation: `{packet['ssh_operation']}`")
     if packet.get("output_path"):
         lines.append(f"- output_path: `{packet['output_path']}`")
     lines.extend(["", "## Subagent Prompt", "", "```text", packet.get("subagent_prompt", "").rstrip(), "```", ""])

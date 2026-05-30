@@ -1,0 +1,20 @@
+version: 1
+defaults:
+  lease_hours: 168
+  workspace_path_template: "{framework_root}/projects/{project_name}"
+  dataset_path_template: "{framework_root}/data/datasets"
+  sync_method: rsync
+
+# Framework-level SSH server library.
+#
+# Add servers with:
+#   python scripts/ssh_manager.py server add lab-a \
+#     --host gpu-a.example.edu --user researcher --identity-file ~/.ssh/id_ed25519 \
+#     --remote-framework-root ~/AutoPaper2 --gpu-count 4 --vram-gb 24 \
+#     --tags gpu,cuda --priority 10 --max-concurrent-projects 1
+#
+# Do not store passwords, API keys, tokens, or private key material here.
+# Use `python scripts/ssh_manager.py bootstrap-key <server_id>` for one-time
+# password-based public-key deployment, then `probe <server_id>` to collect
+# GPU/software capabilities and remote dataset cache contents.
+servers: []

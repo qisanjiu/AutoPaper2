@@ -332,6 +332,15 @@ class ProjectManager:
             except Exception:
                 pass  # env_probe is best-effort; don't fail project creation
 
+        # Re-apply explicit user overrides after env_probe.  The probe refreshes
+        # machine facts and must not erase CLI-provided SSH/server choices.
+        env_overrides = execution_env or {}
+        env_config_dst = proj_dir / "config" / "execution_env.yaml"
+        if env_overrides and env_config_dst.exists():
+            env_config_text = env_config_dst.read_text(encoding="utf-8")
+            env_config_text = _apply_env_overrides(env_config_text, env_overrides)
+            env_config_dst.write_text(env_config_text, encoding="utf-8")
+
         # Mark onboarding pending in pipeline state
         state.data["current"]["status"] = "onboarding_pending"
         state.data["current"]["stage"] = "onboarding"

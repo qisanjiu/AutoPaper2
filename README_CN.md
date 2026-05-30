@@ -275,9 +275,9 @@ my-project-20260115-143022/
 
 `config/execution_env.yaml`（每个项目自动生成）支持：
 - **local** 模式 – 在当前机器运行。
-- **ssh** 模式 – 将实验分发到远程 GPU 服务器。
+- **ssh** 模式 – 将实验分发到已分配租约的远程 GPU 服务器。
 
-项目创建时自动运行环境探测（`scripts/env_probe.py` 检测 CUDA、Python 版本、GPU 数量与框架版本）。
+项目创建时自动运行环境探测（`scripts/env_probe.py` 检测 CUDA、Python 版本、GPU 数量与框架版本）。SSH 服务器库位于 `config/ssh_servers.yaml`，由 `scripts/ssh_manager.py` 管理；onboarding 可用一次性密码推送专用 SSH key，随后 `probe` 会记录远程 GPU/软件能力以及远程数据集缓存中已有的数据集。创建项目时可用 `--server-id auto` 或具体 server id 自动分配。
 
 ---
 
@@ -290,6 +290,8 @@ AutoPaper2 设计为一组 **Claude Code Skills**，位于 `.claude/skills/` 和
 | Skill | 说明 |
 |-------|------|
 | `AutoPaper2_env_probe` | 检测本地 GPU/Python/CUDA 并填充 `execution_env.yaml`。 |
+| `AutoPaper2_ssh_ops` | 管理 SSH 服务器库、租约、探测、远程同步和 SSH Ops 派发。 |
+| `AutoPaper2_ssh_server_onboarding` | 引导新增 SSH 服务器条目并验证连接。 |
 | `AutoPaper2_m1_survey` | M1 完整流程：主题界定 → 文献搜索 → 创意生成 → G1。 |
 | `AutoPaper2_m2_method_design` | M2 完整流程：跨领域搜索 → 迁移分析 → 架构设计 → G2。 |
 | `AutoPaper2_m3_experiment` | M3 完整流程：环境搭建 → 基线 → 主实验 → G3。 |

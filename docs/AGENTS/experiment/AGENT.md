@@ -519,7 +519,8 @@ Step 4: 需要用户协助的上传/传输场景
 - 读取 `config/execution_env.yaml`
 - 确认执行模式：`local` 或 `ssh`
 - local 模式必须确认 `execution.local.env_manager` 为 `conda` / `venv` / `uv` / `docker`，且 `execution.local.python_version` 非空
-- ssh 模式必须确认 `execution.ssh.host`、`user`、`workspace_path`、`env_manager`、`python_version`、`sync.method` 非空，且 `sync.method` 为 `rsync` 或 `scp`
+- ssh 模式优先使用托管服务器租约：确认 `execution.server_id`、`execution.lease_id`、`execution.ssh.server_id`、`execution.ssh.lease_id` 非空，并可在框架级 `state/ssh_leases.yaml` 中找到 active lease
+- 若是 legacy/manual ssh 模式，必须确认 `execution.ssh.host`、`user`、`workspace_path`、`env_manager`、`python_version`、`sync.method` 非空，且 `sync.method` 为 `rsync` 或 `scp`
 - 确认 `execution.sandbox.enabled == true`，并读取 `sandbox.mode`、网络、文件系统、凭证、资源限制和可复现性策略
 - 确认 `execution.resource_optimization.enabled == true`，并读取 target GPU/CPU、并行策略、DataLoader autotune 和监控阈值
 - ssh 模式必须使用 `sandbox.mode: ssh_remote`；local 模式不得使用 `ssh_remote`
@@ -577,6 +578,14 @@ experiments/configs/sandbox_profile.yaml
 ### 10.2 远程执行规范（SSH 模式）
 
 **适用场景**：本地无 GPU，需使用远程服务器/集群。
+
+AutoPaper2 的推荐路径是先由 SSH Ops Agent 分配服务器租约，再由 Experiment Agent 使用该租约。若项目 `config/execution_env.yaml` 中 `execution.mode == ssh` 但缺少有效 `server_id` / `lease_id`，应先请求 Conductor 派发：
+
+```bash
+python scripts/state_manager.py dispatch ssh alloc --write
+```
+
+不要在 M3S01 内临时猜测服务器或手动占用未登记的远程 workspace。
 
 #### 10.2.1 SSH 认证初始化（M3S01 阶段必须完成）
 

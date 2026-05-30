@@ -227,14 +227,14 @@ def generate_execution_env_yaml(report: dict[str, Any], project_name: str = "pro
 
     lines = [
         "# AutoPaper2 — 实验执行环境配置（由 env_probe.py 自动生成）",
-        "# 请检查并补全 SSH / 远程配置 / 作者信息 等无法自动探测的字段",
+        "# 默认使用 local；只有显式选择服务器或填写 SSH 配置后才切换到 ssh。",
         "",
         "execution:",
-        f"  mode: {'ssh' if report['ssh']['available'] else 'local'}",
+        "  mode: local",
         "",
         "  sandbox:",
         "    enabled: true",
-        f"    mode: {'ssh_remote' if report['ssh']['available'] else ('docker' if env_mgr.get('docker', {}).get('available') else preferred_mgr)}",
+        f"    mode: {'docker' if env_mgr.get('docker', {}).get('available') else preferred_mgr}",
         "    network_policy: restricted",
         "    filesystem_policy:",
         "      project_root_read_only: false",
@@ -309,6 +309,8 @@ def generate_execution_env_yaml(report: dict[str, Any], project_name: str = "pro
         f"      cpu_cores: {report['cpu'].get('cores', 0)}",
         "",
         "  ssh:",
+        '    server_id: ""',
+        '    lease_id: ""',
         '    host: ""',
         '    user: ""',
         '    port: 22',
@@ -368,6 +370,71 @@ def generate_execution_env_yaml(report: dict[str, Any], project_name: str = "pro
     return "\n".join(lines)
 
 
+def _has_configured_ssh(data: dict[str, Any]) -> bool:
+    execution = data.get("execution", {}) if isinstance(data.get("execution"), dict) else {}
+    ssh = execution.get("ssh", {}) if isinstance(execution.get("ssh"), dict) else {}
+    return bool(
+        execution.get("mode") == "ssh"
+        and (
+            execution.get("server_id")
+            or execution.get("lease_id")
+            or ssh.get("server_id")
+            or ssh.get("lease_id")
+            or (ssh.get("host") and ssh.get("user"))
+        )
+    )
+
+
+def _merge_non_empty(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    for key, value in overrides.items():
+        if isinstance(value, dict):
+            target = base.setdefault(key, {})
+            if isinstance(target, dict):
+                _merge_non_empty(target, value)
+            continue
+        if value not in ("", None, [], {}):
+            base[key] = value
+    return base
+
+
+def _merge_existing_manual_config(generated: str, existing: dict[str, Any]) -> str:
+    """Preserve explicit user SSH/project fields across local environment probe.
+
+    The probe should refresh local machine facts, not erase a server selected by
+    onboarding or ``state_manager.py create --server-id``.
+    """
+    if not existing:
+        return generated
+    try:
+        generated_data = yaml.safe_load(generated) or {}
+    except Exception:
+        return generated
+    if not isinstance(generated_data, dict):
+        return generated
+
+    existing_execution = existing.get("execution", {}) if isinstance(existing.get("execution"), dict) else {}
+    generated_execution = generated_data.setdefault("execution", {})
+    if not isinstance(generated_execution, dict):
+        return generated
+
+    # Preserve stable project/allocation identifiers even for local mode.
+    for key in ("server_id", "lease_id"):
+        if existing_execution.get(key):
+            generated_execution[key] = existing_execution[key]
+
+    if _has_configured_ssh(existing):
+        generated_execution["mode"] = "ssh"
+        sandbox = generated_execution.setdefault("sandbox", {})
+        if isinstance(sandbox, dict):
+            sandbox["mode"] = "ssh_remote"
+        existing_ssh = existing_execution.get("ssh", {}) if isinstance(existing_execution.get("ssh"), dict) else {}
+        generated_ssh = generated_execution.setdefault("ssh", {})
+        if isinstance(generated_ssh, dict):
+            _merge_non_empty(generated_ssh, existing_ssh)
+
+    return yaml.safe_dump(generated_data, allow_unicode=True, sort_keys=False)
+
+
 def apply_to_project(project_dir: str | Path, dry_run: bool = False) -> Path:
     """Detect environment and overwrite project's execution_env.yaml."""
     project_dir = Path(project_dir).resolve()
@@ -376,9 +443,13 @@ def apply_to_project(project_dir: str | Path, dry_run: bool = False) -> Path:
     if not config_path.exists():
         raise FileNotFoundError(f"Project config not found: {config_path}")
 
+    try:
+        existing = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        existing = {}
     report = probe()
     project_name = project_dir.name.split("-")[0] if "-" in project_dir.name else project_dir.name
-    generated = generate_execution_env_yaml(report, project_name)
+    generated = _merge_existing_manual_config(generate_execution_env_yaml(report, project_name), existing)
 
     if not dry_run:
         config_path.write_text(generated, encoding="utf-8")
