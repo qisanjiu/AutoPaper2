@@ -57,7 +57,29 @@ knowledge/
 
 ## 2. Key Paths
 
-### 2.0 Main Agent Boundary
+### 2.0 Project-Local Skill Loading（跨 CLI 强制）
+
+AutoPaper2 的 Skill **只以项目内文件为可信来源**，不得假设 Claude Code、Codex、KimiCode 或其他 CLI 已安装全局 skill。
+
+| CLI / Runtime | 读取方式 |
+|---------------|----------|
+| Claude Code | 优先读取项目内 `.claude/skills/<skill_name>/SKILL.md` |
+| Codex / KimiCode / 其他 CLI | 根据用户意图或路由结果，直接读取项目内 `skills/<skill_name>/SKILL.md` |
+| 所有 CLI | Stage/subagent prompt 均通过 dispatch packet 中的 `agent_md` 字段读取 `docs/AGENTS/**/AGENT.md` |
+
+**权威源规则**：
+
+1. `skills/` 是项目内 canonical skill source。
+2. `.claude/skills/` 是 Claude Code 自动发现用镜像，必须与 `skills/` 同步。
+3. 主 Agent / Conductor 在任何 CLI 中恢复上下文时，若运行时没有自动 skill 发现能力，必须手动打开对应的 `skills/<skill_name>/SKILL.md`。
+4. 禁止依赖 `~/.codex/skills`、`~/.claude/skills` 或其他用户全局（global）目录中的 AutoPaper2 skill；全局 skill 只能作为外部工具能力，不是本框架流程真源。
+5. 修改任意 `skills/**/SKILL.md` 后，必须同步 `.claude/skills/` 并运行：
+   ```bash
+   python scripts/cli_compat_check.py
+   ```
+6. 生成 dispatch packet 后，传给 subagent 的 prompt 必须保留完整 `agent_md` 路径；subagent 必须直接读取该路径，而不是依赖主 Agent 摘要。
+
+### 2.1 Main Agent Boundary
 
 The main Agent / Conductor **only orchestrates**: project creation, module routing, stage advancement, review scheduling, gate handling, and backtracking. It **must not** execute Stage work or Stage review work directly. Stage execution and review **must be delegated** to the corresponding subagent prompts under `docs/AGENTS/`.
 

@@ -3,7 +3,7 @@
 > **Stage**: M3S03
 > **Agent**: Experiment Agent
 > **输入**: `knowledge/M3/M3S02_baseline_lock.md`, `knowledge/M2/M2S06_full_experiment_plan.md`（旧项目可用 `M2S05_full_experiment_plan.md`）, `knowledge/M3/M3S01_implementation.md`
-> **输出**: `knowledge/M3/M3S03_main_experiment.md` + `experiments/results.tsv` + `experiments/runs/<run_id>/`
+> **输出**: `knowledge/M3/M3S03_main_experiment.md` + `experiments/results.tsv` + `experiments/runs/<run_id>/` + `experiments/logs/runtime_events.jsonl`
 >
 > **审查重点**: 主实验结果是否超过 baseline、结果表是否完整、统计摘要是否齐全、负面结果是否诚实记录
 
@@ -25,6 +25,7 @@
 | 停止条件 | 预算: X GPU-hours / 迭代: N 轮 / 收敛: 连续 3 轮 < 1% 提升 |
 | 放弃条件 | smoke test 级别结果连续 2 轮低于 baseline |
 | 资源执行合同 | `experiments/configs/resource_plan.yaml` |
+| Runtime watchdog | 巡检间隔: 默认 4h / 最长 6h；告警只记录，不自动结束；Agent 决策: continue / fix_and_rerun / early_stop / backtrack_request |
 
 ### 1.2 证据层级目标
 
@@ -70,6 +71,16 @@
 
 如 `resource_plan.yaml` 分配多 GPU，则默认命令必须使用 `torchrun --nproc_per_node=<gpu_count>` 或等价 DDP。若未使用 DDP，必须写明替代资源策略和原因；不得通过多 seed 重复实验来填满资源。
 
+## 2.3 Runtime Watchdog 与告警记录（必须）
+
+| Run ID | Watchdog command / session | 巡检间隔 | Check log | Alert log | 最近状态 | Agent 决策 |
+|--------|----------------------------|----------|-----------|-----------|----------|------------|
+| run_001 | `python scripts/experiment_watchdog.py watch --project . --run-id run_001 --interval-seconds 14400 --log experiments/runs/run_001/logs/train.log --metrics experiments/runs/run_001/metrics.csv` | 4h | `experiments/runs/run_001/watchdog_checks.jsonl` | `experiments/runs/run_001/watchdog_alerts.jsonl` / 无告警 | info / warning / critical / early_stop_candidate | continue / fix_and_rerun / early_stop / backtrack_request |
+
+- **Runtime events**: `experiments/logs/runtime_events.jsonl`
+- **告警不自动终止**: Watchdog 仅写告警；是否结束、继续、修复或回溯由 Experiment Agent 读取日志、metric 曲线、checkpoint 和资源监控后判断。
+- **若出现告警，必须记录证据链**: `run_id`、告警类型、原始日志路径、metric/curve 路径、checkpoint 路径、Agent 决策、决策理由、后续命令。
+
 ---
 
 ## 3. Baseline 结果（本地运行）
@@ -93,6 +104,8 @@
   | Ours | ... | ... | ... | ... |
 - **资源监控**: `experiments/runs/<run_id>/resource_monitor.csv`；平均 GPU 利用率 ...%；平均 CPU 利用率 ...%
 - **低利用率处置**: 无 / 已调 batch size / 已调 num_workers / 已切换 DDP / 已改 task_parallel / 不可优化原因 ...
+- **Watchdog 巡检**: `experiments/runs/<run_id>/watchdog_checks.jsonl`；最近状态 info / warning / critical / early_stop_candidate
+- **告警与 Agent 决策**: 无 / NaN / non_convergence / OOM / early_stop_candidate → continue / fix_and_rerun / early_stop / backtrack_request；理由: ...
 - **结论**: [改善/持平/恶化]
 - **决策**: [继续 / 调整方向 / 诊断]
 - **远程同步**（如适用）: push / pull 状态
@@ -136,7 +149,16 @@
 
 - **曲线路径**: `experiments/runs/<run_id>/curves/`
 - **日志路径**: `experiments/runs/<run_id>/logs/`
+- **Watchdog checks**: `experiments/runs/<run_id>/watchdog_checks.jsonl`
+- **Watchdog alerts**: `experiments/runs/<run_id>/watchdog_alerts.jsonl` / 无告警
+- **Runtime event stream**: `experiments/logs/runtime_events.jsonl`
 - **关键观察**: ...
+
+### 7.1 Agent 决策日志（针对告警或早停候选）
+
+| 时间 | Run ID | Watchdog severity | 证据路径 | Agent 决策 | 理由 | 后续动作 |
+|------|--------|-------------------|----------|------------|------|----------|
+| ... | run_001 | critical / warning / early_stop_candidate | `experiments/runs/run_001/watchdog_alerts.jsonl`; `experiments/runs/run_001/logs/train.log`; `experiments/runs/run_001/metrics.csv` | continue / fix_and_rerun / early_stop / backtrack_request | ... | ... |
 
 ---
 
@@ -175,5 +197,6 @@
 - **关键超参数**: ...
 - **是否达到停止条件**: ...
 - **实验是否按预期收敛**: ...
+- **Watchdog 最终状态**: info / warning_resolved / critical_resolved / early_stopped / backtrack_requested
 - **Evidence Artifact 路径**: `experiments/runs/<best_run_id>/`
 - **远程结果同步状态**（如适用）: 已同步 / 部分同步 / 未同步

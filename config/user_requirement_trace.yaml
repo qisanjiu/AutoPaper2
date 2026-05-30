@@ -69,10 +69,12 @@ requirements:
     user_requirement: >
       Build environment according to local or ssh configuration, patiently
       download/upload files and run models, implement experiments, analyze
-      whether results match expectations, and trigger backtracking when needed.
+      whether results match expectations, supervise long-running training with
+      periodic watchdog/alert checks, and trigger backtracking when needed.
     enforced_by:
       stage_gates: [M3S01, M3S02, M3S03, M3S04]
       configs: [config/execution_env.yaml]
+      scripts: [scripts/experiment_watchdog.py, scripts/resource_planner.py]
       reviews: [m3_dataset_env_review, m3_baseline_result_review, m3_main_result_review, evidence]
     evidence_paths:
       - docs/AGENTS/experiment/AGENT.md
@@ -83,6 +85,8 @@ requirements:
       - templates/stage/M3S04_template.md
       - config/execution_env.yaml
       - scripts/env_probe.py
+      - scripts/experiment_watchdog.py
+      - scripts/resource_planner.py
       - utils/stage_gate.py
     tests:
       - tests/test_m3_integration.py

@@ -303,6 +303,13 @@ resource_optimization:
     min_cpu_utilization_pct: 60
     plan_path: experiments/configs/resource_plan.yaml
     monitor_path_template: experiments/runs/{run_id}/resource_monitor.csv
+    runtime_watchdog:
+      enabled: true
+      default_interval_seconds: 14400
+      events_path: experiments/logs/runtime_events.jsonl
+      checks_path_template: experiments/runs/{run_id}/watchdog_checks.jsonl
+      alerts_path_template: experiments/runs/{run_id}/watchdog_alerts.jsonl
+      alert_policy: record_alert_only_agent_decides_continue_fix_or_stop
 ```
 
 记录到 `knowledge/M3/M3S01_implementation.md`：
@@ -335,6 +342,7 @@ SSH 模式下应在远程 workspace 运行同等命令，并将结果同步回�
 | 线程环境变量 | `OMP_NUM_THREADS`, `MKL_NUM_THREADS` |
 | 启动命令模板 | `torchrun ...` / `python ...` |
 | 监控阈值 | GPU 利用率阈值 / CPU 利用率阈值 |
+| Runtime watchdog | 巡检间隔、runtime_events 路径、watchdog checks/alerts 路径、告警不自动终止策略 |
 
 **如未使用全部可见 GPU/CPU，必须说明原因**:
 

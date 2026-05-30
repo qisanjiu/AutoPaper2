@@ -285,6 +285,8 @@ Environment is auto-probed on project creation (`scripts/env_probe.py` detects C
 
 AutoPaper2 is designed to run as a set of **Claude Code Skills** under `.claude/skills/` and `skills/`:
 
+`skills/` is the canonical project-local source. `.claude/skills/` is a mirror for Claude Code auto-discovery. Codex, KimiCode, and other CLIs should read `AGENTS.md`, then load the relevant `skills/<skill_name>/SKILL.md` directly from this repository; they must not rely on user-global skill directories.
+
 | Skill | Purpose |
 |-------|---------|
 | `AutoPaper2_env_probe` | Detect local GPU/Python/CUDA and fill `execution_env.yaml`. |
@@ -297,6 +299,12 @@ AutoPaper2 is designed to run as a set of **Claude Code Skills** under `.claude/
 | `AutoPaper2_project_auto_run` | Run all modules end-to-end automatically. |
 | `AutoPaper2_project_backtrack` | Handle manual backtrack requests. |
 | `AutoPaper2_project_router` | Route to the correct module based on current state. |
+
+Verify cross-CLI local skill and prompt compatibility with:
+
+```bash
+python scripts/cli_compat_check.py
+```
 
 ---
 

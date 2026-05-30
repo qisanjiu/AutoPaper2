@@ -575,6 +575,14 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                 "min_cpu_utilization_pct": 60,
                 "plan_path": "experiments/configs/resource_plan.yaml",
                 "monitor_path_template": "experiments/runs/{run_id}/resource_monitor.csv",
+                "runtime_watchdog": {
+                    "enabled": True,
+                    "default_interval_seconds": 14400,
+                    "events_path": "experiments/logs/runtime_events.jsonl",
+                    "checks_path_template": "experiments/runs/{run_id}/watchdog_checks.jsonl",
+                    "alerts_path_template": "experiments/runs/{run_id}/watchdog_alerts.jsonl",
+                    "alert_policy": "record_alert_only_agent_decides_continue_fix_or_stop",
+                },
             },
         }
         _write_yaml(
@@ -605,7 +613,19 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                     "env": {"OMP_NUM_THREADS": "4", "MKL_NUM_THREADS": "4"},
                     "command_template": "python experiments/src/train.py --config experiments/configs/main_exp.yaml --device cpu",
                 },
-                "monitoring": {"enabled": True, "min_gpu_utilization_pct": 70, "min_cpu_utilization_pct": 60},
+                "monitoring": {
+                    "enabled": True,
+                    "min_gpu_utilization_pct": 70,
+                    "min_cpu_utilization_pct": 60,
+                    "runtime_watchdog": {
+                        "enabled": True,
+                        "default_interval_seconds": 14400,
+                        "events_path": "experiments/logs/runtime_events.jsonl",
+                        "checks_path_template": "experiments/runs/{run_id}/watchdog_checks.jsonl",
+                        "alerts_path_template": "experiments/runs/{run_id}/watchdog_alerts.jsonl",
+                        "alert_policy": "record_alert_only_agent_decides_continue_fix_or_stop",
+                    },
+                },
             },
         )
         _write(root / "experiments" / "requirements.lock", "numpy==1.26.4\n")
@@ -631,6 +651,9 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "## Run Contract\ncontract. Resource Plan: experiments/configs/resource_plan.yaml.\n\n"
             "## 资源利用率执行记录\n"
             "Run run1 uses cpu_parallel task_parallel and records experiments/runs/run1/resource_monitor.csv; average CPU utilization 72%; low utilization none.\n\n"
+            "## Runtime Watchdog 与告警记录\n"
+            "experiments/logs/runtime_events.jsonl and experiments/runs/run1/watchdog_checks.jsonl record watchdog 巡检. "
+            "Watchdog only records alerts and does not automatically terminate the run. Agent 决策: continue; no alert observed.\n\n"
             "## 迭代循环记录\niterations with resource_monitor.csv.\n\n"
             "## Evidence Ladder\nsolid.\n\n"
             "## 随机种子\n42.\n",
@@ -641,6 +664,13 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "timestamp,command_pid,cpu_load_pct,mem_available_mb,gpu_index,gpu_util_pct,gpu_mem_used_mb,gpu_mem_total_mb\n"
             "2026-05-29T12:00:00,123,72,8000,,,,\n",
         )
+        watchdog_event = (
+            '{"timestamp":"2026-05-29T12:00:00","stage":"M3S03","event_type":"watchdog_check",'
+            '"run_id":"run1","severity":"info","decision_required":false,'
+            '"agent_action_policy":"record_alert_only_agent_decides_continue_fix_or_stop","signals":[]}\n'
+        )
+        _write(root / "experiments" / "logs" / "runtime_events.jsonl", watchdog_event)
+        _write(root / "experiments" / "runs" / "run1" / "watchdog_checks.jsonl", watchdog_event)
         _write(
             root / "experiments" / "results.tsv",
             "method\tseed\taccuracy\tresource_monitor\nbaseline\t42\t0.75\texperiments/runs/run1/resource_monitor.csv\nours\t42\t0.80\texperiments/runs/run1/resource_monitor.csv\n",

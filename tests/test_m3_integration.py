@@ -144,6 +144,13 @@ class TestM3StageGate(unittest.TestCase):
             "      min_cpu_utilization_pct: 60\n"
             "      plan_path: experiments/configs/resource_plan.yaml\n"
             "      monitor_path_template: experiments/runs/{run_id}/resource_monitor.csv\n"
+            "      runtime_watchdog:\n"
+            "        enabled: true\n"
+            "        default_interval_seconds: 14400\n"
+            "        events_path: experiments/logs/runtime_events.jsonl\n"
+            "        checks_path_template: experiments/runs/{run_id}/watchdog_checks.jsonl\n"
+            "        alerts_path_template: experiments/runs/{run_id}/watchdog_alerts.jsonl\n"
+            "        alert_policy: record_alert_only_agent_decides_continue_fix_or_stop\n"
         )
         (self.root / "config" / "execution_env.yaml").write_text(
             "execution:\n"
@@ -228,7 +235,14 @@ class TestM3StageGate(unittest.TestCase):
                 "monitoring:\n"
                 "  enabled: true\n"
                 "  min_gpu_utilization_pct: 70\n"
-                "  min_cpu_utilization_pct: 60\n",
+                "  min_cpu_utilization_pct: 60\n"
+                "  runtime_watchdog:\n"
+                "    enabled: true\n"
+                "    default_interval_seconds: 14400\n"
+                "    events_path: experiments/logs/runtime_events.jsonl\n"
+                "    checks_path_template: experiments/runs/{run_id}/watchdog_checks.jsonl\n"
+                "    alerts_path_template: experiments/runs/{run_id}/watchdog_alerts.jsonl\n"
+                "    alert_policy: record_alert_only_agent_decides_continue_fix_or_stop\n",
                 encoding="utf-8",
             )
         (self.root / "experiments" / "requirements.lock").write_text("numpy==1.26.4\n", encoding="utf-8")
@@ -291,11 +305,18 @@ class TestM3StageGate(unittest.TestCase):
             )
         (self.root / "knowledge" / "M3" / "M3S04_result_validation.md").write_text(text, encoding="utf-8")
 
-    def _write_m3s03_files(self, *, include_monitor: bool = True, multi_gpu: bool = False) -> None:
+    def _write_m3s03_files(
+        self,
+        *,
+        include_monitor: bool = True,
+        include_watchdog: bool = True,
+        multi_gpu: bool = False,
+    ) -> None:
         for rel in (
             "knowledge/M3",
             "knowledge/reviews",
             "experiments/configs",
+            "experiments/logs",
             "experiments/runs/run_001",
         ):
             (self.root / rel).mkdir(parents=True, exist_ok=True)
@@ -311,6 +332,11 @@ class TestM3StageGate(unittest.TestCase):
             "| Run ID | Resource monitor | 平均 GPU 利用率 | 平均 CPU 利用率 | 低利用率处理 |\n"
             "|--------|------------------|----------------|----------------|--------------|\n"
             "| run_001 | `experiments/runs/run_001/resource_monitor.csv` | 82% | 74% | optimized |\n\n"
+            "## Runtime Watchdog 与告警记录\n"
+            "`experiments/logs/runtime_events.jsonl` and "
+            "`experiments/runs/run_001/watchdog_checks.jsonl` record periodic 巡检. "
+            "Watchdog only records alerts and does not automatically terminate the run. "
+            "Agent 决策: continue because no NaN/Inf, OOM, non-convergence, or early_stop alert was observed.\n\n"
             "## Baseline 结果\n"
             "baseline rows are included.\n\n"
             "## 迭代循环记录\n"
@@ -361,7 +387,14 @@ class TestM3StageGate(unittest.TestCase):
             "monitoring:\n"
             "  enabled: true\n"
             "  min_gpu_utilization_pct: 70\n"
-            "  min_cpu_utilization_pct: 60\n",
+            "  min_cpu_utilization_pct: 60\n"
+            "  runtime_watchdog:\n"
+            "    enabled: true\n"
+            "    default_interval_seconds: 14400\n"
+            "    events_path: experiments/logs/runtime_events.jsonl\n"
+            "    checks_path_template: experiments/runs/{run_id}/watchdog_checks.jsonl\n"
+            "    alerts_path_template: experiments/runs/{run_id}/watchdog_alerts.jsonl\n"
+            "    alert_policy: record_alert_only_agent_decides_continue_fix_or_stop\n",
             encoding="utf-8",
         )
         (self.root / "experiments" / "results.tsv").write_text(
@@ -374,6 +407,20 @@ class TestM3StageGate(unittest.TestCase):
             (self.root / "experiments" / "runs" / "run_001" / "resource_monitor.csv").write_text(
                 "timestamp,command_pid,cpu_load_pct,mem_available_mb,gpu_index,gpu_util_pct,gpu_mem_used_mb,gpu_mem_total_mb\n"
                 "2026-05-29T12:00:00,123,74,16000,0,82,8000,24576\n",
+                encoding="utf-8",
+            )
+        if include_watchdog:
+            watchdog_event = (
+                '{"timestamp":"2026-05-29T12:00:00","stage":"M3S03","event_type":"watchdog_check",'
+                '"run_id":"run_001","severity":"info","decision_required":false,'
+                '"agent_action_policy":"record_alert_only_agent_decides_continue_fix_or_stop","signals":[]}\n'
+            )
+            (self.root / "experiments" / "logs" / "runtime_events.jsonl").write_text(
+                watchdog_event,
+                encoding="utf-8",
+            )
+            (self.root / "experiments" / "runs" / "run_001" / "watchdog_checks.jsonl").write_text(
+                watchdog_event,
                 encoding="utf-8",
             )
         (self.root / "knowledge" / "reviews" / "M3S03_main_result_review.md").write_text(
@@ -513,6 +560,8 @@ class TestM3StageGate(unittest.TestCase):
         self.assertTrue(ok, "\n".join(messages))
         self.assertTrue(any("resource monitor file" in message for message in messages), messages)
         self.assertTrue(any("multi-GPU execution strategy documented" in message for message in messages), messages)
+        self.assertTrue(any("runtime_events.jsonl has" in message for message in messages), messages)
+        self.assertTrue(any("watchdog check file" in message for message in messages), messages)
 
     def test_m3s03_stage_gate_requires_resource_monitor(self) -> None:
         self._write_m3s03_files(include_monitor=False)
@@ -521,6 +570,16 @@ class TestM3StageGate(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertTrue(any("no resource_monitor.csv found" in message for message in messages), messages)
+
+    def test_m3s03_stage_gate_requires_runtime_watchdog(self) -> None:
+        self._write_m3s03_files(include_watchdog=False)
+
+        ok, messages = check_stage(self.root, "M3S03")
+
+        self.assertFalse(ok)
+        joined = "\n".join(messages)
+        self.assertIn("runtime_events.jsonl missing", joined)
+        self.assertIn("no watchdog_checks.jsonl found", joined)
 
     def test_m3s04_stage_gate_accepts_keep_with_evidence_package(self) -> None:
         self._write_m3s04_report()

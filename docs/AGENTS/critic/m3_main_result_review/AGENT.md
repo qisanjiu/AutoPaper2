@@ -18,6 +18,7 @@
 - 是否明确说明达到 minimum / solid 的层级
 - 是否有负面结果或未达标结果记录
 - 是否按 `resource_plan.yaml` 使用 GPU/CPU，并为正式 run 保留 `resource_monitor.csv`
+- 是否对长时间 run 建立 runtime watchdog / 告警机制，并记录告警后的 Agent 决策而不是让脚本自动结束实验
 
 ---
 
@@ -52,6 +53,13 @@
 - [ ] CPU/GPU 低利用率已触发优化 pass 或记录不可优化原因
 - [ ] baseline 与 ours 的资源策略公平；资源差异已在结果表中标注
 
+### 2.6 长跑监督、告警与 Agent 决策
+- [ ] `experiments/logs/runtime_events.jsonl` 存在，且包含 M3S03/watchdog 巡检事件
+- [ ] 每个预计超过 2 小时的正式 run 都有 `experiments/runs/<run_id>/watchdog_checks.jsonl` 或等价巡检日志
+- [ ] 若出现 `watchdog_alerts.jsonl`，M3S03 正文必须记录告警类型、原始证据路径、Agent 决策和理由
+- [ ] Watchdog/报警机制没有自动结束训练；停止、继续、修复或回溯由 Experiment Agent 根据日志、metric 曲线、checkpoint 和资源监控判断
+- [ ] NaN/Inf、不收敛、OOM、异常退出、早停候选等运行状态没有被忽略或只在最终结果中事后带过
+
 ---
 
 ## 3. 审查输出
@@ -66,6 +74,7 @@
 - `experiments/results.tsv`
 - `experiments/runs/`
 - `experiments/configs/resource_plan.yaml`
+- `experiments/logs/runtime_events.jsonl`
 - baseline metric contracts
 
 ## 评分
@@ -76,6 +85,7 @@
 | 实验诚实性 | X/10 | ... |
 | 证据层级 | X/10 | ... |
 | 资源利用率与公平性 | X/10 | ... |
+| 长跑监督与告警处置 | X/10 | ... |
 | **总分** | **X/10** | |
 
 ## 问题列表
@@ -108,9 +118,9 @@
 
 ## 4. Verdict 规则
 
-- **PASS**: 主实验结果完整，比较明确，至少达到 minimum，资源监控证据完整，且若声称超越 baseline 有证据支撑
-- **REVISE**: 结果有潜力但还需要补跑、补统计、补记录或补资源利用率优化/说明
-- **BACKTRACK**: 结果根本不支持方法，证据链断裂，或资源使用严重不公平/多卡多核闲置导致比较失效
+- **PASS**: 主实验结果完整，比较明确，至少达到 minimum，资源监控和 runtime watchdog 证据完整，告警后的 Agent 决策可追溯，且若声称超越 baseline 有证据支撑
+- **REVISE**: 结果有潜力但还需要补跑、补统计、补记录、补 watchdog/告警处置、或补资源利用率优化/说明
+- **BACKTRACK**: 结果根本不支持方法，证据链断裂，运行异常被忽略，watchdog 缺失导致长跑不可审计，或资源使用严重不公平/多卡多核闲置导致比较失效
 
 ---
 
@@ -131,6 +141,7 @@
 - `experiments/results.tsv`
 - `experiments/runs/`
 - `experiments/configs/resource_plan.yaml`
+- `experiments/logs/runtime_events.jsonl`
 - baseline metric contracts
 
 ### 5.3 输出与推进规则

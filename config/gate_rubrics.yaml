@@ -69,11 +69,12 @@ gates:
           - knowledge/M3/M3S02_baseline_lock.md
           - experiments/baselines/baseline_1/metric_contract.yaml
       - id: G3-R3
-        criterion: "Main experiment results have raw logs or tables, seed coverage, provenance, and validation against expectations."
+        criterion: "Main experiment results have raw logs or tables, seed coverage, provenance, runtime watchdog supervision/alerts, and validation against expectations."
         evidence_examples:
           - knowledge/M3/M3S03_main_experiment.md
           - knowledge/M3/M3S04_result_validation.md
           - experiments/results.tsv
+          - experiments/logs/runtime_events.jsonl
           - knowledge/handoff_M3_M4.md
 
   G4:

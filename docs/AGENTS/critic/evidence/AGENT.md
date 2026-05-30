@@ -30,6 +30,7 @@
 - [ ] **随机种子已固定为 42**，结果表、配置和日志均记录 seed=42
 - [ ] **无数据泄露迹象**：验证集信息未间接用于训练（如用全数据集做特征标准化后划分）
 - [ ] **训练曲线正常**：无 NaN/Inf、无梯度爆炸/消失、loss 合理下降
+- [ ] **长跑监督可审计**：M3S03 对长时间 run 有 runtime watchdog / alert 记录；NaN/Inf、不收敛、OOM、异常退出或早停候选均有 Agent 决策而非脚本自动终止
 - [ ] **可复现性记录**：关键结果的命令、配置、日志和 seed=42 可追溯；不要求重复运行
 - [ ] **环境快照完整**：Python、PyTorch、CUDA、硬件版本已记录
 
@@ -102,6 +103,7 @@
   - `knowledge/M2/M2S05_experiment_setup.md`
   - `knowledge/M2/M2S06_full_experiment_plan.md`
   - `experiments/results.tsv`
+  - `experiments/logs/runtime_events.jsonl`
   - `experiments/baselines/*/metric_contract.yaml`
   - `knowledge/M1/M1S04_hypothesis_generation.md`
 
@@ -241,6 +243,8 @@
 | 结果声称跨 seed 稳定但只跑 seed=42 | P1 | REVISE | **M3S04** | 收窄声明边界 |
 | 固定 seed=42 下提升过小却强称重大突破 | P1 | REVISE | **M3S04** | 需重新评估实际意义 |
 | 训练曲线有异常但未被分析 | P1 | REVISE | **M3S04** | 补充异常分析 |
+| 长时间训练缺少 watchdog/巡检告警记录 | P1 | REVISE | **M3S03** | 无法判断 NaN/不收敛/早停是否被及时处理 |
+| Watchdog 告警显示 NaN/Inf/OOM 但 M3S03 未记录 Agent 决策 | P0 | BACKTRACK | **M3S03** | 运行异常被忽略，证据不可信 |
 | Baseline 与本文方法的评估协议不一致 | P1 | BACKTRACK | **M3S02** | 可比性破坏 |
 | 负面结果被隐瞒 | P0 | BACKTRACK | **M3S04** | 诚实性违规 |
 | 达到 minimum 但未达 solid，且未解释 | P1 | REVISE | **M3S04** | 需诚实说明证据限制 |

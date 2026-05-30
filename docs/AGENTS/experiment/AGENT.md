@@ -29,6 +29,7 @@
 - **错误处理**：识别和修复代码/运行中的问题
 - **可复现性**：确保实验可以被重新运行并得到相同结果
 - **资源调度**：探测 CPU/GPU，生成可执行资源计划，并监控实际利用率，避免多卡/多核闲置
+- **运行监督与告警**：对长时间训练执行周期巡检，发现 NaN/Inf、不收敛、OOM、异常退出或已收敛时写入告警并由 Agent 判断继续、修复或早停
 
 ---
 
@@ -73,6 +74,8 @@ Conductor 会提供：
 - 记录所有尝试（包括失败的）
 - 记录主实验的结果表、与 baseline 的差异、负面结果和最终最优配置
 - 每个正式 run 必须生成 `experiments/runs/<run_id>/resource_monitor.csv` 或等价监控日志；若 GPU/CPU 利用率低于 plan 阈值，必须先优化或写明不可优化原因
+- 每个预计超过 2 小时的正式 run 必须启动运行 watchdog，默认每 4 小时巡检一次训练日志/metric 曲线，并写入 `experiments/logs/runtime_events.jsonl` 与 `experiments/runs/<run_id>/watchdog_checks.jsonl`
+- Watchdog 只负责告警和留痕，**不得自动结束实验**；出现 NaN/Inf、不收敛、OOM、异常退出或早停候选时，Experiment Agent 必须读取日志、checkpoint、曲线和资源监控后做出 `continue` / `fix_and_rerun` / `early_stop` / `backtrack_request` 判断，并记录原因
 
 > **M3S04 由 Analysis Agent 执行**，Experiment Agent **不执行** M3S04。
 
@@ -202,6 +205,7 @@ checkpoint:
 - 与 baseline 的对比表
 - 训练曲线
 - 环境快照
+- 运行 watchdog 巡检记录、告警记录和 Agent 决策记录
 ```
 
 ### 5.1 Resource Utilization Contract（M3S01/M3S03 强制）
@@ -240,6 +244,37 @@ M3 不允许只记录硬件而不使用硬件。Experiment Agent 必须把资源
 - 如果连续 10 分钟低于阈值（默认 GPU < 70% 或 CPU < 60%），必须执行一次优化 pass；若仍低，写入 `low_utilization_reason`，说明是数据 I/O、模型过小、框架限制、DDP 不兼容、远程配额限制还是实验公平性限制。
 - Stage Review 应把缺失 `resource_plan.yaml`、正式 run 无监控日志、或多 GPU/多核闲置且无原因记录视为 REVISE/BACKTRACK。
 
+### 5.2 Runtime Watchdog Contract（M3S03 长跑监督强制）
+
+M3S03 的长时间训练不能只“启动后等待几天”。Experiment Agent 对每个预计超过 2 小时的正式 run 有持续监督义务：
+
+1. 在 run 启动时创建 `run_id`，同步启动 watchdog：
+   ```bash
+   python scripts/experiment_watchdog.py watch \
+     --project . \
+     --run-id <run_id> \
+     --interval-seconds 14400 \
+     --log experiments/runs/<run_id>/logs/train.log \
+     --metrics experiments/runs/<run_id>/metrics.csv
+   ```
+   SSH 模式下可以在远程执行同等命令，但必须把 `runtime_events.jsonl`、`watchdog_checks.jsonl` 和 `watchdog_alerts.jsonl` 同步回本地。
+2. 默认巡检间隔为 4 小时；如果单 epoch 很长，可放宽到不超过 6 小时；如果模型容易数值不稳，应缩短到 30-60 分钟。
+3. Watchdog 需要检查：
+   - 训练日志中的 NaN/Inf、OOM、Traceback、梯度爆炸/溢出、异常退出
+   - loss / validation loss 是否不下降或变差
+   - 主指标是否已达目标或连续窗口内进入 plateau，可作为早停候选
+   - `resource_monitor.csv` 是否显示长期低利用率
+4. 告警处理规则：
+   - Watchdog 只写告警，不杀进程，不替 Agent 做终止决策。
+   - 出现 `critical` / `warning` / `early_stop_candidate` 后，Experiment Agent 必须读取原始日志、metric 曲线、checkpoint、资源监控和当前预算，再写出 Agent 决策。
+   - 合法决策只有：`continue`、`fix_and_rerun`、`early_stop`、`backtrack_request`。
+   - 如果选择继续，必须说明为什么异常不构成终止理由；如果选择早停，必须说明已达成的 evidence level 和保留的 checkpoint/result 路径。
+5. 必须保留的监督产物：
+   - `experiments/logs/runtime_events.jsonl`
+   - `experiments/runs/<run_id>/watchdog_checks.jsonl`
+   - `experiments/runs/<run_id>/watchdog_alerts.jsonl`（若出现告警）
+   - M3S03 正文中的 Runtime Supervision / Agent Decision Log 表
+
 ---
 
 ## 6. Evidence Ladder（M3S03）
@@ -268,14 +303,16 @@ Setup Phase:
     1. 创建独立 git 分支 `exp/main`
     2. 初始化 experiments/results.tsv
     3. 记录 M3S02 baseline 结果作为参考
+    4. 为每个预计超过 2 小时的正式 run 启动 runtime watchdog，并记录巡检间隔、日志路径和恢复命令
 
 Iteration Loop:
     1. 基于假设/方法设计，提出一个实验性修改
     2. git commit -m "exp(iterN): {修改描述}"
-    3. 运行完整配置实验
-    4. 提取关键指标，与 baseline 和上次最优结果对比
-    5. 记录结果到 results.tsv
-    6. 如果达到收敛条件或预算上限，退出循环
+    3. 运行完整配置实验，同时写入 resource_monitor 和 watchdog 记录
+    4. 每个巡检窗口读取 runtime_events/watchdog_alerts，判断 continue / fix_and_rerun / early_stop / backtrack_request
+    5. 提取关键指标，与 baseline 和上次最优结果对比
+    6. 记录结果到 results.tsv
+    7. 如果达到收敛条件、早停条件或预算上限，退出循环
 ```
 
 **收敛条件**：
@@ -299,6 +336,8 @@ Iteration Loop:
 | `resource_exhausted` | OOM、超时、存储不足 | 降低 batch size、简化模型 |
 | `resource_underutilized` | GPU/CPU 长时间低利用率、多卡/多核闲置 | 按 `resource_plan.yaml` 切换 DDP/任务并行、调 batch/num_workers/AMP；无法优化时记录原因 |
 | `numeric_instability` | NaN/Inf、梯度爆炸 | 检查 loss 设计、添加梯度裁剪 |
+| `non_convergence` | loss/主指标在巡检窗口内不改善或持续变差 | 检查学习率、初始化、归一化、loss 权重；必要时 `fix_and_rerun` 或回溯 M2 |
+| `early_stop_candidate` | 主指标达到目标或连续窗口 plateau | Agent 读取 checkpoint/validation 曲线后决定 `early_stop` 或继续补证据 |
 | `implementation_bug` | 代码逻辑错误 | 回溯到 M3S01 修复 |
 | `evaluation_pipeline_failure` | 评估脚本错误 | 检查 evaluate.py |
 | `external_dependency_blocked` | 依赖缺失/版本冲突 | 修复环境 |
@@ -684,6 +723,7 @@ Ledger 每条记录必须包含 execution mode、command、status、log path、p
 - **陷阱 17**：长时间下载/上传/模型运行没有 ledger → M3S01 审查无法判断是否真正等待、重试、恢复或申请权限
 - **陷阱 18**：没有 sandbox/container profile 就运行 LLM 生成代码 → 无法约束文件写入、网络、凭证和资源，必须补 `execution.sandbox` 与 `sandbox_profile.yaml`
 - **陷阱 19**：多 GPU/多核机器仍串行单进程运行 → 必须生成 `resource_plan.yaml`，使用 DDP 或 seed/config 并行，并记录 `resource_monitor.csv`
+- **陷阱 20**：长时间训练启动后无人巡检 → 必须使用 runtime watchdog 或等价机制，周期检查 NaN/Inf、不收敛、资源低利用率和早停候选，并由 Agent 记录继续/修复/早停判断
 
 ---
 

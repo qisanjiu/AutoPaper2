@@ -236,6 +236,15 @@ def build_stage_review_packets(project_root: str | Path, stage: str) -> list[dic
                 root / "experiments" / "requirements.txt",
             ]
         )
+    if stage == "M3S03":
+        extra_expected.extend(
+            [
+                root / "experiments" / "results.tsv",
+                root / "experiments" / "runs",
+                root / "experiments" / "configs" / "resource_plan.yaml",
+                root / "experiments" / "logs" / "runtime_events.jsonl",
+            ]
+        )
 
     for checker in conductor.get_stage_checkers(stage):
         if checker == "source_log_validator":
@@ -338,6 +347,16 @@ def build_gate_review_packets(
 
     gate_stage = _gate_stage_for_id(gate_id)
     input_docs = conductor.get_stage_input_docs(gate_stage)
+    if gate_id == "G3":
+        input_docs = _existing_or_expected(
+            [
+                *[Path(path) for path in input_docs],
+                root / "experiments" / "results.tsv",
+                root / "experiments" / "runs",
+                root / "experiments" / "logs" / "runtime_events.jsonl",
+                root / "experiments" / "configs" / "resource_plan.yaml",
+            ]
+        )
     aggregate_output = root / "knowledge" / "reviews" / f"{gate_id}_aggregate.md"
     packets: list[dict[str, Any]] = []
     for critic in GATE_CRITICS.get(gate_id, []):

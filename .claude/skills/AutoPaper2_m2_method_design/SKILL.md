@@ -179,7 +179,7 @@ Phase 5: M2S05 Experiment Setup
   → **Baseline 发现（多方法互补）**: 通过直接发现（M1 Source Log）、间接发现（论文对比基线反向追踪）、关键词/数据库搜索、引用链追踪等多种方法发现候选基线
   → Baseline 综合评估（技术相关性、可复现性、对比价值、维度覆盖、资源约束）→ 确定最终 baseline 列表
   → 代码可用性验证（GitHub/论文/社区三重确认）、公平性保证
-  → 实验协议（超参数、训练/评估、随机种子≥3）
+  → 实验协议（超参数、训练/评估、固定随机种子=42）
   → 可复现性检查清单
   → 产出: knowledge/M2/M2S05_experiment_setup.md
   → 产出: knowledge/M2/M2S05_baseline_discovery_supplement.md（如使用了间接发现，记录候选基线与评估结果）
@@ -341,7 +341,7 @@ state.save()
 | M2S02 完成后 | 映射到算法步骤、改进点有必要性论证、诚实性自检完整 | BACKTRACK → M2S02 或 M2S01 |
 | M2S03 完成后 | 产出文件非空、有形式化描述、组件接口明确、与 M2S02 对应 | REVISE → M2S03 |
 | M2S04 完成后 | 算法流程与架构一致、复杂度与伪代码一致、理论不自相矛盾 | REVISE → M2S04 |
-| M2S05 完成后 | 数据集可获取、**外部基线≥5个且覆盖≥4个维度**、**基线发现过程有记录**（使用了哪些发现方法、评估维度、最终选择理由）、**代码可用性经三重验证**、baseline 公平、超参数有依据、随机种子≥3、逐实验目的/假设/指标完整、m2_experiment_design_review PASS | BACKTRACK → M2S05 |
+| M2S05 完成后 | 数据集可获取、**外部基线≥5个且覆盖≥4个维度**、**基线发现过程有记录**（使用了哪些发现方法、评估维度、最终选择理由）、**代码可用性经三重验证**、baseline 公平、超参数有依据、固定随机种子=42、逐实验目的/假设/指标完整、m2_experiment_design_review PASS | BACKTRACK → M2S05 |
 | M2S06 完成后 | 执行顺序清晰、成功/失败标准明确、风险有应对、完整实验报告蓝图覆盖每个实验、证据保存协议明确、m2_experiment_plan_review PASS | BACKTRACK → M2S06 |
 | Gate G2 | Logic ≥7.0 AND Method ≥7.0 AND Novelty ≥7.0 | BACKTRACK 或 REVISE |
 | Handoff 前 | 所有 M2 产出文件存在 | 阻止完成 |

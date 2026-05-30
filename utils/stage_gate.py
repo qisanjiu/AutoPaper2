@@ -2132,6 +2132,108 @@ def _check_m3s03_resource_execution(root: Path, *, doc_text: str = "") -> tuple[
     return ok, messages
 
 
+def _jsonl_has_watchdog_event(path: Path) -> tuple[bool, str]:
+    if not path.exists():
+        return False, "missing"
+    try:
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except Exception as exc:
+        return False, f"unreadable ({exc})"
+    if not lines:
+        return False, "empty"
+
+    watchdog_events = 0
+    decision_required = 0
+    for line in lines:
+        lowered = line.lower()
+        has_watchdog_marker = "watchdog" in lowered
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            event = {}
+        if str(event.get("event_type", "")).lower() == "watchdog_check":
+            has_watchdog_marker = True
+        if has_watchdog_marker:
+            watchdog_events += 1
+        if isinstance(event, dict) and event.get("decision_required") is True:
+            decision_required += 1
+    if watchdog_events <= 0:
+        return False, f"{len(lines)} line(s), but no watchdog event"
+    suffix = f"; {decision_required} decision-required event(s)" if decision_required else ""
+    return True, f"{len(lines)} line(s), {watchdog_events} watchdog event marker(s){suffix}"
+
+
+def _check_m3s03_runtime_watchdog(root: Path, *, doc_text: str = "") -> tuple[bool, list[str]]:
+    """Validate runtime watchdog supervision for long-running M3S03 runs."""
+    messages: list[str] = []
+    ok = True
+
+    if not _contains_any(doc_text, ("watchdog", "runtime_events", "巡检", "告警", "早停", "early_stop")):
+        messages.append("[FAIL] M3S03: main experiment doc missing runtime watchdog/alert supervision record")
+        ok = False
+    else:
+        messages.append("[PASS] M3S03: main experiment doc records runtime watchdog/alert supervision")
+
+    runtime_events = root / "experiments" / "logs" / "runtime_events.jsonl"
+    runtime_ok, runtime_summary = _jsonl_has_watchdog_event(runtime_events)
+    if not runtime_ok:
+        messages.append(f"[FAIL] M3S03: experiments/logs/runtime_events.jsonl {runtime_summary}")
+        ok = False
+    else:
+        messages.append(f"[PASS] M3S03: runtime_events.jsonl has {runtime_summary}")
+
+    runs_dir = root / "experiments" / "runs"
+    checks = sorted(runs_dir.rglob("watchdog_checks.jsonl")) if runs_dir.exists() else []
+    if not checks:
+        messages.append("[FAIL] M3S03: no watchdog_checks.jsonl found under experiments/runs/")
+        ok = False
+    else:
+        valid_checks = 0
+        for check in checks:
+            check_ok, summary = _jsonl_has_watchdog_event(check)
+            if check_ok:
+                valid_checks += 1
+                messages.append(f"[PASS] M3S03: {check.relative_to(root)} has {summary}")
+            else:
+                messages.append(f"[FAIL] M3S03: {check.relative_to(root)} {summary}")
+                ok = False
+        if valid_checks:
+            messages.append(f"[PASS] M3S03: {valid_checks} watchdog check file(s) found")
+
+    alerts = sorted(runs_dir.rglob("watchdog_alerts.jsonl")) if runs_dir.exists() else []
+    nonempty_alerts = [path for path in alerts if _file_has_content(path)]
+    if nonempty_alerts:
+        if not _contains_any(
+            doc_text,
+            (
+                "Agent 决策",
+                "agent decision",
+                "continue",
+                "fix_and_rerun",
+                "early_stop",
+                "backtrack_request",
+                "继续",
+                "修复",
+                "早停",
+                "回溯",
+            ),
+        ):
+            messages.append("[FAIL] M3S03: watchdog alerts exist but Agent decision log is missing")
+            ok = False
+        else:
+            messages.append("[PASS] M3S03: watchdog alerts have Agent decision evidence in main doc")
+    else:
+        messages.append("[PASS] M3S03: no nonempty watchdog alert file requiring decision log")
+
+    if _contains_any(doc_text, ("watchdog auto stop", "watchdog auto-stop", "watchdog 自动终止", "脚本自动结束")):
+        messages.append("[FAIL] M3S03: watchdog must not automatically terminate experiments")
+        ok = False
+    else:
+        messages.append("[PASS] M3S03: watchdog policy does not claim automatic termination")
+
+    return ok, messages
+
+
 # Backward-compatible aliases for internal callers
 _extract_structured_field_value = extract_m3_repair_field_value
 _extract_review_verdict = extract_stage_review_verdict
@@ -2762,6 +2864,10 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
             resource_ok, resource_msgs = _check_m3s03_resource_execution(root, doc_text=text)
             messages.extend(resource_msgs)
             ok = ok and resource_ok
+
+            watchdog_ok, watchdog_msgs = _check_m3s03_runtime_watchdog(root, doc_text=text)
+            messages.extend(watchdog_msgs)
+            ok = ok and watchdog_ok
 
         if not runs_dir.exists():
             messages.append("[FAIL] M3S03: experiments/runs/ not found")

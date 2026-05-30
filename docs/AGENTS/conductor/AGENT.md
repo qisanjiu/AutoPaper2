@@ -60,6 +60,7 @@ M3 的流程必须按以下顺序执行：
 **硬约束**：
 - 任何 M3 Stage 只有在对应 review 文件存在且 `Verdict: PASS` 时才能推进
 - M3S01 缺少 `m3s01_longrun_ledger.md` 或 ledger 中出现因"太大/太慢/需要等"跳过必要数据/checkpoint/上传任务时，不得推进
+- M3S03 缺少 `experiments/logs/runtime_events.jsonl`、`watchdog_checks.jsonl` 或告警后的 Agent 决策记录时，不得推进；watchdog 告警本身不是终止条件，必须由 Experiment Agent 读取证据后判断继续、修复、早停或回溯
 - 任何 reviewer 只能读取原始文件路径，不能依赖 executor 的摘要
 - 任何非 PASS verdict 都必须触发重新执行或回溯
 - 任何回溯都必须携带 `target_stage`、`blocking_reason`、`required_fix`、`success_criteria`、`evidence_paths`、`rebuild_mode`、`rerun_scope`、`handoff_updates`

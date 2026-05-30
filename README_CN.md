@@ -285,6 +285,8 @@ my-project-20260115-143022/
 
 AutoPaper2 设计为一组 **Claude Code Skills**，位于 `.claude/skills/` 和 `skills/`：
 
+`skills/` 是项目内 canonical skill source。`.claude/skills/` 是给 Claude Code 自动发现用的镜像。Codex、KimiCode 和其他 CLI 应先读取 `AGENTS.md`，再从本仓库直接打开对应的 `skills/<skill_name>/SKILL.md`；不得依赖用户全局 skill 目录。
+
 | Skill | 说明 |
 |-------|------|
 | `AutoPaper2_env_probe` | 检测本地 GPU/Python/CUDA 并填充 `execution_env.yaml`。 |
@@ -297,6 +299,12 @@ AutoPaper2 设计为一组 **Claude Code Skills**，位于 `.claude/skills/` 和
 | `AutoPaper2_project_auto_run` | 端到端自动运行所有模块。 |
 | `AutoPaper2_project_backtrack` | 处理手动回溯请求。 |
 | `AutoPaper2_project_router` | 根据当前状态路由到正确模块。 |
+
+使用以下命令验证跨 CLI 的本地 skill 与 prompt 兼容性：
+
+```bash
+python scripts/cli_compat_check.py
+```
 
 ---
 

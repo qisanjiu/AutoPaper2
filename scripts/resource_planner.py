@@ -248,6 +248,18 @@ def build_plan(project: Path) -> dict[str, Any]:
             "min_gpu_utilization_pct": min_gpu,
             "min_cpu_utilization_pct": min_cpu,
             "low_utilization_policy": "optimize_or_document_blocker",
+            "runtime_watchdog": {
+                "enabled": True,
+                "default_interval_seconds": 4 * 60 * 60,
+                "events_path": "experiments/logs/runtime_events.jsonl",
+                "checks_path_template": "experiments/runs/{run_id}/watchdog_checks.jsonl",
+                "alerts_path_template": "experiments/runs/{run_id}/watchdog_alerts.jsonl",
+                "alert_policy": "record_alert_only_agent_decides_continue_fix_or_stop",
+                "default_command": (
+                    "python scripts/experiment_watchdog.py watch "
+                    "--run-id {run_id} --interval-seconds 14400"
+                ),
+            },
         },
     }
 
