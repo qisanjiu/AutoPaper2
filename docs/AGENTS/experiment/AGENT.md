@@ -81,11 +81,12 @@ Conductor 会提供：
 
 **M4S03: Deep Analysis Experiment Execution** → `knowledge/M4/M4S03_analysis_experiment.md` + `experiments/analysis_results.tsv`
 
-M4S03 由 Experiment Agent 执行，因为它需要按 M4S02 的分析设计运行消融、机制、鲁棒性、失败/负面分析等实际实验。
+M4S03 由 Experiment Agent 执行，因为它需要按 M4S02 的分析设计运行消融、机制、鲁棒性、效率、失败/负面分析等实际实验。
 
 - 读取 `knowledge/M4/M4S02_analysis_experiment_design.md`、`knowledge/M3/M3S04_result_validation.md`、`knowledge/handoff_M3_M4.md`、baseline/metric contract 和 M3S01 sandbox profile
-- 为每个 `Ana-*` slice 记录 status、command、seed/config、baseline inclusion、expected vs actual、evidence_path、raw logs 和 artifact paths
-- 生成 `experiments/analysis_results.tsv`，其中必须包含 slice/type/method/metric/value，并保留 baseline 与 ours/proposed 对比行
+- 为每个 `Ana-*` slice 记录 status、command、seed/config、baseline inclusion、expected vs actual、evidence_path、raw logs、artifact paths 和适用的效率指标
+- 生成 `experiments/analysis_results.tsv`，其中必须包含 `slice`, `analysis_type`, `method`, `dataset`, `split`, `seed`, `config_id`, `run_id`, `metric`, `value`, `baseline_inclusion`, `artifact_path`, `runtime_sec`, `params_m`, `peak_mem_mb`, `notes`，并保留 baseline 与 ours/proposed 对比行
+- 若 M4S02 标记 `efficiency_required: yes`，必须执行 efficiency slice 或记录 blocked 原因；适用列包括 `flops_g`, `inference_latency_ms`, `throughput`, `train_time_sec`
 - 产出 `experiments/artifacts/analysis_experiment/manifest.yaml`、`reproduction.md` 和至少一个分析图/可视化 artifact
 - 写明 Sandbox / Container Execution Record，确认是否沿用 M3S01 的 `experiments/configs/sandbox_profile.yaml`
 - 做执行侧异常分流：`stage_in_fix` 可在 M4S03 内补跑；`stage_out_backtrack` 必须把根因交给 reviewer/Conductor，不得自行修改 M4S02/M3 上游设计

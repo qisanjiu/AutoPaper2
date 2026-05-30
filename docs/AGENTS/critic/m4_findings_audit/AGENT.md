@@ -43,6 +43,9 @@
 - [ ] 候选 slice 是否明确标注 `analysis_type`
 - [ ] 候选 slice 是否写出 `literature_basis`
 - [ ] 需要比较的 slice 是否说明 `baseline_inclusion`
+- [ ] 是否包含组件/Claim 分析矩阵，且每个核心组件或 claim 都有分析 slice 或 waiver reason
+- [ ] 是否检查 M1/M2 source log 与 M2S05/M2S06 中的高水平论文 task/metric/baseline/protocol，并说明采用或拒绝原因
+- [ ] 是否包含 `efficiency_required: yes / no / waived`；若存在额外组件、额外计算路径、效率 claim 或参考论文惯例，是否规划效率分析
 - [ ] 优先级排序是否有依据（关键 Claim 优先）
 - [ ] 是否存在明显不可行的 slice
 

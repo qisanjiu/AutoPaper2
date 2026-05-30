@@ -59,18 +59,33 @@
 
 ## 7. 分析战役规划草案
 
-> 目标: 为 M4S02 生成可执行的分析计划，至少覆盖消融、机制、鲁棒性三类；失败分析必须显式纳入或给出不纳入理由。
+> 目标: 为 M4S02 生成可执行的分析计划，至少覆盖消融、机制、鲁棒性三类；失败分析必须显式纳入或给出不纳入理由。若方法包含额外组件、额外计算路径、复杂模型或论文中存在效率声明，必须规划效率分析；否则写明效率豁免理由。
 
-| 方向 | 优先级 | 候选 Slice | 目标 Claim | literature_basis | baseline_inclusion | 纸面位置 |
-|------|--------|-----------|-----------|------------------|--------------------|----------|
-| 消融实验 | High / Medium / Low | | | | required / optional / no | main_text / appendix |
-| 机制分析 | High / Medium / Low | | | | required / optional / no | main_text / appendix |
-| 鲁棒性检查 | High / Medium / Low | | | | required / optional / no | main_text / appendix |
-| 失败分析 | High / Medium / Low | | | | required / optional / no | appendix / removed |
+| 方向 | 优先级 | 候选 Slice | 目标 Claim | literature_basis | baseline_inclusion | 效率触发 | 纸面位置 |
+|------|--------|-----------|-----------|------------------|--------------------|----------|----------|
+| 消融实验 | High / Medium / Low | | | | required / optional / no | no | main_text / appendix |
+| 机制分析 | High / Medium / Low | | | | required / optional / no | no | main_text / appendix |
+| 鲁棒性检查 | High / Medium / Low | | | | required / optional / no | no | main_text / appendix |
+| 效率分析 | High / Medium / Low | | | | required / optional / no | efficiency_required: yes / no / waived | main_text / appendix |
+| 失败分析 | High / Medium / Low | | | | required / optional / no | no | appendix / removed |
 
-### 7.1 计划备注
+### 7.1 组件/Claim 分析矩阵
+
+| Component / Claim | Ablation | Mechanism / Visualization | Robustness / Boundary | Efficiency | Failure / Negative | Waiver Reason |
+|-------------------|----------|---------------------------|-----------------------|------------|--------------------|---------------|
+| C1 / component A  | planned / not_needed | planned / not_needed | planned / not_needed | required / waived | planned / not_needed | |
+
+### 7.2 高水平论文实验协议参考
+
+| source_id / paper | task_setup | metric | baseline/protocol | transferable_part | adopted_for_slice | rejected_reason |
+|-------------------|------------|--------|-------------------|-------------------|-------------------|-----------------|
+|                   |            |        |                   |                   |                   |                 |
+
+### 7.3 计划备注
 - 每个候选 slice 都必须能追溯到 `M1S02` 文献或 `M1_source_log.yaml`/`survey_memory.yaml` 中的相关做法。
+- 优先使用 `M2S05` 的相关工作实验设置表和 `M2_source_log.yaml` 中的 task/metric/baseline/protocol 信息；可参考则写入 `adopted_for_slice`，不可参考则写明 `rejected_reason`。
 - 对于要与 baseline 比较的 slice，必须说明 baseline 是否同跑，以及是否沿用 M3 的 metric/split/seed contract。
+- `efficiency_required: yes` 时，M4S02 至少设计一个效率 slice，指标至少覆盖参数量、训练或推理时间、显存/内存或吞吐中的相关项，并与 baseline 或完整模型对齐。
 - 若某方向只适合边界/负面证据，必须标注为 `appendix` 或 `reference_only`，不能直接写成主结论。
 
 ## 8. 论文面向映射初稿

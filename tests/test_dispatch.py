@@ -130,6 +130,10 @@ def _make_project(tmp_path: Path) -> Path:
         yaml.safe_dump(_valid_m2_source_log(), allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
+    (root / "state" / "survey_memory.yaml").write_text(
+        "findings:\n  gaps: []\n",
+        encoding="utf-8",
+    )
     return root
 
 
@@ -167,6 +171,9 @@ class TestDispatchPackets(unittest.TestCase):
     def test_m4_dispatch_packets_include_analysis_handoff_inputs(self) -> None:
         for rel_path in (
             "knowledge/handoff_M3_M4.md",
+            "knowledge/M1/M1_source_log.yaml",
+            "knowledge/M2/M2_source_log.yaml",
+            "knowledge/M2/M2S05_experiment_setup.md",
             "knowledge/M2/M2S06_full_experiment_plan.md",
             "knowledge/M3/M3S04_result_validation.md",
             "knowledge/M4/M4S01_other_findings.md",
@@ -182,6 +189,9 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertEqual(m4s02["role"], "analysis")
         self.assertTrue(any(path.endswith("knowledge/handoff_M3_M4.md") for path in m4s02["input_docs"]))
         self.assertTrue(any(path.endswith("knowledge/M2/M2S06_full_experiment_plan.md") for path in m4s02["input_docs"]))
+        self.assertTrue(any(path.endswith("knowledge/M1/M1_source_log.yaml") for path in m4s02["input_docs"]))
+        self.assertTrue(any(path.endswith("knowledge/M2/M2_source_log.yaml") for path in m4s02["input_docs"]))
+        self.assertTrue(any(path.endswith("state/survey_memory.yaml") for path in m4s02["input_docs"]))
 
         self.assertEqual(m4s03["role"], "experiment")
         self.assertTrue(any(path.endswith("knowledge/handoff_M3_M4.md") for path in m4s03["input_docs"]))

@@ -27,14 +27,19 @@
 - [ ] `intervention`: 具体、可执行的干预
 - [ ] `metric`: 与问题匹配的评估指标
 - [ ] `claim_links`: 与该 slice 关联的 Claim ID
-- [ ] `analysis_type`: ablation / mechanism / robustness / failure / other
+- [ ] `analysis_type`: ablation / mechanism / robustness / efficiency / failure / other
 - [ ] `baseline_inclusion`: 是否需要 baseline 同跑
+- [ ] `efficiency_required`: yes / no / waived；若为 yes，是否存在 efficiency slice
+- [ ] `efficiency_metrics`: params_m / flops_g / train_time_sec / inference_latency_ms / throughput / peak_mem_mb / not_applicable
 - [ ] `literature_basis`: 对照文献或数据库依据
+- [ ] `paper_protocol_adaptation`: 高水平论文 task/metric/baseline/protocol 的采用或拒绝理由
 - [ ] `comparison_target`: 与 full model、active baseline、随机基线或边界案例比较的对象
 - [ ] `expected_pattern`: 该 slice 预期应观察到的模式
 - [ ] `claim_links`: 对应 M4S01/M3S04 claim
 - [ ] 是否至少有 3 个具体 `Ana-*` slice ID
 - [ ] 是否覆盖 How / Where / Why：怎么 work、在哪里 work / 不 work、为什么 work
+- [ ] 是否包含 Component Claim Analysis Matrix，且每个核心组件/claim 都有 slice 或 waiver
+- [ ] 是否包含 Paper Protocol Adaptation Table，并明确 source id / reference paper、task setup、metric、baseline protocol 和 adoption decision
 - [ ] 是否说明上游依据来自 M2S05/M2S06、M3S04、`handoff_M3_M4.md` 或文献/数据库
 - [ ] `evidence_criteria`: 什么算作可写入论文的证据
 
@@ -63,7 +68,13 @@
 - [ ] 扰动类型是否与实际问题相关
 - [ ] 扰动强度是否合理（不是故意让方法失败）
 
-### 2.6 执行信封可行性
+### 2.6 效率分析设计质量
+- [ ] 若 `efficiency_required: yes`，是否至少包含一个效率 slice
+- [ ] 是否记录参数量、FLOPs/MACs、训练时间、推理延迟、吞吐、峰值显存/内存中的适用指标
+- [ ] 是否固定 hardware、batch size、precision、warmup、repeat、input size 等可比条件
+- [ ] 是否与 baseline 或 full model 做公平比较；若不比较，是否降级为 caveat/appendix
+
+### 2.7 执行信封可行性
 - [ ] 预估时间和资源是否现实
 - [ ] 不可行的 slice 是否被明确标记为 blocked 而非保留在计划中
 
@@ -88,6 +99,8 @@
 | Comparability Contract 严谨性 | X/10 | ... |
 | 机制分析设计质量 | X/10 | ... |
 | 鲁棒性检查设计质量 | X/10 | ... |
+| 效率分析设计质量 | X/10 | ... |
+| 论文协议适配质量 | X/10 | ... |
 | 执行信封可行性 | X/10 | ... |
 | **总分** | **X/10** | |
 
@@ -131,7 +144,7 @@ PASS / REVISE / BACKTRACK
 
 ## 4. Verdict 规则
 
-- **PASS**: 总分 ≥ 7.0，无 critical 问题，所有 claim-carrying slice 都有完整的 Evidence Contract
+- **PASS**: 总分 ≥ 7.0，无 critical 问题，所有 claim-carrying slice 都有完整的 Evidence Contract，效率触发/豁免清楚，论文协议适配表完整
 - **REVISE**: 总分 < 7.0 或有 major 设计缺陷但可修复（如缺少 comparison_target、消融设计不完整）
 - **BACKTRACK**: 有 critical 问题（如核心 slice 设计无法回答其 research_question、存在严重的 apples-to-oranges 风险）
 

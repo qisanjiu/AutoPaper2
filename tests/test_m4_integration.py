@@ -119,12 +119,22 @@ class TestM4StageGate(unittest.TestCase):
                 "## 分析目标\n"
                 "How: test how the component drives the gain. Where: test scenario boundaries and where it works. "
                 "Why: test why the mechanism explains the improvement. Upstream basis: M2S06, M3S04, handoff_M3_M4.\n\n"
+                "## Component Claim Analysis Matrix\n"
+                "| Component / Claim | Required Evidence | Planned Slice IDs | Missing Evidence / Waiver |\n"
+                "|---|---|---|---|\n"
+                "| C1 / component | ablation, mechanism, robustness | Ana-1, Ana-2, Ana-3 | efficiency_required: no because no extra compute claim |\n\n"
+                "## Paper Protocol Adaptation Table\n"
+                "| reference_paper / source_id | task_setup | metric | baseline_protocol | transferable_part | adopted_for_slice | adoption_decision |\n"
+                "|---|---|---|---|---|---|---|\n"
+                "| PaperX | diagnostic task | accuracy | active baseline same seed | ablation protocol | Ana-1 | adopted |\n\n"
                 "## Slice 列表\n"
                 "### Slice: Ana-1\n"
                 "- analysis_type: ablation 消融\n"
                 "- comparison_target: full model and active baseline\n"
                 "- baseline_inclusion: required\n"
+                "- efficiency_required: no\n"
                 "- literature_basis: PaperX / M2S06 diagnostic protocol\n"
+                "- paper_protocol_adaptation: PaperX task_setup metric baseline_protocol adopted for Ana-1\n"
                 "- expected_pattern: full > w/o component\n"
                 "- evidence_criteria: 3 seeds, effect size, confidence interval\n"
                 "- claim_links: C1\n\n"
@@ -132,7 +142,9 @@ class TestM4StageGate(unittest.TestCase):
                 "- analysis_type: mechanism 机制\n"
                 "- comparison_target: baseline probe\n"
                 "- baseline_inclusion: required\n"
+                "- efficiency_required: no\n"
                 "- literature_basis: PaperY visualization protocol\n"
+                "- paper_protocol_adaptation: PaperY visualization protocol adopted for Ana-2\n"
                 "- expected_pattern: ours alignment score higher\n"
                 "- evidence_criteria: quantitative probe plus figure\n"
                 "- claim_links: C2\n\n"
@@ -140,7 +152,9 @@ class TestM4StageGate(unittest.TestCase):
                 "- analysis_type: robustness 鲁棒\n"
                 "- comparison_target: active baseline under same perturbation\n"
                 "- baseline_inclusion: required\n"
+                "- efficiency_required: no\n"
                 "- literature_basis: PaperZ robustness setup\n"
+                "- paper_protocol_adaptation: PaperZ robustness protocol adopted for Ana-3\n"
                 "- expected_pattern: ours remains stable under mild noise\n"
                 "- evidence_criteria: same split, same seeds, confidence interval\n"
                 "- claim_links: C3\n\n"
@@ -148,7 +162,9 @@ class TestM4StageGate(unittest.TestCase):
                 "- analysis_type: failure negative 失败 负面\n"
                 "- comparison_target: boundary cases\n"
                 "- baseline_inclusion: optional\n"
+                "- efficiency_required: no\n"
                 "- literature_basis: negative-result audit\n"
+                "- paper_protocol_adaptation: negative-result audit adopted for Ana-4\n"
                 "- expected_pattern: failures documented honestly\n"
                 "- evidence_criteria: taxonomy and examples\n"
                 "- claim_links: C4\n\n"
@@ -268,7 +284,8 @@ class TestM4StageGate(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "experiments" / "analysis_results.tsv").write_text(
-            "slice\tmetric\tvalue\nAna-1\taccuracy_drop\t0.05\n",
+            "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tnotes\n"
+            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-a\trun-a\taccuracy_drop\t0.05\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t120\t10.5\t2048\tok\n",
             encoding="utf-8",
         )
         (root / "knowledge" / "reviews" / "M4S03_analysis_execution_review.md").write_text(
@@ -297,6 +314,19 @@ class TestM4StageGate(unittest.TestCase):
             self.assertFalse(ok)
             self.assertTrue(any("missing how target" in m for m in messages), messages)
             self.assertTrue(any("fewer than 3 concrete Ana-* slice IDs" in m for m in messages), messages)
+
+    def test_m4s02_stage_gate_blocks_required_efficiency_without_metrics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "test_project"
+            self._write_m4s02_project(proj, complete=True)
+            doc = proj / "knowledge" / "M4" / "M4S02_analysis_experiment_design.md"
+            text = doc.read_text(encoding="utf-8").replace("efficiency_required: no", "efficiency_required: yes")
+            doc.write_text(text, encoding="utf-8")
+
+            ok, messages = check_stage(proj, "M4S02")
+
+            self.assertFalse(ok)
+            self.assertTrue(any("efficiency metrics missing" in m for m in messages), messages)
 
     def test_m4s03_stage_gate_accepts_sandbox_execution_record(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -351,23 +381,36 @@ class TestM4StageGate(unittest.TestCase):
             "| Ana-1 | experiments/analysis_results.tsv | usable | baseline included | main_text |\n"
             "| Ana-2 | experiments/artifacts/analysis_experiment/figures/mechanism.pdf | weak | visualization exploratory | appendix |\n"
             "| Ana-4 | experiments/analysis_results.tsv | unusable | failure negative | removed |\n\n"
+            "## Component Claim Analysis Matrix\n"
+            "| Component / Claim | ablation | mechanism | robustness | efficiency | failure | waiver_reason |\n"
+            "|---|---|---|---|---|---|---|\n"
+            "| C1 / component | Ana-1 | Ana-2 | Ana-3 | efficiency_required: no | Ana-4 | no efficiency claim or extra compute path |\n\n"
+            "## Efficiency Evidence / Waiver\n"
+            "efficiency_required: no\n"
+            "trigger_reason: not_applicable\n"
+            "efficiency_metrics_available: params_m runtime_sec peak_mem_mb not_applicable\n"
+            "baseline_or_full_model_comparison: waived with reason\n\n"
+            "## Paper Protocol Adaptation Summary\n"
+            "| reference_paper / source_id | adopted_for_slice | task/metric/protocol adapted | rejected_reason / caveat |\n"
+            "|---|---|---|---|\n"
+            "| PaperX | Ana-1 | task_setup accuracy baseline_protocol | none |\n\n"
             "## M4→M5 Handoff\n"
             "literature_basis: M2 diagnostic protocol and 文献 analysis design. Visualization figure path recorded for M5.\n",
             encoding="utf-8",
         )
         baseline_rows = (
-            "Ana-1\tablation\tbaseline\taccuracy\t0.753\n"
-            "Ana-2\tmechanism\tbaseline\talignment_score\t0.410\n"
-            "Ana-3\trobustness\tbaseline\taccuracy_noise\t0.700\n"
+            "Ana-1\tablation\tbaseline\tds\ttest\t42\tcfg-b\trun-b\taccuracy\t0.753\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t100\t9.8\t1900\tbaseline\n"
+            "Ana-2\tmechanism\tbaseline\tds\ttest\t42\tcfg-b\trun-b\talignment_score\t0.410\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t80\t9.8\t1900\tbaseline\n"
+            "Ana-3\trobustness\tbaseline\tds\tnoise\t42\tcfg-b\trun-b\taccuracy_noise\t0.700\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t110\t9.8\t1900\tbaseline\n"
             if include_baseline_rows else ""
         )
         (root / "experiments" / "analysis_results.tsv").write_text(
-            "slice\tanalysis_type\tmethod\tmetric\tvalue\n"
+            "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tnotes\n"
             f"{baseline_rows}"
-            "Ana-1\tablation\tours\taccuracy\t0.803\n"
-            "Ana-2\tmechanism\tours\talignment_score\t0.560\n"
-            "Ana-3\trobustness\tours\taccuracy_noise\t0.760\n"
-            "Ana-4\tfailure\tours\taccuracy_high_noise\t0.610\n",
+            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-o\trun-o\taccuracy\t0.803\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t130\t10.5\t2100\tours\n"
+            "Ana-2\tmechanism\tours\tds\ttest\t42\tcfg-o\trun-o\talignment_score\t0.560\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t95\t10.5\t2100\tours\n"
+            "Ana-3\trobustness\tours\tds\tnoise\t42\tcfg-o\trun-o\taccuracy_noise\t0.760\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t140\t10.5\t2100\tours\n"
+            "Ana-4\tfailure\tours\tds\thigh_noise\t42\tcfg-o\trun-o\taccuracy_high_noise\t0.610\toptional\texperiments/artifacts/analysis_experiment/Ana-4\t120\t10.5\t2100\tnegative\n",
             encoding="utf-8",
         )
         if include_artifacts:
@@ -385,6 +428,15 @@ class TestM4StageGate(unittest.TestCase):
                 "    analysis_type: robustness\n"
                 "    baseline_inclusion: required\n"
                 "    literature_basis: PaperZ robustness protocol\n"
+                "component_claim_analysis_matrix:\n"
+                "  - claim: C1\n"
+                "    component: component\n"
+                "    slices: [Ana-1, Ana-2, Ana-3]\n"
+                "paper_protocol_adaptation:\n"
+                "  - reference_paper: PaperX\n"
+                "    source_id: S1\n"
+                "    task_setup: diagnostic task\n"
+                "    adoption_decision: adopted\n"
                 "figure_paths:\n"
                 "  - experiments/artifacts/analysis_experiment/figures/mechanism.pdf\n",
                 encoding="utf-8",

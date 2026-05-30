@@ -99,9 +99,10 @@ requirements:
     status: framework_enforced
     user_requirement: >
       After M3 verifies the method works, run deeper analysis through
-      visualization, ablation, robustness, and literature- or idea-driven
-      experiments to prove how, where, and why it works, including baselines
-      whenever required.
+      visualization, ablation, robustness, efficiency analysis when triggered,
+      and literature- or idea-driven experiments to prove how, where, and why
+      it works, including baselines whenever required. M1/M2 paper/source-log
+      evidence must inform M3/M4 experiment design and M5 writing.
     enforced_by:
       stage_gates: [M4S01, M4S02, M4S03, M4S04]
       reviews: [m4_findings_audit, m4_analysis_design_review, m4_analysis_execution_review]
@@ -119,7 +120,7 @@ requirements:
       - tests/test_m4_integration.py
       - tests/test_dispatch.py
     residual_gaps:
-      - Per-claim automatic analysis task expansion remains a future optimization.
+      - Real efficiency measurements still depend on project-specific code and hardware.
 
   - id: AP2-M5
     module: M5

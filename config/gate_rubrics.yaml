@@ -81,17 +81,20 @@ gates:
     title: "Deep analysis and mechanism evidence"
     items:
       - id: G4-R1
-        criterion: "M4 identifies post-experiment findings, negative results, and analysis questions grounded in M3 evidence."
+        criterion: "M4 identifies post-experiment findings, negative results, component/claim coverage needs, efficiency triggers or waivers, and analysis questions grounded in M3 evidence."
         evidence_examples:
           - knowledge/M4/M4S01_other_findings.md
           - knowledge/M3/M3S04_result_validation.md
       - id: G4-R2
-        criterion: "Analysis design covers ablation, mechanism, robustness or failure slices, literature basis, baseline inclusion, and evidence criteria."
+        criterion: "Analysis design covers ablation, mechanism, robustness, failure, efficiency when required, literature/source-log basis, paper protocol adaptation, baseline inclusion, and evidence criteria."
         evidence_examples:
           - knowledge/M4/M4S02_analysis_experiment_design.md
+          - knowledge/M1/M1_source_log.yaml
+          - knowledge/M2/M2_source_log.yaml
+          - knowledge/M2/M2S05_experiment_setup.md
           - knowledge/M2/M2S06_full_experiment_plan.md
       - id: G4-R3
-        criterion: "Analysis execution records sandboxed commands, logs, tables, baseline comparisons when required, and usable claims."
+        criterion: "Analysis execution records sandboxed commands, logs, extended result tables, efficiency measurements when required, baseline comparisons when required, and usable claims."
         evidence_examples:
           - knowledge/M4/M4S03_analysis_experiment.md
           - experiments/analysis_results.tsv

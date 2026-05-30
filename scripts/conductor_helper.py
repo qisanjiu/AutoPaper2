@@ -29,8 +29,32 @@ CROSS_STAGE_INPUTS: dict[str, list[str]] = {
     "M3S03": ["M3S02_baseline_lock.md", "M2S06_full_experiment_plan.md", "M1S04_hypothesis_generation.md", "M3S01_implementation.md"],
     "M3S04": ["M3S03_main_experiment.md", "M3S02_baseline_lock.md", "M1S04_hypothesis_generation.md"],
     # M4: Deep Analysis
-    "M4S01": ["handoff_M3_M4.md", "M3S03_main_experiment.md", "M3S04_result_validation.md", "M3S02_baseline_lock.md", "M1S02_literature_deepdive.md"],
-    "M4S02": ["handoff_M3_M4.md", "M4S01_other_findings.md", "M3S04_result_validation.md", "M3S03_main_experiment.md", "M3S02_baseline_lock.md", "M2S03_method_architecture.md", "M2S05_experiment_setup.md", "M2S06_full_experiment_plan.md", "M1S02_literature_deepdive.md"],
+    "M4S01": [
+        "handoff_M3_M4.md",
+        "M3S03_main_experiment.md",
+        "M3S04_result_validation.md",
+        "M3S02_baseline_lock.md",
+        "M2S05_experiment_setup.md",
+        "M2S06_full_experiment_plan.md",
+        "M2_source_log.yaml",
+        "M1S02_literature_deepdive.md",
+        "M1_source_log.yaml",
+        "survey_memory.yaml",
+    ],
+    "M4S02": [
+        "handoff_M3_M4.md",
+        "M4S01_other_findings.md",
+        "M3S04_result_validation.md",
+        "M3S03_main_experiment.md",
+        "M3S02_baseline_lock.md",
+        "M2S03_method_architecture.md",
+        "M2S05_experiment_setup.md",
+        "M2S06_full_experiment_plan.md",
+        "M2_source_log.yaml",
+        "M1S02_literature_deepdive.md",
+        "M1_source_log.yaml",
+        "survey_memory.yaml",
+    ],
     "M4S03": ["handoff_M3_M4.md", "M4S02_analysis_experiment_design.md", "M4S01_other_findings.md", "M3S01_implementation.md", "M3S02_baseline_lock.md", "M3S03_main_experiment.md", "M3S04_result_validation.md", "M2S06_full_experiment_plan.md"],
     "M4S04": ["handoff_M3_M4.md", "M3S03_main_experiment.md", "M3S04_result_validation.md", "M3S02_baseline_lock.md", "M4S01_other_findings.md", "M4S02_analysis_experiment_design.md", "M4S03_analysis_experiment.md"],
     # M5: Writing & Finalization
@@ -183,6 +207,12 @@ def _resolve_input_doc(knowledge_dir: Path, stage: str, filename: str) -> Path |
     candidates = INPUT_ALIASES.get(filename, [filename])
 
     for candidate_name in candidates:
+        if candidate_name == "survey_memory.yaml":
+            candidate = knowledge_dir.parent / "state" / "survey_memory.yaml"
+            if candidate.exists():
+                return candidate
+            continue
+
         if candidate_name.startswith("handoff_"):
             candidate = knowledge_dir / candidate_name
             if candidate.exists():

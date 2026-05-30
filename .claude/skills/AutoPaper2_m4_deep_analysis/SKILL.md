@@ -184,11 +184,12 @@ Phase 6: Handoff & 完成
 - 当前 stage（M4S01 / M4S02 / M4S04）
 - 上游输入文档路径（handoff_M3_M4.md, M3S03-M3S04 产出, M4S01-M4S03 下游产出）
 - 产出路径
-- 如果是 M4S01，必须显式记录数据质量审计、意外发现、边界条件、负面结果，以及后续分析战役规划草案的文献/数据库依据
+- 如果是 M4S01，必须显式记录数据质量审计、意外发现、边界条件、负面结果，以及后续分析战役规划草案的文献/数据库依据、组件/Claim 分析矩阵、效率触发/豁免判断
 - 如果是 M4S02，必须强调 Slice Evidence Contract 的必填字段
-- 如果是 M4S02，必须要求 claim-carrying slice 填写 `analysis_type`、`literature_basis`、`baseline_inclusion`、`evidence_criteria`
+- 如果是 M4S02，必须要求 claim-carrying slice 填写 `analysis_type`、`literature_basis`、`baseline_inclusion`、`efficiency_required`、`paper_protocol_adaptation`、`evidence_criteria`
+- 如果是 M4S02，必须包含 Component Claim Analysis Matrix 和 Paper Protocol Adaptation Table；若 `efficiency_required: yes`，必须设计 `analysis_type=efficiency` slice
 - 如果是 M4S04，必须强调 Claim Ledger 的完整性和 Insight Articulation 的 "So what?" 要求
-- 如果是 M4S04，必须把 unusable / unsupported / deferred 证据从主结论中剥离，并显式标记可用性
+- 如果是 M4S04，必须把 unusable / unsupported / deferred 证据从主结论中剥离，并显式标记可用性、效率证据或豁免、论文协议适配摘要
 
 **Analysis Agent subagent 工具集**: ReadFile, WriteFile, Shell, WebSearch
 
@@ -207,6 +208,7 @@ Phase 6: Handoff & 完成
 - M4S03 只能在 M4S02 设计的干预范围内执行实验
 - 任何偏离 M4S02 设计的行为必须在产出中明确记录并说明原因
 - 每个 analysis slice 必须记录 sandbox/container mode、命令、working dir、allowed writes、network policy、resource limits、log path
+- `experiments/analysis_results.tsv` 必须包含 dataset/split/seed/config/run/artifact/resource 字段；若执行效率 slice，还必须记录参数量、时间、显存/内存、吞吐或 FLOPs/MACs 中的适用指标
 - M4S03 必须沿用 M3S01 的 `experiments/configs/sandbox_profile.yaml` 或说明兼容 profile；不得无隔离运行 LLM 生成的分析脚本
 - M4S03 的输出必须包含执行侧的初步异常分流摘要，但不得自判最终 verdict；最终 verdict 由独立 reviewer subagent 写入 review 文件
 - 初步异常分流必须区分 `environment / setup / model / data / metric / method / unknown`
@@ -303,10 +305,10 @@ state.save()
 
 | 节点 | 检查项 | 失败处理 |
 |------|--------|---------|
-| M4S01 完成后 | 数据质量审计覆盖 4 个维度、Claim 初筛有依据、分析战役规划有明确目标且有文献/数据库依据 | REVISE / BACKTRACK → M4S01 |
-| M4S02 完成后 | 所有 claim-carrying slice 有完整 Evidence Contract、Comparability Contract 明确、baseline_inclusion 与 literature_basis 明确、执行信封现实 | REVISE / BACKTRACK → M4S02 / M4S01 |
-| M4S03 完成后 | 所有设计 slice 有执行记录（含 failed/blocked）、负面结果未被隐藏、初步审查摘要给出异常分流、结果数据完整 | REVISE / BACKTRACK → M4S03 / M4S02 |
-| M4S04 完成后 | Claim Ledger 完整、Insight Articulation 有 "So what?"、Limitations 诚实、证据可用性标注清楚、Handoff 完整 | BACKTRACK → M4S04 REVISE |
+| M4S01 完成后 | 数据质量审计覆盖 4 个维度、Claim 初筛有依据、分析战役规划有明确目标且有文献/数据库依据、组件/Claim 矩阵和效率触发/豁免判断 | REVISE / BACKTRACK → M4S01 |
+| M4S02 完成后 | 所有 claim-carrying slice 有完整 Evidence Contract、Comparability Contract 明确、baseline_inclusion / literature_basis / paper_protocol_adaptation 明确，效率 slice 按需设计，执行信封现实 | REVISE / BACKTRACK → M4S02 / M4S01 |
+| M4S03 完成后 | 所有设计 slice 有执行记录（含 failed/blocked）、负面结果未被隐藏、初步审查摘要给出异常分流、结果数据完整且包含扩展 schema | REVISE / BACKTRACK → M4S03 / M4S02 |
+| M4S04 完成后 | Claim Ledger 完整、Insight Articulation 有 "So what?"、Limitations 诚实、证据可用性/效率证据/论文协议适配标注清楚、Handoff 完整 | BACKTRACK → M4S04 REVISE |
 | Gate G4 | Logic ≥ 7.0 AND Evidence ≥ 7.0 AND Novelty ≥ 7.0 | BACKTRACK → 指定 M4 stage |
 | Handoff 前 | 所有 M4 产出文件存在、handoff_M4_M5 非空 | 阻止完成 |
 
@@ -348,6 +350,7 @@ M4 核心产出清单：
 
 补充规则：
 - `experiments/analysis_results.tsv` 记录所有 analysis slice 结果，包括失败的
+- `experiments/analysis_results.tsv` 必须包含 `slice`, `analysis_type`, `method`, `dataset`, `split`, `seed`, `config_id`, `run_id`, `metric`, `value`, `baseline_inclusion`, `artifact_path`, `runtime_sec`, `params_m`, `peak_mem_mb`, `notes`
 - `experiments/artifacts/analysis_experiment/` 保存原始数据、图表、可视化
 - `knowledge/M4/` 保存阶段性结论，`knowledge/reviews/` 保存独立审查结论
 - 默认输出语言为中文，除非用户指定英文
@@ -383,6 +386,8 @@ python scripts/state_manager.py auto-module M4
 - **M4S03 必须使用 sandbox/container profile**：所有深度分析脚本都必须在 M3S01 建立的 `experiments/configs/sandbox_profile.yaml` 边界内运行，并记录命令、网络、写入、资源和日志路径。
 - **Slice Evidence Contract 是 M4S02 的核心义务**：每个 claim-carrying slice 必须有完整的研究问题、干预、指标、claim_links。
 - **M4S02 必须为可比 slice 写明 baseline_inclusion**：只要该 slice 讨论性能、鲁棒性或泛化，就要说明 baseline 是否同跑。
+- **M4S02 必须为效率分析写明触发/豁免**：只要方法引入额外组件、额外计算路径、效率 claim 或参考论文惯例，就要设计效率 slice；不做时必须写明 waiver reason。
+- **M4S02 必须使用 M1/M2 结构化论文信息**：高水平论文 task/metric/baseline/protocol 的采用或拒绝必须写入 Paper Protocol Adaptation Table。
 - **Comparability Contract 必须明确**：防止 analysis slice 与主实验出现 apples-to-oranges 比较。
 - **负面结果必须可见**：所有 failed / blocked / null / negative slice 必须完整记录，隐藏负面结果视为学术不端。
 - **Stage Review 必须独立**：M4S01-M4S03 的 review 不得由执行 agent 自审。

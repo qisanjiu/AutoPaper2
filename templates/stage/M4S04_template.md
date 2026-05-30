@@ -48,6 +48,20 @@
 |-------------|--------|-----------|--------|----------------|
 |             |        | usable / weak / unusable |        | main_text / appendix / removed |
 
+## 5.1 Efficiency Evidence / Waiver
+
+- **efficiency_required**: yes / no / waived
+- **trigger_reason**: extra module / extra compute path / paper claim / reference-paper convention / not_applicable
+- **efficiency_metrics_available**: params_m / flops_g / train_time_sec / inference_latency_ms / throughput / peak_mem_mb / not_applicable
+- **baseline_or_full_model_comparison**: present / waived with reason
+- **paper_handling**: main_text / appendix / caveat / not_reported
+
+## 5.2 Paper Protocol Adaptation Summary
+
+| reference_paper / source_id | adopted_for_slice | task/metric/protocol adapted | rejected_reason / caveat |
+|-----------------------------|-------------------|------------------------------|--------------------------|
+|                             |                   |                              |                          |
+
 ## 6. M4→M5 Handoff
 
 ### 5.1 核心发现摘要
@@ -81,9 +95,12 @@ M4S04 通过前必须满足：
 - `knowledge/M4/M4S04_analysis_results.md` 同时覆盖 ablation/消融、mechanism/机制、robustness/鲁棒、failure/负面或失败分析
 - 必须明确回答 how / where / why：方法怎么 work、哪里 work、为什么 work，以及哪里不 work
 - 所有 claim-carrying evidence 必须说明 baseline inclusion；性能、鲁棒性、泛化相关 claim 必须有 baseline/基线 对照或降级为 caveat/appendix
-- `experiments/analysis_results.tsv` 必须包含 `slice`、`analysis_type`、`method`、`metric`、`value` 等列，并包含 baseline 与 ours/proposed 行
+- 必须说明 `efficiency_required: yes / no / waived`；若为 yes，必须纳入 efficiency slice，并报告参数量、时间、显存/内存、吞吐或 FLOPs/MACs 中的适用指标
+- 必须包含 paper protocol adaptation summary，说明哪些 M1/M2/source log 中的高水平论文 task/metric/baseline/protocol 被采用或拒绝
+- `experiments/analysis_results.tsv` 必须包含 `slice`、`analysis_type`、`method`、`dataset`、`split`、`seed`、`config_id`、`run_id`、`metric`、`value`、`baseline_inclusion`、`artifact_path`、`runtime_sec`、`params_m`、`peak_mem_mb`、`notes` 等列，并包含 baseline 与 ours/proposed 行
 - 必须存在分析 artifact 目录：`experiments/artifacts/analysis_experiment/`（或 `deep_analysis/` / `m4_analysis/`）
 - artifact 目录必须包含 `manifest.yaml`、`reproduction.md`、至少一个分析图/可视化文件
 - `manifest.yaml` 必须列出至少 3 个 `analysis_slices`，覆盖 ablation、mechanism、robustness，并记录 `baseline_inclusion` 和 `literature_basis`
+- `manifest.yaml` 必须记录 `component_claim_analysis_matrix` 或等价 claim/component 覆盖信息，以及 `paper_protocol_adaptation` 或等价引用论文协议映射
 - Claim Ledger 中 `unsupported`、`deferred`、`unusable` evidence 不得标为 `main_text`
 - `knowledge/handoff_M4_M5.md` 必须包含 claim/evidence 映射、artifact 路径、M5 写作指导、局限/caveat、usable/weak evidence status

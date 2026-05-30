@@ -1482,9 +1482,117 @@ def _analysis_type_coverage(text: str) -> set[str]:
         "ablation": ("ablation", "消融"),
         "mechanism": ("mechanism", "机制", "visualization", "可视化", "probe", "attribution"),
         "robustness": ("robust", "鲁棒", "stress", "noise", "shift", "泛化"),
+        "efficiency": (
+            "efficiency",
+            "效率",
+            "runtime",
+            "latency",
+            "throughput",
+            "flops",
+            "macs",
+            "params",
+            "参数量",
+            "推理时间",
+            "训练时间",
+            "显存",
+            "峰值内存",
+        ),
         "failure": ("failure", "negative", "失败", "负面", "边界"),
     }
     return {name for name, terms in groups.items() if any(term in lowered for term in terms)}
+
+
+def _m4_efficiency_decision(text: str) -> tuple[bool, bool, bool]:
+    """Return (decision_present, required, waived_or_not_required)."""
+    lowered = text.lower()
+    decision_present = (
+        "efficiency_required" in lowered
+        or "efficiency waiver" in lowered
+        or "efficiency_waiver" in lowered
+        or "效率触发" in text
+        or "效率豁免" in text
+        or "效率分析" in text
+    )
+    required = bool(
+        re.search(r"efficiency_required\s*[:：]\s*(yes|required|true|1)\b", lowered)
+        or re.search(r"efficiency_required\s*[:：]\s*(?:是|需要|必须)", text)
+        or re.search(r"效率分析.{0,20}(?:required|yes|需要|必须)", text, flags=re.IGNORECASE)
+    )
+    waived = bool(
+        re.search(r"efficiency_required\s*[:：]\s*(no|false|0|waived|not_required)\b", lowered)
+        or re.search(r"efficiency_required\s*[:：]\s*(?:否|不需要|豁免)", text)
+        or "efficiency_waiver" in lowered
+        or "efficiency waiver" in lowered
+        or "效率豁免" in text
+    )
+    return decision_present, required, waived
+
+
+def _m4_efficiency_metrics_present(text: str) -> bool:
+    return _contains_any(
+        text,
+        (
+            "params_m",
+            "parameters",
+            "参数量",
+            "flops",
+            "macs",
+            "train_time_sec",
+            "training time",
+            "训练时间",
+            "inference_latency_ms",
+            "latency",
+            "推理时间",
+            "throughput",
+            "吞吐",
+            "peak_mem_mb",
+            "memory",
+            "显存",
+        ),
+    )
+
+
+def _m4_efficiency_slice_present(text: str) -> bool:
+    lowered = text.lower()
+    return bool(
+        re.search(r"analysis_type\s*[:=：]\s*efficiency\b", lowered)
+        or re.search(r"analysis_type\s*[:=：].{0,30}效率", text, flags=re.IGNORECASE)
+        or re.search(r"slice\s*:\s*ana-\d+.{0,120}efficiency", lowered, flags=re.DOTALL)
+    )
+
+
+def _m4_component_claim_matrix_present(text: str) -> bool:
+    return _contains_any(
+        text,
+        (
+            "component claim analysis matrix",
+            "component_claim_analysis_matrix",
+            "component / claim",
+            "component/claim",
+            "组件/claim",
+            "组件 claim",
+            "组件/Claim",
+            "组件/主张",
+        ),
+    )
+
+
+def _m4_paper_protocol_present(text: str) -> bool:
+    return _contains_any(
+        text,
+        (
+            "paper protocol adaptation",
+            "paper_protocol_adaptation",
+            "protocol adaptation",
+            "reference_paper",
+            "source_id",
+            "task_setup",
+            "baseline_protocol",
+            "adoption_decision",
+            "论文协议适配",
+            "高水平论文",
+        ),
+    )
 
 
 def _find_m4_artifact_dir(root: Path) -> Path | None:
@@ -1523,6 +1631,8 @@ def _check_m4s04_analysis_results(root: Path) -> tuple[bool, list[str]]:
         "baseline-aware comparison": ("baseline", "基线", "对照"),
         "literature/design basis": ("literature_basis", "文献", "参考", "M2"),
         "visualization/provenance": ("visualization", "可视化", "figure", "图表", "plot", "图像"),
+        "efficiency decision": ("efficiency_required", "efficiency", "效率分析", "效率豁免"),
+        "paper protocol adaptation": ("paper_protocol_adaptation", "Paper Protocol", "论文协议适配", "reference_paper", "source_id"),
     }
     for label, terms in required_sections.items():
         if not _contains_any(text, terms):
@@ -1539,6 +1649,36 @@ def _check_m4s04_analysis_results(root: Path) -> tuple[bool, list[str]]:
         ok = False
     else:
         messages.append("[PASS] M4S04: covers ablation/mechanism/robustness/failure")
+
+    if not _m4_component_claim_matrix_present(text):
+        messages.append("[FAIL] M4S04: component/claim analysis matrix missing")
+        ok = False
+    else:
+        messages.append("[PASS] M4S04: component/claim analysis matrix present")
+    if not _m4_paper_protocol_present(text):
+        messages.append("[FAIL] M4S04: paper protocol adaptation summary missing")
+        ok = False
+    else:
+        messages.append("[PASS] M4S04: paper protocol adaptation summary present")
+    efficiency_decision, efficiency_required, efficiency_waived = _m4_efficiency_decision(text)
+    if not efficiency_decision:
+        messages.append("[FAIL] M4S04: efficiency_required decision or waiver missing")
+        ok = False
+    elif efficiency_required:
+        if "efficiency" not in coverage:
+            messages.append("[FAIL] M4S04: efficiency_required=yes but efficiency evidence missing")
+            ok = False
+        else:
+            messages.append("[PASS] M4S04: efficiency evidence present")
+        if not _m4_efficiency_metrics_present(text):
+            messages.append("[FAIL] M4S04: efficiency_required=yes but efficiency metrics missing")
+            ok = False
+        else:
+            messages.append("[PASS] M4S04: efficiency metrics present")
+    elif efficiency_waived:
+        messages.append("[PASS] M4S04: efficiency analysis explicitly waived/not required")
+    else:
+        messages.append("[PASS] M4S04: efficiency analysis decision present")
 
     problematic_claims = []
     for line in text.splitlines():
@@ -1575,8 +1715,18 @@ def _check_m4s04_analysis_results(root: Path) -> tuple[bool, list[str]]:
                     "slice/analysis id": {"slice", "analysis_id", "evidence_id"},
                     "analysis type": {"analysis_type", "type"},
                     "method/system": {"method", "system"},
+                    "dataset": {"dataset", "data"},
+                    "split": {"split", "fold"},
+                    "seed": {"seed", "random_seed"},
+                    "config/run id": {"config_id", "run_id", "config", "run"},
                     "metric": {"metric"},
                     "value/result": {"value", "result", "mean"},
+                    "baseline inclusion": {"baseline_inclusion", "baseline"},
+                    "artifact/evidence path": {"artifact_path", "evidence_path", "path"},
+                    "runtime": {"runtime_sec", "time_sec", "runtime"},
+                    "parameter count": {"params_m", "parameters", "params"},
+                    "memory": {"peak_mem_mb", "memory_mb", "peak_memory"},
+                    "notes": {"notes", "comment"},
                 }
                 for label, options in required_header_groups.items():
                     if not (headers & options):
@@ -1595,16 +1745,44 @@ def _check_m4s04_analysis_results(root: Path) -> tuple[bool, list[str]]:
                     ok = False
                 else:
                     messages.append("[PASS] M4S04: analysis_results.tsv covers ablation/mechanism/robustness")
-                if "baseline" not in joined_rows and "基线" not in joined_rows:
+                method_values = [
+                    str(row.get("method") or row.get("system") or "").lower()
+                    for row in rows
+                ]
+                if not any("baseline" in value or "基线" in value for value in method_values):
                     messages.append("[FAIL] M4S04: analysis_results.tsv missing baseline comparison rows")
                     ok = False
                 else:
                     messages.append("[PASS] M4S04: analysis_results.tsv includes baseline comparison rows")
-                if "ours" not in joined_rows and "proposed" not in joined_rows and "our_method" not in joined_rows:
+                if not any(
+                    "ours" in value or "proposed" in value or "our_method" in value
+                    for value in method_values
+                ):
                     messages.append("[FAIL] M4S04: analysis_results.tsv missing ours/proposed rows")
                     ok = False
                 else:
                     messages.append("[PASS] M4S04: analysis_results.tsv includes ours/proposed rows")
+                if efficiency_required:
+                    if "efficiency" not in joined_rows and "效率" not in joined_rows:
+                        messages.append("[FAIL] M4S04: analysis_results.tsv missing efficiency rows")
+                        ok = False
+                    else:
+                        messages.append("[PASS] M4S04: analysis_results.tsv includes efficiency rows")
+                    if not any(
+                        header in headers
+                        for header in {
+                            "flops_g",
+                            "macs_g",
+                            "inference_latency_ms",
+                            "latency_ms",
+                            "throughput",
+                            "train_time_sec",
+                        }
+                    ):
+                        messages.append("[FAIL] M4S04: analysis_results.tsv missing efficiency metric columns")
+                        ok = False
+                    else:
+                        messages.append("[PASS] M4S04: analysis_results.tsv includes efficiency metric columns")
 
     artifact_dir = _find_m4_artifact_dir(root)
     if artifact_dir is None:
@@ -1655,6 +1833,16 @@ def _check_m4s04_analysis_results(root: Path) -> tuple[bool, list[str]]:
                     ok = False
                 else:
                     messages.append("[PASS] M4S04: manifest.yaml includes literature/design basis")
+                if not _m4_component_claim_matrix_present(manifest_text):
+                    messages.append("[FAIL] M4S04: manifest.yaml missing component/claim coverage")
+                    ok = False
+                else:
+                    messages.append("[PASS] M4S04: manifest.yaml includes component/claim coverage")
+                if not _m4_paper_protocol_present(manifest_text):
+                    messages.append("[FAIL] M4S04: manifest.yaml missing paper protocol adaptation")
+                    ok = False
+                else:
+                    messages.append("[PASS] M4S04: manifest.yaml includes paper protocol adaptation")
         if not reproduction.exists() or not reproduction.read_text(encoding="utf-8").strip():
             messages.append("[FAIL] M4S04: analysis artifact reproduction.md missing or empty")
             ok = False
@@ -2976,6 +3164,29 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 ok = False
             else:
                 messages.append("[PASS] M4S01: analysis directions cover ablation/mechanism/robustness")
+            if not _m4_component_claim_matrix_present(text):
+                messages.append("[FAIL] M4S01: component/claim analysis matrix missing")
+                ok = False
+            else:
+                messages.append("[PASS] M4S01: component/claim analysis matrix present")
+            if not _m4_paper_protocol_present(text):
+                messages.append("[FAIL] M4S01: paper protocol adaptation table missing")
+                ok = False
+            else:
+                messages.append("[PASS] M4S01: paper protocol adaptation table present")
+            efficiency_decision, efficiency_required, efficiency_waived = _m4_efficiency_decision(text)
+            if not efficiency_decision:
+                messages.append("[FAIL] M4S01: efficiency_required decision or waiver missing")
+                ok = False
+            elif efficiency_required and not _m4_efficiency_metrics_present(text):
+                messages.append("[FAIL] M4S01: efficiency required but candidate metrics missing")
+                ok = False
+            elif efficiency_required:
+                messages.append("[PASS] M4S01: efficiency analysis trigger and metrics present")
+            elif efficiency_waived:
+                messages.append("[PASS] M4S01: efficiency analysis explicitly waived/not required")
+            else:
+                messages.append("[PASS] M4S01: efficiency analysis decision present")
             if not any(term in text for term in ["文献", "数据库", "literature_basis"]):
                 messages.append("[FAIL] M4S01: literature/database basis missing")
                 ok = False
@@ -3018,6 +3229,35 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                     ok = False
                 else:
                     messages.append(f"[PASS] M4S02: covers {name}")
+            if not _m4_component_claim_matrix_present(text):
+                messages.append("[FAIL] M4S02: component/claim analysis matrix missing")
+                ok = False
+            else:
+                messages.append("[PASS] M4S02: component/claim analysis matrix present")
+            if not _m4_paper_protocol_present(text):
+                messages.append("[FAIL] M4S02: paper protocol adaptation table missing")
+                ok = False
+            else:
+                messages.append("[PASS] M4S02: paper protocol adaptation table present")
+            efficiency_decision, efficiency_required, efficiency_waived = _m4_efficiency_decision(text)
+            if not efficiency_decision:
+                messages.append("[FAIL] M4S02: efficiency_required decision or waiver missing")
+                ok = False
+            elif efficiency_required:
+                if not _m4_efficiency_slice_present(text):
+                    messages.append("[FAIL] M4S02: efficiency_required=yes but efficiency slice coverage missing")
+                    ok = False
+                else:
+                    messages.append("[PASS] M4S02: efficiency slice coverage present")
+                if not _m4_efficiency_metrics_present(text):
+                    messages.append("[FAIL] M4S02: efficiency_required=yes but efficiency metrics missing")
+                    ok = False
+                else:
+                    messages.append("[PASS] M4S02: efficiency metrics present")
+            elif efficiency_waived:
+                messages.append("[PASS] M4S02: efficiency analysis explicitly waived/not required")
+            else:
+                messages.append("[PASS] M4S02: efficiency analysis decision present")
             if "baseline_inclusion" not in text:
                 messages.append("[FAIL] M4S02: baseline comparison contract missing")
                 ok = False
@@ -3111,6 +3351,34 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 ok = False
             else:
                 messages.append("[PASS] M4S03: experiments/analysis_results.tsv has data rows")
+                headers = {header.strip().lower() for header in lines[0].split("\t") if header.strip()}
+                required_headers = {
+                    "slice",
+                    "analysis_type",
+                    "method",
+                    "dataset",
+                    "split",
+                    "seed",
+                    "config_id",
+                    "run_id",
+                    "metric",
+                    "value",
+                    "baseline_inclusion",
+                    "artifact_path",
+                    "runtime_sec",
+                    "params_m",
+                    "peak_mem_mb",
+                    "notes",
+                }
+                missing_headers = sorted(required_headers - headers)
+                if missing_headers:
+                    messages.append(
+                        "[FAIL] M4S03: analysis_results.tsv missing required columns: "
+                        + ", ".join(missing_headers)
+                    )
+                    ok = False
+                else:
+                    messages.append("[PASS] M4S03: analysis_results.tsv includes extended M4 schema")
 
         sandbox_ok, sandbox_msgs = _check_experiment_sandbox_profile(root, require_m4_execution_doc=True)
         messages.extend(sandbox_msgs)

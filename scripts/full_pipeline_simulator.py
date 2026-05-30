@@ -745,7 +745,24 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "M4 should run analysis, ablation 消融, robustness 鲁棒, and mechanism 机制 checks.\n",
         )
     elif stage == "M4S01":
-        _write(out, "# M4S01\n\n## 数据质量审计\nok\n## 主实验结果摘要\nok\n## 意外发现\nok\n## 边界条件探索\nok\n## 负面结果\nok\n## Claim 初筛\nok\n## 分析战役规划草案\n消融 ablation, 机制 mechanism, 鲁棒 robustness. literature_basis 文献 数据库.\n## 论文面向映射初稿\nok\n")
+        _write(
+            out,
+            "# M4S01\n\n"
+            "## 数据质量审计\nok\n## 主实验结果摘要\nok\n## 意外发现\nok\n"
+            "## 边界条件探索\nok\n## 负面结果\nok\n## Claim 初筛\nok\n"
+            "## 分析战役规划草案\n"
+            "消融 ablation, 机制 mechanism, 鲁棒 robustness. literature_basis 文献 数据库. "
+            "efficiency_required: no; 效率豁免: no extra compute claim in this simulation.\n\n"
+            "### Component Claim Analysis Matrix\n"
+            "| Component / Claim | ablation | mechanism | robustness | efficiency | failure | waiver_reason |\n"
+            "|---|---|---|---|---|---|---|\n"
+            "| C1 / component A | planned | planned | planned | waived | planned | no efficiency claim |\n\n"
+            "### Paper Protocol Adaptation Table\n"
+            "| reference_paper / source_id | task_setup | metric | baseline_protocol | transferable_part | adopted_for_slice | adoption_decision |\n"
+            "|---|---|---|---|---|---|---|\n"
+            "| src1 | diagnostic setup | accuracy | active baseline same seed | ablation protocol | Ana-1 | adopted |\n\n"
+            "## 论文面向映射初稿\nok\n",
+        )
     elif stage == "M4S02":
         _write(
             out,
@@ -753,14 +770,26 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "## 分析目标\n"
             "How: test the contribution mechanism. Where: test mild-noise and boundary scenarios. "
             "Why: probe the mechanism behind the gain. Upstream basis: M2S06 plan, M3S04 KEEP validation, and handoff_M3_M4.\n\n"
+            "## Component Claim Analysis Matrix\n"
+            "| Component / Claim | Required Evidence | Planned Slice IDs | Missing Evidence / Waiver |\n"
+            "|---|---|---|---|\n"
+            "| C1 / component A | ablation, mechanism, robustness | Ana-1, Ana-2, Ana-3 | efficiency_required: no because no efficiency claim |\n\n"
+            "## Paper Protocol Adaptation Table\n"
+            "| reference_paper / source_id | task_setup | metric | baseline_protocol | transferable_part | adopted_for_slice | adoption_decision |\n"
+            "|---|---|---|---|---|---|---|\n"
+            "| src1 | diagnostic setup | accuracy | active baseline same seed | ablation protocol | Ana-1 | adopted |\n\n"
             "## Slice 列表\n"
             "### Slice: Ana-1\nanalysis_type=ablation; baseline_inclusion=required; literature_basis=src1; "
+            "efficiency_required: no; paper_protocol_adaptation=src1 task_setup metric baseline_protocol adopted; "
             "comparison_target=full model and active baseline; expected_pattern=full > w/o component; evidence_criteria=metric effect size; claim_links=C1.\n"
             "### Slice: Ana-2\nanalysis_type=mechanism; baseline_inclusion=required; literature_basis=src2; "
+            "efficiency_required: no; paper_protocol_adaptation=src2 visualization protocol adopted; "
             "comparison_target=baseline probe; expected_pattern=ours alignment higher; evidence_criteria=visualization plus metric; claim_links=C2.\n"
             "### Slice: Ana-3\nanalysis_type=robustness; baseline_inclusion=required; literature_basis=src3; "
+            "efficiency_required: no; paper_protocol_adaptation=src3 robustness protocol adopted; "
             "comparison_target=active baseline under same perturbation; expected_pattern=ours stable under mild noise; evidence_criteria=metric and CI; claim_links=C3.\n"
             "### Slice: Ana-4\nanalysis_type=failure negative; baseline_inclusion=optional; literature_basis=negative-result audit; "
+            "efficiency_required: no; paper_protocol_adaptation=negative-result audit adopted; "
             "comparison_target=boundary cases; expected_pattern=failures documented; evidence_criteria=case taxonomy; claim_links=C4.\n\n"
             "## Comparability Contract\nbaseline same split.\n## 执行信封审计\nrealistic.\n",
         )
@@ -768,14 +797,14 @@ def _write_stage_output(root: Path, stage: str) -> Path:
         _write(out, "# M4S03\n\n## 执行摘要\nok\n## Slice 执行记录\nok\n## 负面/失败结果记录\nfailed case.\n## 原始数据与日志\nlogs. sandbox_profile: experiments/configs/sandbox_profile.yaml.\n\n## Sandbox / Container Execution Record\nAna-1 sandbox mode venv; command `python analysis.py`; working dir experiments; allowed writes experiments/runs/; network policy restricted; resource limits timeout=24h cpu=4 gpu=0; log path experiments/runs/analysis_1/logs/run.log.\n\n## 初步审查摘要\nstage_in_fix continue; abnormal class: data metric method model environment.\n")
         _write(
             root / "experiments" / "analysis_results.tsv",
-            "slice\tanalysis_type\tmethod\tmetric\tvalue\tseed\n"
-            "Ana-1\tablation\tbaseline\taccuracy\t0.753\t1\n"
-            "Ana-1\tablation\tours\taccuracy\t0.803\t1\n"
-            "Ana-2\tmechanism\tbaseline\talignment_score\t0.410\t1\n"
-            "Ana-2\tmechanism\tours\talignment_score\t0.560\t1\n"
-            "Ana-3\trobustness\tbaseline\taccuracy_noise\t0.700\t1\n"
-            "Ana-3\trobustness\tours\taccuracy_noise\t0.760\t1\n"
-            "Ana-4\tfailure\tours\taccuracy_high_noise\t0.610\t1\n",
+            "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tnotes\n"
+            "Ana-1\tablation\tbaseline\tds\ttest\t42\tcfg-b\trun-b\taccuracy\t0.753\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t100\t9.8\t1900\tbaseline\n"
+            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-o\trun-o\taccuracy\t0.803\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t130\t10.5\t2100\tours\n"
+            "Ana-2\tmechanism\tbaseline\tds\ttest\t42\tcfg-b\trun-b\talignment_score\t0.410\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t80\t9.8\t1900\tbaseline\n"
+            "Ana-2\tmechanism\tours\tds\ttest\t42\tcfg-o\trun-o\talignment_score\t0.560\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t95\t10.5\t2100\tours\n"
+            "Ana-3\trobustness\tbaseline\tds\tnoise\t42\tcfg-b\trun-b\taccuracy_noise\t0.700\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t110\t9.8\t1900\tbaseline\n"
+            "Ana-3\trobustness\tours\tds\tnoise\t42\tcfg-o\trun-o\taccuracy_noise\t0.760\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t140\t10.5\t2100\tours\n"
+            "Ana-4\tfailure\tours\tds\thigh_noise\t42\tcfg-o\trun-o\taccuracy_high_noise\t0.610\toptional\texperiments/artifacts/analysis_experiment/Ana-4\t120\t10.5\t2100\tnegative\n",
         )
     elif stage == "M4S04":
         _write(
@@ -801,6 +830,19 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "| Ana-1 | experiments/analysis_results.tsv | usable | baseline included | main_text |\n"
             "| Ana-2 | experiments/artifacts/analysis_experiment/figures/mechanism.pdf | weak | visualization exploratory | appendix |\n"
             "| Ana-4 | experiments/analysis_results.tsv | unusable | negative high-noise result | removed |\n\n"
+            "## Component Claim Analysis Matrix\n"
+            "| Component / Claim | ablation | mechanism | robustness | efficiency | failure | waiver_reason |\n"
+            "|---|---|---|---|---|---|---|\n"
+            "| C1 / component A | Ana-1 | Ana-2 | Ana-3 | efficiency_required: no | Ana-4 | no efficiency claim or extra compute path |\n\n"
+            "## Efficiency Evidence / Waiver\n"
+            "efficiency_required: no\n"
+            "trigger_reason: not_applicable\n"
+            "efficiency_metrics_available: params_m runtime_sec peak_mem_mb not_applicable\n"
+            "baseline_or_full_model_comparison: waived with reason\n\n"
+            "## Paper Protocol Adaptation Summary\n"
+            "| reference_paper / source_id | adopted_for_slice | task/metric/protocol adapted | rejected_reason / caveat |\n"
+            "|---|---|---|---|\n"
+            "| src1 | Ana-1 | task_setup accuracy baseline_protocol | none |\n\n"
             "## M4→M5 Handoff\n"
             "literature_basis: M2 reference protocol and 文献 diagnostic setup. Visualization figure path recorded. "
             "M5 should write Analysis with ablation, mechanism, robustness, and failure evidence.\n",
@@ -813,6 +855,16 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                     {"id": "Ana-2", "analysis_type": "mechanism", "baseline_inclusion": "required", "literature_basis": "PaperY probe visualization"},
                     {"id": "Ana-3", "analysis_type": "robustness", "baseline_inclusion": "required", "literature_basis": "PaperZ robustness setup"},
                     {"id": "Ana-4", "analysis_type": "failure", "baseline_inclusion": "optional", "literature_basis": "negative-result audit"},
+                ],
+                "component_claim_analysis_matrix": [
+                    {"claim": "C1", "component": "component A", "slices": ["Ana-1", "Ana-2", "Ana-3"]},
+                ],
+                "paper_protocol_adaptation": [
+                    {
+                        "reference_paper": "src1",
+                        "task_setup": "diagnostic setup",
+                        "adoption_decision": "adopted",
+                    },
                 ],
                 "result_table": "experiments/analysis_results.tsv",
                 "figure_paths": ["experiments/artifacts/analysis_experiment/figures/mechanism.pdf"],

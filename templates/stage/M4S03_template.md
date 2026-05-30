@@ -18,6 +18,7 @@
 - **results**: 
 - **evidence_path**: experiments/artifacts/analysis_experiment/[ana_id]/
 - **claim_update**: 
+- **efficiency_metrics**: params_m / flops_g / train_time_sec / inference_latency_ms / throughput / peak_mem_mb / not_applicable
 - **deviation_from_design**: yes / no
 - **notes**: 任何偏离 M4S02 设计的地方必须显式写出
 
@@ -33,6 +34,16 @@
 - 原始日志: `experiments/runs/analysis_*/`
 - 图表/可视化: `experiments/artifacts/analysis_experiment/`
 - 沙箱配置: `experiments/configs/sandbox_profile.yaml`
+
+### 4.0 analysis_results.tsv 必填列
+
+`experiments/analysis_results.tsv` 必须至少包含：
+
+`slice`, `analysis_type`, `method`, `dataset`, `split`, `seed`, `config_id`, `run_id`, `metric`, `value`, `baseline_inclusion`, `artifact_path`, `runtime_sec`, `params_m`, `peak_mem_mb`, `notes`
+
+- baseline 与 ours/proposed 必须保留在同一个表中。
+- efficiency slice 若适用，还应包含 `flops_g`、`inference_latency_ms`、`throughput`、`train_time_sec` 等列。
+- 不适用的效率字段可以为空，但不能省略列名；这样 M4S04 和 M5 能稳定读取证据。
 
 ## 4.1 Sandbox / Container Execution Record（必须）
 

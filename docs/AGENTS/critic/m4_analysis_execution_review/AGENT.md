@@ -44,6 +44,8 @@
 
 ### 2.5 数据可追溯性
 - [ ] `experiments/analysis_results.tsv` 是否完整
+- [ ] `analysis_results.tsv` 是否包含 `slice`, `analysis_type`, `method`, `dataset`, `split`, `seed`, `config_id`, `run_id`, `metric`, `value`, `baseline_inclusion`, `artifact_path`, `runtime_sec`, `params_m`, `peak_mem_mb`, `notes`
+- [ ] 若 M4S02 标记 `efficiency_required: yes`，是否包含 efficiency rows 和适用的 `flops_g`, `inference_latency_ms`, `throughput`, `train_time_sec` 等字段
 - [ ] 原始日志是否保存在 `experiments/runs/analysis_*/`
 - [ ] 图表/可视化是否保存在 `experiments/artifacts/analysis_experiment/`
 
@@ -101,6 +103,7 @@
 | 负面结果诚实性 | X/10 | ... |
 | 与设计符合度 | X/10 | ... |
 | 数据可追溯性 | X/10 | ... |
+| 效率结果记录完整性 | X/10 | ... |
 | Sandbox / Container 执行安全 | X/10 | ... |
 | **总分** | **X/10** | |
 

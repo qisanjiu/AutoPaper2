@@ -35,7 +35,7 @@ Conductor 会提供：
 - 若当前 stage 为 M5S01：`knowledge/handoff_M4_M5.md`
 - `knowledge/M3/M3S03_main_experiment.md`
 - M1 关键产物：`knowledge/M1/M1S02_literature_deepdive.md`、`knowledge/M1/M1_source_log.yaml`、`knowledge/M1/M1S03_research_question.md`、`knowledge/M1/M1S04_hypothesis_generation.md`
-- M2 关键产物：`knowledge/M2/M2S03_method_architecture.md`、`knowledge/M2/M2S04_algorithm_theory.md`、`knowledge/M2/M2S05_experiment_setup.md`、`knowledge/M2/M2S06_full_experiment_plan.md`
+- M2 关键产物：`knowledge/M2/M2S03_method_architecture.md`、`knowledge/M2/M2S04_algorithm_theory.md`、`knowledge/M2/M2S05_experiment_setup.md`、`knowledge/M2/M2S06_full_experiment_plan.md`、`knowledge/M2/M2_source_log.yaml`（如存在）
 - M4 分析产物：`knowledge/M4/M4S03_analysis_experiment.md`、`knowledge/M4/M4S04_analysis_results.md`
 - 实验原始数据（`experiments/results/` 目录下各文件）
 - `state/research_brief.yaml`（如存在，帮助 M5S01 识别 foundation/reference anchors 的传承关系）
@@ -141,16 +141,22 @@ Conductor 会提供：
 | C2 | ... | M3S03 | partial | 消融验证 |
 
 ## 7. 分析战役规划草案
-- 覆盖要求: 必须覆盖消融、机制、鲁棒性三类分析；失败/负面分析必须纳入，或说明为何不纳入。
+- 覆盖要求: 必须覆盖消融、机制、鲁棒性三类分析；失败/负面分析必须纳入，或说明为何不纳入；若方法引入额外组件、额外计算路径、效率 claim 或参考论文通常报告效率，必须纳入效率分析，否则写明效率豁免。
 - 文献/数据库依据: 每个方向必须引用 `knowledge/M1/M1S02_literature_deepdive.md`、`M1_source_log.yaml`、`survey_memory.yaml` 或上游数据库中的相关分析做法；若无可参考文献，必须说明采用该分析方式的领域通用理由。
+- 论文协议适配: 必须查看 M2S05/M2S06 和 M1/M2 source log 中的高水平论文 task/metric/baseline/protocol，说明采用或拒绝的理由。
 - baseline 对照原则: 只要该 slice 讨论性能、稳定性、鲁棒性或场景泛化，就必须说明是否纳入 active baseline；不纳入时必须给出原因。
 
-| 方向 | 优先级 | 候选 Slice | 目标 Claim | literature_basis | baseline_inclusion |
-|------|--------|-----------|-----------|------------------|--------------------|
-| 消融实验 | High | 组件 A/B/C 消融 | C1, C2 | 参考文献/数据库条目 | required |
-| 机制分析 | Medium | 注意力可视化/探针 | C3 | 参考文献/数据库条目 | optional / required |
-| 鲁棒性检查 | Medium | 噪声/偏移/子场景测试 | C1 | 参考文献/数据库条目 | required |
-| 失败分析 | Low | 错误案例分类 | C4 | 参考文献/数据库条目 | optional |
+| 方向 | 优先级 | 候选 Slice | 目标 Claim | literature_basis | baseline_inclusion | efficiency_required |
+|------|--------|-----------|-----------|------------------|--------------------|---------------------|
+| 消融实验 | High | 组件 A/B/C 消融 | C1, C2 | 参考文献/数据库条目 | required | no |
+| 机制分析 | Medium | 注意力可视化/探针 | C3 | 参考文献/数据库条目 | optional / required | no |
+| 鲁棒性检查 | Medium | 噪声/偏移/子场景测试 | C1 | 参考文献/数据库条目 | required | no |
+| 效率分析 | Medium | 参数量/时间/显存/吞吐 | C5 | 参考文献/数据库条目 | required / optional | yes / waived |
+| 失败分析 | Low | 错误案例分类 | C4 | 参考文献/数据库条目 | optional | no |
+
+## 7.1 Component Claim Analysis Matrix
+| Component / Claim | ablation | mechanism | robustness | efficiency | failure | waiver_reason |
+|-------------------|----------|-----------|------------|------------|---------|---------------|
 
 ## 8. 论文面向映射初稿
 | 发现 | paper_role | 建议位置 |
@@ -184,7 +190,9 @@ Conductor 会提供：
 - **metric**: 主指标（与 M3 主实验一致）
 - **comparison_target**: 完整模型（M3 主实验最佳结果）
 - **baseline_inclusion**: required，纳入 active baseline 的同一 metric/split/seed contract；若不可运行，说明替代对照
+- **efficiency_required**: no
 - **literature_basis**: 参考 M1/M2 数据库中类似消融或诊断方法，列出 source id / title
+- **paper_protocol_adaptation**: 参考 source id 中的 ablation task/metric/protocol，说明采用或拒绝原因
 - **expected_pattern**: Full > w/o A，且 drop 大于最小效应阈值
 - **evidence_criteria**: 固定 seed=42、主指标差异、可比性成立
 - **stop_condition**: seed=42 单次实验完成
@@ -200,7 +208,9 @@ Conductor 会提供：
 - **metric**: 注意力-目标区域 IoU
 - **comparison_target**: 随机注意力基线
 - **baseline_inclusion**: optional / required（若用于证明优于 baseline 的机制差异，则 required）
+- **efficiency_required**: no
 - **literature_basis**: 参考 M1/M2 数据库中类似机制可视化、probe 或 attribution 方法
+- **paper_protocol_adaptation**: 参考 source id 中的 visualization/probe protocol，说明采用或拒绝原因
 - **expected_pattern**: Ours 的机制指标优于随机或 baseline probe
 - **evidence_criteria**: 样本量、抽样规则、可视化/定量指标、反例记录
 - **stop_condition**: 100 个样本可视化完成
@@ -209,6 +219,9 @@ Conductor 会提供：
 
 ### Slice 覆盖要求
 - 至少包含 `analysis_type=ablation`、`analysis_type=mechanism`、`analysis_type=robustness`。
+- 必须包含 `Component Claim Analysis Matrix`，每个核心组件或 claim 都要有对应分析 slice 或 waiver reason。
+- 必须包含 `Paper Protocol Adaptation Table`，说明参考论文 task/metric/baseline/protocol 如何影响 M4 实验布置。
+- 必须包含 `efficiency_required: yes / no / waived`；若为 yes，至少包含一个 `analysis_type=efficiency` slice，指标覆盖参数量、FLOPs/MACs、训练时间、推理延迟、吞吐或峰值显存中的适用项。
 - 必须显式处理失败/负面分析：作为独立 slice，或在每个 slice 的失败解释中覆盖。
 - claim-carrying slice 必须填写 `baseline_inclusion`、`literature_basis`、`comparison_target`、`expected_pattern`、`evidence_criteria`、`claim_links`。
 - 必须至少给出 3 个具体 `Ana-*` slice ID，并显式覆盖 How / Where / Why 三类分析目标。
@@ -222,10 +235,10 @@ Conductor 会提供：
 - 防止 apples-to-oranges 的措施: ...
 
 ## 4. 执行信封审计
-| Slice | 预估时间 | 预估资源 | 可行性 | 备注 |
-|-------|---------|---------|--------|------|
-| Ana-1 | 2h | 1x GPU | feasible | — |
-| Ana-2 | 30min | CPU | feasible | — |
+| Slice | 预估时间 | 预估资源 | GPU/CPU/内存 | 效率采集 | 可行性 | 备注 |
+|-------|---------|---------|--------------|----------|--------|------|
+| Ana-1 | 2h | 1x GPU | GPU 24GB | no | feasible | — |
+| Ana-2 | 30min | CPU | CPU 4c | no | feasible | — |
 
 ## 5. 与主实验的区别
 （分析实验通常不同于主实验的评估指标或设置）
@@ -364,10 +377,11 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 - **M3S04 写 KEEP 时必须同步完成证据包与 M3→M4 handoff**：`manifest.yaml`, `metric_contract.yaml`, `comparison_table.csv`, `reproduction.md`, `knowledge/handoff_M3_M4.md`
 - **M3S04 KEEP 必须包含固定 seed=42 结果验证、数据质量检查、假设映射、根因分析、负面结果、局限性和下游分析方向**
 - **M3S04 若决策为 BACKTRACK，必须产出「回溯修改方向」章节**
-- **M4S01/M4S02 必须覆盖消融、机制、鲁棒性，并显式处理失败/负面分析**
-- **M4S02 的 claim-carrying slice 必须包含 `literature_basis`、`baseline_inclusion`、`evidence_criteria`**
+- **M4S01/M4S02 必须覆盖消融、机制、鲁棒性，并显式处理失败/负面分析；效率分析必须按 `efficiency_required` 触发或豁免**
+- **M4S02 的 claim-carrying slice 必须包含 `literature_basis`、`baseline_inclusion`、`evidence_criteria`、`paper_protocol_adaptation`**
+- **M4S02 必须包含 Component Claim Analysis Matrix 和 Paper Protocol Adaptation Table**
 - **M4S03 必须为异常结果记录 expected vs actual、异常原因分类、stage-in 修正或 stage-out 回溯建议；最终判断由独立 reviewer 完成**
-- **M4S04 必须打包可复用分析证据**：`experiments/analysis_results.tsv`、`experiments/artifacts/analysis_experiment/manifest.yaml`、`reproduction.md`、至少一个分析图/可视化文件
+- **M4S04 必须打包可复用分析证据**：`experiments/analysis_results.tsv`、`experiments/artifacts/analysis_experiment/manifest.yaml`、`reproduction.md`、至少一个分析图/可视化文件；结果表必须包含 dataset/split/seed/config/run/artifact/resource 字段
 - **M4S04 必须回答 how/where/why，并覆盖消融、机制、鲁棒性、失败/负面分析；claim-carrying evidence 必须说明 baseline inclusion 和 literature_basis**
 - **M4S04 只能把 usable 或有 caveat 的 weak evidence 交给 M5；unusable/unsupported/deferred 不得作为论文主结论**
 - **M5S01 必须输出 pre-write audit，不得使用旧版 `M5S01_claim_evidence_map.md` 或 `M5S02_contribution_articulation.md` 文件名**
