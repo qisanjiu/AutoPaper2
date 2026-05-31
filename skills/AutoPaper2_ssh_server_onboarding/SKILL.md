@@ -107,6 +107,10 @@ python scripts/ssh_manager.py server add <server_id> \
    ```bash
    python scripts/state_manager.py create "Topic" "Project Name" --server-id <server_id>
    python scripts/state_manager.py create "Topic" "Project Name" --server-id auto --server-tags gpu --min-gpu-count 1
+   python scripts/state_manager.py create "Topic" "Project Name" --server-ids <server_a>,<server_b>
+   python scripts/state_manager.py create "Topic" "Project Name" --server-pool-count 2 --server-tags gpu --min-gpu-count 1
+   python scripts/ssh_manager.py lease alloc-pool --project <project> --server-ids <server_a>,<server_b> --apply
+   python scripts/ssh_manager.py lease alloc-pool --project <project> --count 2 --tags gpu --min-gpu-count 1 --apply
    ```
 
 ## Interaction Rules

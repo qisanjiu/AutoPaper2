@@ -58,6 +58,8 @@ python scripts/ssh_manager.py bootstrap-key <server_id>
 python scripts/ssh_manager.py probe <server_id>
 python scripts/ssh_manager.py doctor <server_id>
 python scripts/ssh_manager.py lease alloc --project <project> --server-id auto --apply
+python scripts/ssh_manager.py lease alloc-pool --project <project> --server-ids lab-a,lab-b --apply
+python scripts/ssh_manager.py lease alloc-pool --project <project> --count 2 --tags gpu --min-gpu-count 1 --apply
 python scripts/ssh_manager.py lease release <lease_id>
 python scripts/state_manager.py dispatch ssh alloc --project <project> --write
 ```
@@ -71,3 +73,5 @@ python scripts/state_manager.py dispatch ssh alloc --project <project> --write
 5. `execution.mode == ssh` must use `execution.sandbox.mode == ssh_remote`.
 6. Experiment Agent consumes a valid lease; it should not choose servers itself.
 7. SSH Ops Agent may prepare infrastructure and sync files, but it must not write experiment findings or review verdicts.
+8. For M3/M4 multi-resource execution, SSH Ops may allocate multiple leases and apply them as `execution.resource_optimization.resource_pool.resources` plus project `state/ssh_resource_pool.yaml`; Experiment Agent then schedules independent tasks with `scripts/resource_planner.py allocate`.
+9. Multi-resource pools may include both local and SSH resources. Remote assignments must keep per-resource workspace/sync evidence and must pull metrics, logs, resource monitors, and referenced artifacts back before stage completion.

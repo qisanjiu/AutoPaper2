@@ -22,7 +22,9 @@ from spiral.ssh_registry import (
     SSHRegistryError,
     active_leases,
     allocate_server,
+    allocate_server_pool,
     apply_lease_to_project,
+    apply_lease_pool_to_project,
     doctor_server,
     get_lease,
     get_server,
@@ -126,6 +128,30 @@ def _cmd_lease(args: argparse.Namespace) -> int:
             apply_lease_to_project(args.framework_root, args.project, lease["lease_id"])
         print(f"[SSH] Lease allocated: {lease['lease_id']}")
         _print_yaml(lease)
+        return 0
+    if args.lease_cmd == "alloc-pool":
+        server_ids = _split_csv(args.server_ids) if args.server_ids else []
+        leases = allocate_server_pool(
+            args.framework_root,
+            args.project,
+            server_ids=server_ids,
+            count=args.count,
+            min_gpu_count=args.min_gpu_count,
+            min_vram_gb=args.min_vram_gb,
+            tags=_split_csv(args.tags),
+            lease_hours=args.lease_hours,
+            stage_scope=args.stage_scope,
+            reason=args.reason,
+        )
+        if args.apply:
+            apply_lease_pool_to_project(
+                args.framework_root,
+                args.project,
+                [lease["lease_id"] for lease in leases],
+                include_local=not args.remote_only,
+            )
+        print(f"[SSH] Lease pool allocated: {len(leases)} lease(s)")
+        _print_yaml({"leases": leases})
         return 0
     if args.lease_cmd == "release":
         lease = release_lease(args.lease_id, args.framework_root, reason=args.reason)
@@ -341,6 +367,18 @@ def build_parser() -> argparse.ArgumentParser:
     alloc.add_argument("--stage-scope", default="M3-M4")
     alloc.add_argument("--reason", default="project allocation")
     alloc.add_argument("--apply", action="store_true", help="Write lease into project config/execution_env.yaml")
+    pool = lease_sub.add_parser("alloc-pool", help="Allocate multiple leases into a project resource pool")
+    pool.add_argument("--project", required=True)
+    pool.add_argument("--server-ids", default="", help="Comma-separated server ids; use auto entries or --count for automatic selection")
+    pool.add_argument("--count", type=int, default=1)
+    pool.add_argument("--tags", default="")
+    pool.add_argument("--min-gpu-count", type=int, default=0)
+    pool.add_argument("--min-vram-gb", type=float, default=None)
+    pool.add_argument("--lease-hours", type=int, default=None)
+    pool.add_argument("--stage-scope", default="M3-M4")
+    pool.add_argument("--reason", default="project resource pool allocation")
+    pool.add_argument("--apply", action="store_true", help="Write resource_pool into project config/execution_env.yaml")
+    pool.add_argument("--remote-only", action="store_true", help="Do not include local resources in the pool")
     release = lease_sub.add_parser("release", help="Release lease")
     release.add_argument("lease_id")
     release.add_argument("--reason", default="manual release")

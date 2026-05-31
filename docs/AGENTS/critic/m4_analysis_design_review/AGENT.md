@@ -76,6 +76,8 @@
 
 ### 2.7 执行信封可行性
 - [ ] 预估时间和资源是否现实
+- [ ] 多资源条件下是否写明每个 slice 的 `parallelizable`、`dependencies`、`resource_requirements` 和 fairness_key
+- [ ] 可并行 slice 与必须串行/同资源运行的 slice 是否有清楚理由，能直接交给 M4S03 生成 task queue/allocation
 - [ ] 不可行的 slice 是否被明确标记为 blocked 而非保留在计划中
 
 ---

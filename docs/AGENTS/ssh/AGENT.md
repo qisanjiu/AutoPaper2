@@ -33,6 +33,7 @@
 | `state/ssh_events.jsonl` | SSH 操作事件流，必须 redacted |
 | `{project}/config/execution_env.yaml` | 项目使用的服务器/租约引用 |
 | `{project}/state/ssh_allocation.yaml` | 项目本次 SSH 分配摘要 |
+| `{project}/state/ssh_resource_pool.yaml` | 多服务器/本地+远程资源池摘要 |
 
 推荐使用：
 
@@ -43,6 +44,8 @@ python scripts/ssh_manager.py bootstrap-key <server_id>
 python scripts/ssh_manager.py probe <server_id>
 python scripts/ssh_manager.py doctor <server_id>
 python scripts/ssh_manager.py lease alloc --project <project> --server-id auto --apply
+python scripts/ssh_manager.py lease alloc-pool --project <project> --server-ids lab-a,lab-b --apply
+python scripts/ssh_manager.py lease alloc-pool --project <project> --count 2 --tags gpu --min-gpu-count 1 --apply
 python scripts/ssh_manager.py lease release <lease_id>
 python scripts/ssh_manager.py sync push --project <project>
 python scripts/ssh_manager.py sync pull --project <project>
@@ -68,6 +71,16 @@ python scripts/ssh_manager.py sync pull --project <project>
    - `execution.ssh.host/user/port/identity_file/workspace_path/dataset_path`
 6. 写入 `{project}/state/ssh_allocation.yaml`。
 
+### 3.1.1 分配多资源池
+
+当用户提供多个服务器、多个 GPU 服务器，或要求 local+remote 混合计算时：
+
+1. 使用 `lease alloc-pool` 分配多个 active lease。
+2. `--apply` 必须写入项目 `execution.resource_optimization.resource_pool.resources`，并生成 `{project}/state/ssh_resource_pool.yaml`。
+3. 默认 `include_local: true`，除非用户明确要求 remote-only。
+4. SSH Ops 只准备资源池和同步能力；M3S03/M4S03 的 task queue、task allocation、实验运行和结果判断必须由 Experiment Agent 完成。
+5. 返回结果必须列出所有 `server_id`、`lease_id`、workspace、dataset_path、GPU/CPU capacity 和需要同步的路径。
+
 ### 3.2 健康检查
 
 健康检查只验证基础设施，不运行实验：
@@ -84,6 +97,7 @@ python scripts/ssh_manager.py sync pull --project <project>
 - Push 只同步当前项目执行所需代码、配置和小型 metadata。
 - 数据集优先使用远程公共缓存 `dataset_path`，不批量同步全量 `data/`。
 - Pull 必须把实验所需结果、日志、曲线和 metric contract 同步回本地项目。
+- 多资源池下，每个远程 assignment 完成后必须 pull 该任务的 metrics/logs/resource_monitor/watchdog/artifacts；不能只同步最终汇总表。
 - 任何远程命令输出都必须 redacted，不能暴露 token、password、private key。
 
 ---

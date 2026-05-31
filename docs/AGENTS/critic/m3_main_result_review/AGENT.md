@@ -52,6 +52,10 @@
 - [ ] 多 GPU 可见时，M3S03 使用 DDP 或 seed/config task_parallel；未使用时有合理说明
 - [ ] CPU/GPU 低利用率已触发优化 pass 或记录不可优化原因
 - [ ] baseline 与 ours 的资源策略公平；资源差异已在结果表中标注
+- [ ] 若 `resource_pool.enabled == true` 或资源池 resources > 1，M3S03 存在 `m3_task_queue.yaml` 和 `m3_task_allocation.yaml`，且 assignments/waves 合理利用可并行任务
+- [ ] 每个正式 run 在正文和 `experiments/results.tsv` 中记录 `resource_id`、`resource_kind`、`server_id`（如适用）、`resource_monitor`
+- [ ] 远程 run 有 push/pull 同步证据，metrics/logs/resource_monitor/watchdog/artifacts 已回收到本地项目
+- [ ] allocation 中 blocked_tasks 或未使用资源有明确原因：依赖、DDP 不兼容、显存、数据同步、fairness、配额或远程不可达
 
 ### 2.6 长跑监督、告警与 Agent 决策
 - [ ] `experiments/logs/runtime_events.jsonl` 存在，且包含 M3S03/watchdog 巡检事件
@@ -119,8 +123,8 @@
 ## 4. Verdict 规则
 
 - **PASS**: 主实验结果完整，比较明确，至少达到 minimum，资源监控和 runtime watchdog 证据完整，告警后的 Agent 决策可追溯，且若声称超越 baseline 有证据支撑
-- **REVISE**: 结果有潜力但还需要补跑、补统计、补记录、补 watchdog/告警处置、或补资源利用率优化/说明
-- **BACKTRACK**: 结果根本不支持方法，证据链断裂，运行异常被忽略，watchdog 缺失导致长跑不可审计，或资源使用严重不公平/多卡多核闲置导致比较失效
+- **REVISE**: 结果有潜力但还需要补跑、补统计、补记录、补 watchdog/告警处置、补资源利用率优化/说明、或补多资源 allocation/同步证据
+- **BACKTRACK**: 结果根本不支持方法，证据链断裂，运行异常被忽略，watchdog 缺失导致长跑不可审计，资源使用严重不公平，多卡多核/多服务器闲置导致比较失效，或远程结果未同步导致证据不可追溯
 
 ---
 

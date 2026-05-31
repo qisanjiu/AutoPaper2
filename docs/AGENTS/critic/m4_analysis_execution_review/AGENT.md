@@ -52,6 +52,10 @@
 ### 2.5.1 Sandbox / Container 执行审查
 - [ ] `experiments/configs/sandbox_profile.yaml` 存在且可读
 - [ ] M4S03 文档记录每个 slice 的 sandbox mode、命令、working dir、allowed writes、network policy、resource limits、log path
+- [ ] 每个 slice 记录 `resource_id`、`resource_kind`、GPU/CPU 分配、resource_monitor；SSH slice 记录 server_id、lease_id、remote workspace、push/pull 同步证据
+- [ ] 若 `resource_pool.enabled == true` 或资源池 resources > 1，存在 `experiments/configs/m4_task_queue.yaml` 与 `m4_task_allocation.yaml`，assignments/waves 与 M4S02 的并行性/依赖设计一致
+- [ ] allocation 中 blocked_tasks、未并行或未使用资源有合理解释：依赖、checkpoint 互斥、显存、数据同步、baseline fairness、配额或远程不可达
+- [ ] `experiments/analysis_results.tsv` 包含 `resource_id`, `resource_kind`, `server_id`, `gpu_ids`, `resource_monitor` 等资源字段
 - [ ] 没有写出 allowed_write_paths 之外的位置
 - [ ] 没有在日志中打印 SSH key、API key、token、password
 - [ ] 若某个 slice 放宽网络或写入权限，必须说明原因并给出恢复/收敛记录

@@ -50,12 +50,13 @@ M3 的流程必须按以下顺序执行：
 1. `M3S01` 由 Experiment Agent 执行
 2. `M3S01` 必须同时产出 `experiments/logs/m3s01_longrun_ledger.md`，用于审计下载、上传、远程环境、依赖、checkpoint、smoke run 的长任务等待/恢复/权限状态
 3. `M3S01` 的 review 由 `m3_dataset_env_review` 执行
-4. `M3S02` 由 Experiment Agent 执行
-5. `M3S02` 的 review 由 `m3_baseline_result_review` 执行
-6. `M3S03` 由 Experiment Agent 执行
-7. `M3S03` 的 review 由 `m3_main_result_review` 执行
-8. `M3S04` 由 Analysis Agent 执行
-9. `G3` 由 Method Critic + Evidence Critic 执行
+4. 当用户提供多个服务器、多张 GPU 或要求 local+remote 混合计算时，Conductor 只能准备/派发 SSH resource pool（如需），不得自行执行实验；M3S01/M3S03 由 Experiment Agent 使用 `resource_plan.yaml` 与 `m3_task_allocation.yaml` 调度可并行任务
+5. `M3S02` 由 Experiment Agent 执行
+6. `M3S02` 的 review 由 `m3_baseline_result_review` 执行
+7. `M3S03` 由 Experiment Agent 执行
+8. `M3S03` 的 review 由 `m3_main_result_review` 执行
+9. `M3S04` 由 Analysis Agent 执行
+10. `G3` 由 Method Critic + Evidence Critic 执行
 
 **硬约束**：
 - 任何 M3 Stage 只有在对应 review 文件存在且 `Verdict: PASS` 时才能推进
@@ -78,8 +79,9 @@ M4 的流程必须按以下顺序执行：
 4. `M4S02` 的 review 由 `m4_analysis_design_review` 执行
 5. `M4S03` 由 Experiment Agent 执行
 6. `M4S03` 的 review 由 `m4_analysis_execution_review` 执行
-7. `M4S04` 由 Analysis Agent 执行
-8. `G4` 由 Logic + Evidence + Novelty Critics 执行
+7. 若 M4 分析 slice 可并行，Conductor 必须把资源池配置路径传给 Experiment Agent；任务分配与执行证据由 M4S03 subagent 写入 `m4_task_allocation.yaml` 和 stage 输出
+8. `M4S04` 由 Analysis Agent 执行
+9. `G4` 由 Logic + Evidence + Novelty Critics 执行
 
 **硬约束**：
 - M4S01/M4S02 必须覆盖消融、机制、鲁棒性，并显式写出 literature / database basis

@@ -44,6 +44,10 @@
 - **expected_pattern**: 预期结果模式，例如 Full > w/o A、ours 在 mild noise 下优于 baseline、机制指标与目标区域对齐
 - **evidence_criteria**: 判断该 slice 是否提供了可写入论文的证据
 - **stop_condition**: 
+- **resource_requirements**: min_gpu_count / min_cpu_cores / memory_gb / remote_ok / local_only / expected_minutes
+- **parallelizable**: yes / no
+- **dependencies**: none / Ana-* / run_id / checkpoint
+- **fairness_key**: 与 baseline/ours 比较保持同资源或同资源类型的分组键
 - **paper_role**: main_text / appendix / reference_only
 - **claim_links**: 
 
@@ -71,6 +75,12 @@
 |-------|---------|---------|--------------|----------|--------|------|
 |       |         |         |              | yes / no / not_applicable | feasible / blocked | |
 
+如果存在多个计算资源，执行信封审计必须说明可并行性：
+
+| Slice | parallelizable | dependencies | resource_requirements | preferred_resource_class | fairness_key | 不并行原因 |
+|-------|----------------|--------------|-----------------------|--------------------------|--------------|------------|
+| Ana-1 | yes | none | min_gpu_count=1, expected_minutes=120 | gpu | C1_same_hw | |
+
 ## 5. 与主实验的区别
 
 （分析实验通常不同于主实验的评估指标或设置）
@@ -85,6 +95,6 @@
 
 M4S03 必须按此 schema 写入 `experiments/analysis_results.tsv`：
 
-`slice`, `analysis_type`, `method`, `dataset`, `split`, `seed`, `config_id`, `run_id`, `metric`, `value`, `baseline_inclusion`, `artifact_path`, `runtime_sec`, `params_m`, `peak_mem_mb`, `notes`
+`slice`, `analysis_type`, `method`, `dataset`, `split`, `seed`, `config_id`, `run_id`, `metric`, `value`, `baseline_inclusion`, `artifact_path`, `runtime_sec`, `params_m`, `peak_mem_mb`, `resource_id`, `resource_kind`, `server_id`, `gpu_ids`, `resource_monitor`, `notes`
 
 效率 slice 若适用，还应补充 `flops_g`、`inference_latency_ms`、`throughput`、`train_time_sec` 中的相关列；不适用字段可留空但列名应保留。

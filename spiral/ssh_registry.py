@@ -434,6 +434,50 @@ def allocate_server(
     return lease
 
 
+def allocate_server_pool(
+    framework_root: str | Path | None,
+    project_root: str | Path,
+    *,
+    server_ids: list[str] | None = None,
+    count: int = 1,
+    min_gpu_count: int = 0,
+    min_vram_gb: float | None = None,
+    tags: list[str] | None = None,
+    lease_hours: int | None = None,
+    stage_scope: str = "M3-M4",
+    reason: str = "project resource pool allocation",
+) -> list[dict[str, Any]]:
+    """Allocate one or more SSH leases for a project resource pool.
+
+    ``server_ids`` may contain explicit server ids and/or ``auto``.  The result
+    is a list of normal lease objects that can be written into the project
+    resource pool by ``apply_lease_pool_to_project``.
+    """
+    root = framework_root_from(framework_root)
+    requested = [item for item in (server_ids or []) if str(item).strip()]
+    if not requested:
+        requested = ["auto"] * max(1, count)
+    elif len(requested) < count:
+        requested.extend(["auto"] * (count - len(requested)))
+
+    leases: list[dict[str, Any]] = []
+    for server_id in requested:
+        leases.append(
+            allocate_server(
+                root,
+                project_root,
+                server_id=str(server_id),
+                min_gpu_count=min_gpu_count,
+                min_vram_gb=min_vram_gb,
+                tags=tags,
+                lease_hours=lease_hours,
+                stage_scope=stage_scope,
+                reason=reason,
+            )
+        )
+    return leases
+
+
 def get_lease(lease_id: str, framework_root: str | Path | None = None) -> dict[str, Any]:
     for lease in load_leases(framework_root).get("leases", []) or []:
         if str(lease.get("lease_id", "")) == lease_id:
@@ -493,6 +537,31 @@ def build_execution_env_overrides(server: dict[str, Any], lease: dict[str, Any])
     }
 
 
+def _lease_resource_summary(server: dict[str, Any], lease: dict[str, Any]) -> dict[str, Any]:
+    capabilities = server.get("capabilities", {}) if isinstance(server.get("capabilities"), dict) else {}
+    gpus = capabilities.get("gpus", []) if isinstance(capabilities.get("gpus"), list) else []
+    gpu_count = _server_gpu_count(server)
+    return {
+        "resource_id": f"ssh:{server['server_id']}",
+        "kind": "ssh",
+        "enabled": True,
+        "server_id": server["server_id"],
+        "lease_id": lease["lease_id"],
+        "host": server.get("host", ""),
+        "ssh_alias": server.get("ssh_alias", ""),
+        "port": server.get("port", 22),
+        "workspace_path": lease.get("workspace_path", ""),
+        "dataset_path": lease.get("dataset_path", ""),
+        "gpu_count": gpu_count,
+        "gpu_ids": lease.get("gpu_ids") or [str(index) for index in range(gpu_count)],
+        "cpu_cores": lease.get("cpu_cores") or capabilities.get("cpu_cores") or None,
+        "gpus": gpus,
+        "tags": server.get("tags", []) if isinstance(server.get("tags"), list) else [],
+        "sync_required": True,
+        "launcher": "ssh",
+    }
+
+
 def apply_lease_to_project(
     framework_root: str | Path | None,
     project_root: str | Path,
@@ -525,6 +594,54 @@ def apply_lease_to_project(
         encoding="utf-8",
     )
     append_event(root, "project_apply_lease", {"project_root": str(project), "lease_id": lease_id})
+    return config_path
+
+
+def apply_lease_pool_to_project(
+    framework_root: str | Path | None,
+    project_root: str | Path,
+    lease_ids: list[str],
+    *,
+    include_local: bool = True,
+) -> Path:
+    root = framework_root_from(framework_root)
+    project = Path(project_root).resolve()
+    config_path = project / "config" / "execution_env.yaml"
+    if not config_path.exists():
+        raise SSHRegistryError(f"Project execution config not found: {config_path}")
+
+    resources: list[dict[str, Any]] = []
+    allocation_entries: list[dict[str, Any]] = []
+    for lease_id in lease_ids:
+        lease = get_lease(lease_id, root)
+        server = get_server(str(lease["server_id"]), root)
+        resources.append(_lease_resource_summary(server, lease))
+        allocation_entries.append({"server": _redact(server), "lease": _redact(lease)})
+
+    data = _read_yaml(config_path, {})
+    _set_nested(data, "execution.resource_optimization.resource_pool.enabled", True)
+    _set_nested(data, "execution.resource_optimization.resource_pool.include_local", include_local)
+    _set_nested(data, "execution.resource_optimization.resource_pool.allow_local_and_ssh", include_local)
+    _set_nested(data, "execution.resource_optimization.resource_pool.resources", resources)
+    _write_yaml(config_path, data)
+
+    pool_path = project / "state" / "ssh_resource_pool.yaml"
+    pool_path.parent.mkdir(parents=True, exist_ok=True)
+    pool_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "include_local": include_local,
+                "resources": resources,
+                "allocations": allocation_entries,
+                "execution_env": str(config_path),
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    append_event(root, "project_apply_lease_pool", {"project_root": str(project), "lease_ids": lease_ids})
     return config_path
 
 

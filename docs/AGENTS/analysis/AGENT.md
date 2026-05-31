@@ -196,6 +196,9 @@ Conductor 会提供：
 - **expected_pattern**: Full > w/o A，且 drop 大于最小效应阈值
 - **evidence_criteria**: 固定 seed=42、主指标差异、可比性成立
 - **stop_condition**: seed=42 单次实验完成
+- **resource_requirements**: min_gpu_count / min_cpu_cores / memory_gb / remote_ok / local_only / expected_minutes
+- **parallelizable**: yes / no（如果 no，写明依赖或互斥原因）
+- **dependencies**: none / 依赖的 slice、run 或 checkpoint
 - **paper_role**: main_text
 - **claim_links**: C1
 
@@ -214,6 +217,9 @@ Conductor 会提供：
 - **expected_pattern**: Ours 的机制指标优于随机或 baseline probe
 - **evidence_criteria**: 样本量、抽样规则、可视化/定量指标、反例记录
 - **stop_condition**: 100 个样本可视化完成
+- **resource_requirements**: min_gpu_count / min_cpu_cores / memory_gb / remote_ok / local_only / expected_minutes
+- **parallelizable**: yes / no（如果 no，写明依赖或互斥原因）
+- **dependencies**: none / 依赖的 slice、run 或 checkpoint
 - **paper_role**: main_text
 - **claim_links**: C3
 
@@ -227,6 +233,7 @@ Conductor 会提供：
 - 必须至少给出 3 个具体 `Ana-*` slice ID，并显式覆盖 How / Where / Why 三类分析目标。
 - 每个 claim-carrying slice 必须说明其上游依据来自 M2S05/M2S06 实验设计、M3S04 KEEP 证据、`handoff_M3_M4.md` 或文献/数据库依据。
 - 鲁棒性或场景分析必须说明 baseline 是否同跑；若不同跑，不能声称超过 baseline，只能作为边界/泛化证据。
+- 如果 `experiments/configs/resource_plan.yaml` 中存在多个资源/slot，必须显式标注哪些 slice 可并行、哪些 slice 有依赖或必须与 baseline 同资源执行。M4S03 将据此生成 `experiments/configs/m4_task_queue.yaml` 与 `m4_task_allocation.yaml`。
 
 ## 3. Comparability Contract
 - 与 M3 主实验的比较基准: ...
@@ -239,6 +246,8 @@ Conductor 会提供：
 |-------|---------|---------|--------------|----------|--------|------|
 | Ana-1 | 2h | 1x GPU | GPU 24GB | no | feasible | — |
 | Ana-2 | 30min | CPU | CPU 4c | no | feasible | — |
+
+多资源计划还必须记录 `parallelizable`、`dependencies`、`resource_requirements`、建议 resource class（local/ssh/GPU/CPU）和 fairness_key。
 
 ## 5. 与主实验的区别
 （分析实验通常不同于主实验的评估指标或设置）

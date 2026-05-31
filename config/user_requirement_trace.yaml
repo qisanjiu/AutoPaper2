@@ -70,7 +70,9 @@ requirements:
       Build environment according to local or ssh configuration, patiently
       download/upload files and run models, implement experiments, analyze
       whether results match expectations, supervise long-running training with
-      periodic watchdog/alert checks, and trigger backtracking when needed.
+      periodic watchdog/alert checks, distribute independent M3 tasks across
+      available local/SSH/GPU resources when provided, and trigger backtracking
+      when needed.
     enforced_by:
       stage_gates: [M3S01, M3S02, M3S03, M3S04]
       configs: [config/execution_env.yaml]
@@ -87,6 +89,7 @@ requirements:
       - scripts/env_probe.py
       - scripts/experiment_watchdog.py
       - scripts/resource_planner.py
+      - scripts/ssh_manager.py
       - utils/stage_gate.py
     tests:
       - tests/test_m3_integration.py
@@ -101,7 +104,9 @@ requirements:
       After M3 verifies the method works, run deeper analysis through
       visualization, ablation, robustness, efficiency analysis when triggered,
       and literature- or idea-driven experiments to prove how, where, and why
-      it works, including baselines whenever required. M1/M2 paper/source-log
+      it works, including baselines whenever required. Independent M4 analysis
+      slices should be scheduled across available local/SSH/GPU resources when
+      provided, with resource/sync evidence. M1/M2 paper/source-log
       evidence must inform M3/M4 experiment design and M5 writing.
     enforced_by:
       stage_gates: [M4S01, M4S02, M4S03, M4S04]

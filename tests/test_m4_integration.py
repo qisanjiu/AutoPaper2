@@ -284,8 +284,8 @@ class TestM4StageGate(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "experiments" / "analysis_results.tsv").write_text(
-            "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tnotes\n"
-            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-a\trun-a\taccuracy_drop\t0.05\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t120\t10.5\t2048\tok\n",
+            "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tresource_id\tresource_kind\tserver_id\tgpu_ids\tresource_monitor\tnotes\n"
+            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-a\trun-a\taccuracy_drop\t0.05\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t120\t10.5\t2048\tlocal\tlocal\t\t[]\texperiments/runs/analysis_1/resource_monitor.csv\tok\n",
             encoding="utf-8",
         )
         (root / "knowledge" / "reviews" / "M4S03_analysis_execution_review.md").write_text(
@@ -399,18 +399,18 @@ class TestM4StageGate(unittest.TestCase):
             encoding="utf-8",
         )
         baseline_rows = (
-            "Ana-1\tablation\tbaseline\tds\ttest\t42\tcfg-b\trun-b\taccuracy\t0.753\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t100\t9.8\t1900\tbaseline\n"
-            "Ana-2\tmechanism\tbaseline\tds\ttest\t42\tcfg-b\trun-b\talignment_score\t0.410\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t80\t9.8\t1900\tbaseline\n"
-            "Ana-3\trobustness\tbaseline\tds\tnoise\t42\tcfg-b\trun-b\taccuracy_noise\t0.700\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t110\t9.8\t1900\tbaseline\n"
+            "Ana-1\tablation\tbaseline\tds\ttest\t42\tcfg-b\trun-b\taccuracy\t0.753\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t100\t9.8\t1900\tlocal\tlocal\t\t[]\texperiments/runs/run-b/resource_monitor.csv\tbaseline\n"
+            "Ana-2\tmechanism\tbaseline\tds\ttest\t42\tcfg-b\trun-b\talignment_score\t0.410\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t80\t9.8\t1900\tlocal\tlocal\t\t[]\texperiments/runs/run-b/resource_monitor.csv\tbaseline\n"
+            "Ana-3\trobustness\tbaseline\tds\tnoise\t42\tcfg-b\trun-b\taccuracy_noise\t0.700\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t110\t9.8\t1900\tlocal\tlocal\t\t[]\texperiments/runs/run-b/resource_monitor.csv\tbaseline\n"
             if include_baseline_rows else ""
         )
         (root / "experiments" / "analysis_results.tsv").write_text(
-            "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tnotes\n"
+            "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tresource_id\tresource_kind\tserver_id\tgpu_ids\tresource_monitor\tnotes\n"
             f"{baseline_rows}"
-            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-o\trun-o\taccuracy\t0.803\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t130\t10.5\t2100\tours\n"
-            "Ana-2\tmechanism\tours\tds\ttest\t42\tcfg-o\trun-o\talignment_score\t0.560\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t95\t10.5\t2100\tours\n"
-            "Ana-3\trobustness\tours\tds\tnoise\t42\tcfg-o\trun-o\taccuracy_noise\t0.760\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t140\t10.5\t2100\tours\n"
-            "Ana-4\tfailure\tours\tds\thigh_noise\t42\tcfg-o\trun-o\taccuracy_high_noise\t0.610\toptional\texperiments/artifacts/analysis_experiment/Ana-4\t120\t10.5\t2100\tnegative\n",
+            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-o\trun-o\taccuracy\t0.803\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t130\t10.5\t2100\tlocal\tlocal\t\t[]\texperiments/runs/run-o/resource_monitor.csv\tours\n"
+            "Ana-2\tmechanism\tours\tds\ttest\t42\tcfg-o\trun-o\talignment_score\t0.560\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t95\t10.5\t2100\tlocal\tlocal\t\t[]\texperiments/runs/run-o/resource_monitor.csv\tours\n"
+            "Ana-3\trobustness\tours\tds\tnoise\t42\tcfg-o\trun-o\taccuracy_noise\t0.760\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t140\t10.5\t2100\tlocal\tlocal\t\t[]\texperiments/runs/run-o/resource_monitor.csv\tours\n"
+            "Ana-4\tfailure\tours\tds\thigh_noise\t42\tcfg-o\trun-o\taccuracy_high_noise\t0.610\toptional\texperiments/artifacts/analysis_experiment/Ana-4\t120\t10.5\t2100\tlocal\tlocal\t\t[]\texperiments/runs/run-o/resource_monitor.csv\tnegative\n",
             encoding="utf-8",
         )
         if include_artifacts:

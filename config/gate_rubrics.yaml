@@ -57,11 +57,13 @@ gates:
     title: "Implementation and main experiment evidence"
     items:
       - id: G3-R1
-        criterion: "M3S01 builds the configured local or SSH environment with sandbox policy, dependencies, data access, and long-running task ledger."
+        criterion: "M3S01 builds the configured local, SSH, or multi-resource environment with sandbox policy, dependencies, data access, resource pool/task-allocation contract, and long-running task ledger."
         evidence_examples:
           - knowledge/M3/M3S01_implementation.md
           - config/execution_env.yaml
           - experiments/configs/sandbox_profile.yaml
+          - experiments/configs/resource_plan.yaml
+          - experiments/configs/m3_task_allocation.yaml
           - experiments/logs/m3s01_longrun_ledger.md
       - id: G3-R2
         criterion: "Baselines are locked, smoke-tested, and comparable to the proposed method."
@@ -69,11 +71,12 @@ gates:
           - knowledge/M3/M3S02_baseline_lock.md
           - experiments/baselines/baseline_1/metric_contract.yaml
       - id: G3-R3
-        criterion: "Main experiment results have raw logs or tables, seed coverage, provenance, runtime watchdog supervision/alerts, and validation against expectations."
+        criterion: "Main experiment results have raw logs or tables, seed coverage, provenance, resource assignment/monitoring evidence, runtime watchdog supervision/alerts, and validation against expectations."
         evidence_examples:
           - knowledge/M3/M3S03_main_experiment.md
           - knowledge/M3/M3S04_result_validation.md
           - experiments/results.tsv
+          - experiments/configs/m3_task_allocation.yaml
           - experiments/logs/runtime_events.jsonl
           - knowledge/handoff_M3_M4.md
 
@@ -94,9 +97,10 @@ gates:
           - knowledge/M2/M2S05_experiment_setup.md
           - knowledge/M2/M2S06_full_experiment_plan.md
       - id: G4-R3
-        criterion: "Analysis execution records sandboxed commands, logs, extended result tables, efficiency measurements when required, baseline comparisons when required, and usable claims."
+        criterion: "Analysis execution records sandboxed commands, logs, multi-resource task allocation when applicable, extended result tables, efficiency measurements when required, baseline comparisons when required, and usable claims."
         evidence_examples:
           - knowledge/M4/M4S03_analysis_experiment.md
+          - experiments/configs/m4_task_allocation.yaml
           - experiments/analysis_results.tsv
           - knowledge/M4/M4S04_analysis_results.md
           - knowledge/handoff_M4_M5.md

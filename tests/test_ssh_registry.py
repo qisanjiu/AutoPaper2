@@ -10,6 +10,8 @@ from scripts.env_probe import _merge_existing_manual_config, generate_execution_
 from spiral.ssh_registry import (
     _parse_probe_stdout,
     allocate_server,
+    allocate_server_pool,
+    apply_lease_pool_to_project,
     apply_lease_to_project,
     init_registry,
     load_leases,
@@ -108,6 +110,43 @@ class TestSSHRegistry(unittest.TestCase):
         other_project.mkdir(parents=True)
         with self.assertRaises(Exception):
             allocate_server(self.root, other_project, server_id="solo")
+
+    def test_allocate_apply_resource_pool(self) -> None:
+        init_registry(self.root)
+        for server_id in ("lab-a", "lab-b"):
+            upsert_server(
+                {
+                    "server_id": server_id,
+                    "host": f"{server_id}.example.test",
+                    "user": "researcher",
+                    "max_concurrent_projects": 1,
+                    "tags": ["gpu"],
+                    "capabilities": {"gpu_count": 1, "vram_gb": 24},
+                },
+                self.root,
+            )
+
+        leases = allocate_server_pool(
+            self.root,
+            self.project,
+            server_ids=["lab-a", "lab-b"],
+            min_gpu_count=1,
+            tags=["gpu"],
+        )
+        self.assertEqual(len(leases), 2)
+
+        config_path = apply_lease_pool_to_project(
+            self.root,
+            self.project,
+            [lease["lease_id"] for lease in leases],
+            include_local=True,
+        )
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        pool = config["execution"]["resource_optimization"]["resource_pool"]
+        self.assertTrue(pool["enabled"])
+        self.assertTrue(pool["include_local"])
+        self.assertEqual(len(pool["resources"]), 2)
+        self.assertTrue((self.project / "state" / "ssh_resource_pool.yaml").exists())
 
     def test_env_probe_defaults_local_and_preserves_managed_ssh(self) -> None:
         report = {

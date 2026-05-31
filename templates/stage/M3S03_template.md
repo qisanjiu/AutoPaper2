@@ -25,6 +25,7 @@
 | 停止条件 | 预算: X GPU-hours / 迭代: N 轮 / 收敛: 连续 3 轮 < 1% 提升 |
 | 放弃条件 | smoke test 级别结果连续 2 轮低于 baseline |
 | 资源执行合同 | `experiments/configs/resource_plan.yaml` |
+| 多资源任务分配 | `experiments/configs/m3_task_queue.yaml` / `experiments/configs/m3_task_allocation.yaml`（如适用） |
 | Runtime watchdog | 巡检间隔: 默认 4h / 最长 6h；告警只记录，不自动结束；Agent 决策: continue / fix_and_rerun / early_stop / backtrack_request |
 
 ### 1.2 证据层级目标
@@ -45,7 +46,9 @@
 - **CUDA**: ...
 - **硬件**: ...
 - **Resource Plan**: `experiments/configs/resource_plan.yaml`
+- **Task Queue / Allocation**: `experiments/configs/m3_task_queue.yaml`, `experiments/configs/m3_task_allocation.yaml`（如启用多资源）
 - **设备策略**: distributed_data_parallel / single_gpu / cpu_parallel / task_parallel
+- **资源池**: local / ssh resources, resource_id, server_id/lease_id, GPU/CPU capacity, sync_required
 - **分配 GPU**: `gpu_ids=[...]`, `gpu_count=...`
 - **分配 CPU**: `cpu_cores=...`
 - **DataLoader**: `num_workers=...`, `pin_memory=...`, `persistent_workers=...`, `prefetch_factor=...`
@@ -63,15 +66,34 @@
 
 ---
 
-## 2.2 资源利用率执行记录（必须）
+## 2.2 多资源任务分配（如适用，必须）
 
-| Run ID | 启动命令 | Resource monitor | 平均 GPU 利用率 | 平均 CPU 利用率 | 低利用率处理 |
-|--------|----------|------------------|----------------|----------------|--------------|
-| run_001 | `python scripts/resource_planner.py run --output experiments/runs/run_001/resource_monitor.csv --interval 10 -- ...` | `experiments/runs/run_001/resource_monitor.csv` | ...% | ...% | optimized / documented blocker |
+当 `resource_plan.yaml.resource_pool.enabled == true` 或资源池中超过 1 个 resource/slot：
+
+```bash
+python scripts/resource_planner.py allocate \
+  --project . \
+  --stage M3S03 \
+  --tasks experiments/configs/m3_task_queue.yaml \
+  --output experiments/configs/m3_task_allocation.yaml
+```
+
+| Wave | Task / Run ID | parallelizable | resource_id | resource_kind | server_id / lease_id | slot / GPU ids | CPU cores | launch command | sync |
+|------|---------------|----------------|-------------|---------------|----------------------|----------------|-----------|----------------|------|
+| 0 | run_001 | yes | local | local | — | gpu:0 | 8 | `...` | no |
+| 0 | run_002 | yes | ssh:lab-a | ssh | lab-a / lease_x | gpu:0 | 16 | `ssh ...` | push/pull |
+
+必须说明未并行或未使用资源的原因：依赖、共用 checkpoint 写入、显存不足、数据未同步、DDP 不兼容、baseline 公平性、服务器配额或远程不可达。
+
+## 2.3 资源利用率执行记录（必须）
+
+| Run ID | resource_id | server_id | 启动命令 | Resource monitor | 平均 GPU 利用率 | 平均 CPU 利用率 | 低利用率处理 |
+|--------|-------------|-----------|----------|------------------|----------------|----------------|--------------|
+| run_001 | local / ssh:lab-a | lab-a / — | `python scripts/resource_planner.py run --output experiments/runs/run_001/resource_monitor.csv --interval 10 -- ...` | `experiments/runs/run_001/resource_monitor.csv` | ...% | ...% | optimized / documented blocker |
 
 如 `resource_plan.yaml` 分配多 GPU，则默认命令必须使用 `torchrun --nproc_per_node=<gpu_count>` 或等价 DDP。若未使用 DDP，必须写明替代资源策略和原因；不得通过多 seed 重复实验来填满资源。
 
-## 2.3 Runtime Watchdog 与告警记录（必须）
+## 2.4 Runtime Watchdog 与告警记录（必须）
 
 | Run ID | Watchdog command / session | 巡检间隔 | Check log | Alert log | 最近状态 | Agent 决策 |
 |--------|----------------------------|----------|-----------|-----------|----------|------------|
@@ -85,9 +107,9 @@
 
 ## 3. Baseline 结果（本地运行）
 
-| Baseline | 主指标 | 次指标 | Seed | 运行时间 | 资源策略 | Monitor | 备注 |
-|----------|--------|--------|------|---------|----------|---------|------|
-| Baseline-1 | ... | ... | 42 | ... | resource_plan / fair override | `experiments/runs/.../resource_monitor.csv` | 官方代码 |
+| Baseline | 主指标 | 次指标 | Seed | 运行时间 | 资源策略 | resource_id | Monitor | 备注 |
+|----------|--------|--------|------|---------|----------|-------------|---------|------|
+| Baseline-1 | ... | ... | 42 | ... | resource_plan / fair override | local / ssh:lab-a | `experiments/runs/.../resource_monitor.csv` | 官方代码 |
 | Baseline-2 | ... | ... | 42 | ... | resource_plan / fair override | `experiments/runs/.../resource_monitor.csv` | 自行实现 |
 
 ---
@@ -119,10 +141,10 @@
 
 ### 5.1 主结果表
 
-| 方法 | Seed | 主指标 | 次指标 | 运行时间 | 资源策略 | Monitor |
-|------|------|--------|--------|---------|----------|---------|
-| Baseline-1 | 42 | ... | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
-| Ours | 42 | ... | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
+| 方法 | Seed | 主指标 | 次指标 | 运行时间 | 资源策略 | resource_id | server_id | Monitor |
+|------|------|--------|--------|---------|----------|-------------|-----------|---------|
+| Baseline-1 | 42 | ... | ... | ... | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
+| Ours | 42 | ... | ... | ... | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
 
 ### 5.2 与 Baseline 的对比
 

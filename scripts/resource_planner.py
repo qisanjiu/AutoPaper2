@@ -13,6 +13,7 @@ import argparse
 import csv
 import datetime as dt
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -131,6 +132,226 @@ def _resource_optimization(config: dict[str, Any]) -> dict[str, Any]:
     return opt if isinstance(opt, dict) else {}
 
 
+def _as_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def _gpu_ids_from_count(gpu_count: int, raw_ids: Any = None) -> list[str]:
+    if raw_ids is None:
+        return [str(index) for index in range(max(0, gpu_count))]
+    raw_text = str(raw_ids).strip().lower() if not isinstance(raw_ids, list) else ""
+    if not isinstance(raw_ids, list) and raw_text in {"", "auto", "all", "all_visible"}:
+        return [str(index) for index in range(max(0, gpu_count))]
+    return [str(item) for item in _as_list(raw_ids) if str(item).strip()]
+
+
+def _resource_pool_config(config: dict[str, Any]) -> dict[str, Any]:
+    opt = _resource_optimization(config)
+    pool = opt.get("resource_pool", {}) if isinstance(opt.get("resource_pool"), dict) else {}
+    return pool if isinstance(pool, dict) else {}
+
+
+def _state_resource_pool(project: Path) -> list[dict[str, Any]]:
+    path = project / "state" / "ssh_resource_pool.yaml"
+    data = _read_yaml(path)
+    resources = data.get("resources", [])
+    return resources if isinstance(resources, list) else []
+
+
+def _single_ssh_resource(project: Path, execution: dict[str, Any]) -> dict[str, Any] | None:
+    ssh = execution.get("ssh", {}) if isinstance(execution.get("ssh"), dict) else {}
+    allocation = _read_yaml(project / "state" / "ssh_allocation.yaml")
+    server = allocation.get("server", {}) if isinstance(allocation.get("server"), dict) else {}
+    lease = allocation.get("lease", {}) if isinstance(allocation.get("lease"), dict) else {}
+
+    server_id = (
+        ssh.get("server_id")
+        or execution.get("server_id")
+        or server.get("server_id")
+        or lease.get("server_id")
+    )
+    lease_id = ssh.get("lease_id") or execution.get("lease_id") or lease.get("lease_id")
+    host = ssh.get("host") or server.get("host")
+    workspace_path = ssh.get("workspace_path") or lease.get("workspace_path")
+    if not any(str(value or "").strip() for value in (server_id, lease_id, host, workspace_path)):
+        return None
+
+    capabilities = server.get("capabilities", {}) if isinstance(server.get("capabilities"), dict) else {}
+    hardware = ssh.get("hardware", {}) if isinstance(ssh.get("hardware"), dict) else {}
+    gpus = capabilities.get("gpus", [])
+    gpu_count = _safe_positive_int(
+        capabilities.get("gpu_count"),
+        default=len(gpus) if isinstance(gpus, list) else _safe_positive_int(hardware.get("gpu_count"), default=0),
+    )
+    cpu_cores = _safe_positive_int(capabilities.get("cpu_cores"), default=_safe_positive_int(hardware.get("cpu_cores"), default=0))
+    return {
+        "resource_id": f"ssh:{server_id or host}",
+        "kind": "ssh",
+        "enabled": True,
+        "server_id": server_id or "",
+        "lease_id": lease_id or "",
+        "host": host or "",
+        "workspace_path": workspace_path or "",
+        "dataset_path": ssh.get("dataset_path") or lease.get("dataset_path") or "",
+        "cpu_cores": cpu_cores,
+        "gpu_count": gpu_count,
+        "gpu_ids": _gpu_ids_from_count(gpu_count, lease.get("gpu_ids")),
+        "gpus": gpus if isinstance(gpus, list) else [],
+        "tags": server.get("tags", []) if isinstance(server.get("tags"), list) else [],
+        "sync_required": True,
+        "launcher": "ssh",
+    }
+
+
+def _safe_positive_int(value: Any, *, default: int = 0) -> int:
+    parsed = _int_or_none(value)
+    if parsed is None:
+        return default
+    return max(0, parsed)
+
+
+def _normalize_pool_resource(raw: dict[str, Any]) -> dict[str, Any]:
+    resource_id = str(raw.get("resource_id") or raw.get("server_id") or raw.get("name") or raw.get("kind") or "resource")
+    kind = str(raw.get("kind") or ("ssh" if raw.get("server_id") or raw.get("host") else "local")).lower()
+    gpu_count = _safe_positive_int(raw.get("gpu_count"), default=len(raw.get("gpus", []) or []))
+    cpu_cores = _safe_positive_int(raw.get("cpu_cores"), default=0)
+    normalized = {
+        "resource_id": resource_id,
+        "kind": kind,
+        "enabled": raw.get("enabled", True) is not False,
+        "server_id": raw.get("server_id", ""),
+        "lease_id": raw.get("lease_id", ""),
+        "host": raw.get("host", ""),
+        "ssh_alias": raw.get("ssh_alias", ""),
+        "port": raw.get("port", 22),
+        "workspace_path": raw.get("workspace_path", ""),
+        "dataset_path": raw.get("dataset_path", ""),
+        "cpu_cores": cpu_cores,
+        "gpu_count": gpu_count,
+        "gpu_ids": _gpu_ids_from_count(gpu_count, raw.get("gpu_ids")),
+        "gpus": raw.get("gpus", []) if isinstance(raw.get("gpus"), list) else [],
+        "tags": raw.get("tags", []) if isinstance(raw.get("tags"), list) else [],
+        "sync_required": bool(raw.get("sync_required", kind == "ssh")),
+        "launcher": raw.get("launcher") or ("ssh" if kind == "ssh" else "local"),
+        "notes": raw.get("notes", ""),
+    }
+    return normalized
+
+
+def _dedupe_resources(resources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in resources:
+        resource = _normalize_pool_resource(raw)
+        if not resource.get("enabled", True):
+            continue
+        key = str(resource.get("resource_id") or resource.get("server_id") or len(deduped))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(resource)
+    return deduped
+
+
+def build_resource_pool(
+    project: Path,
+    config: dict[str, Any],
+    *,
+    local_cpu: dict[str, Any],
+    local_gpus: list[dict[str, Any]],
+    allocated_cpu: int,
+    allocated_gpu_ids: list[str],
+) -> dict[str, Any]:
+    execution = config.get("execution", {}) if isinstance(config, dict) else {}
+    pool_cfg = _resource_pool_config(config)
+    include_local = pool_cfg.get("include_local", True) is not False
+    manual_resources = pool_cfg.get("resources") or pool_cfg.get("manual_resources") or []
+    managed_leases = pool_cfg.get("managed_ssh_leases") or []
+
+    resources: list[dict[str, Any]] = []
+    if include_local:
+        resources.append(
+            {
+                "resource_id": "local",
+                "kind": "local",
+                "enabled": True,
+                "cpu_cores": allocated_cpu,
+                "gpu_count": len(allocated_gpu_ids),
+                "gpu_ids": allocated_gpu_ids,
+                "gpus": [
+                    device
+                    for device in local_gpus
+                    if str(device.get("index")) in {str(gpu_id) for gpu_id in allocated_gpu_ids}
+                ],
+                "memory_total_mb": local_cpu.get("memory_total_mb"),
+                "workspace_path": str(project),
+                "sync_required": False,
+                "launcher": "local",
+                "tags": ["local"] + (["gpu"] if allocated_gpu_ids else ["cpu"]),
+            }
+        )
+
+    if isinstance(managed_leases, list):
+        for lease in managed_leases:
+            if not isinstance(lease, dict):
+                continue
+            resources.append(
+                {
+                    "resource_id": f"ssh:{lease.get('server_id') or lease.get('lease_id')}",
+                    "kind": "ssh",
+                    "enabled": lease.get("enabled", True) is not False,
+                    "server_id": lease.get("server_id", ""),
+                    "lease_id": lease.get("lease_id", ""),
+                    "workspace_path": lease.get("workspace_path", ""),
+                    "dataset_path": lease.get("dataset_path", ""),
+                    "cpu_cores": lease.get("cpu_cores", 0),
+                    "gpu_count": lease.get("gpu_count", len(lease.get("gpu_ids", []) or [])),
+                    "gpu_ids": lease.get("gpu_ids", "all_visible"),
+                    "tags": lease.get("tags", ["ssh", "gpu"]),
+                    "sync_required": True,
+                    "launcher": "ssh",
+                }
+            )
+
+    single_ssh = _single_ssh_resource(project, execution)
+    if single_ssh:
+        resources.append(single_ssh)
+
+    for raw in _as_list(manual_resources):
+        if isinstance(raw, dict):
+            resources.append(raw)
+
+    resources.extend(_state_resource_pool(project))
+    resources = _dedupe_resources(resources)
+    explicit_enabled = pool_cfg.get("enabled") is True
+    enabled = explicit_enabled or len(resources) > 1
+    return {
+        "enabled": enabled,
+        "policy": str(pool_cfg.get("scheduling_policy") or "dependency_aware_pack_by_gpu_then_cpu"),
+        "include_local": include_local,
+        "allow_local_and_ssh": pool_cfg.get("allow_local_and_ssh", True) is not False,
+        "resources": resources,
+        "parallelism_contract": {
+            "parallelize_only_independent_tasks": True,
+            "do_not_parallelize_replicate_seeds_as_resource_filler": True,
+            "prefer_ddp_within_single_multi_gpu_training_task": True,
+            "prefer_task_parallel_for_independent_configs_baselines_or_analysis_slices": True,
+            "fairness_policy": "baseline_and_ours_use_same_resource_class_or_record_resource_id",
+            "result_sync_policy": "each_remote_assignment_must_pull_metrics_logs_monitors_and_artifacts",
+        },
+        "artifacts": {
+            "m3_task_queue": "experiments/configs/m3_task_queue.yaml",
+            "m3_task_allocation": "experiments/configs/m3_task_allocation.yaml",
+            "m4_task_queue": "experiments/configs/m4_task_queue.yaml",
+            "m4_task_allocation": "experiments/configs/m4_task_allocation.yaml",
+        },
+    }
+
+
 def _resolve_gpu_count(total_gpus: int, limits: dict[str, Any], opt: dict[str, Any]) -> int:
     if total_gpus <= 0:
         return 0
@@ -160,6 +381,263 @@ def _resolve_cpu_count(total_cpu: int, limits: dict[str, Any], opt: dict[str, An
     parsed_target = _int_or_none(raw_target)
     target = limit if parsed_target is None or parsed_target <= 0 else min(limit, parsed_target)
     return max(1, target)
+
+
+def _default_resource_from_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    allocation = plan.get("allocation", {}) if isinstance(plan.get("allocation"), dict) else {}
+    available = plan.get("available", {}) if isinstance(plan.get("available"), dict) else {}
+    cpu = available.get("cpu", {}) if isinstance(available.get("cpu"), dict) else {}
+    gpus = available.get("gpus", []) if isinstance(available.get("gpus"), list) else []
+    return {
+        "resource_id": "local",
+        "kind": "local",
+        "enabled": True,
+        "cpu_cores": _safe_positive_int(allocation.get("cpu_cores"), default=_safe_positive_int(cpu.get("cores"), default=1)),
+        "gpu_count": _safe_positive_int(allocation.get("gpu_count"), default=0),
+        "gpu_ids": _gpu_ids_from_count(_safe_positive_int(allocation.get("gpu_count"), default=0), allocation.get("gpu_ids")),
+        "gpus": gpus,
+        "workspace_path": plan.get("project_root", "."),
+        "sync_required": False,
+        "launcher": "local",
+        "tags": ["local"],
+    }
+
+
+def _plan_resources(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    pool = plan.get("resource_pool", {}) if isinstance(plan.get("resource_pool"), dict) else {}
+    resources = pool.get("resources", []) if isinstance(pool.get("resources"), list) else []
+    if resources:
+        return _dedupe_resources([item for item in resources if isinstance(item, dict)])
+    return [_normalize_pool_resource(_default_resource_from_plan(plan))]
+
+
+def _load_task_queue(path: Path) -> list[dict[str, Any]]:
+    data = _read_yaml(path)
+    tasks = data.get("tasks") or data.get("runs") or data.get("slices") or []
+    if not isinstance(tasks, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for index, raw in enumerate(tasks, start=1):
+        if not isinstance(raw, dict):
+            continue
+        task_id = str(raw.get("task_id") or raw.get("run_id") or raw.get("slice") or raw.get("id") or f"task_{index:03d}")
+        requirements = raw.get("resource_requirements", {}) if isinstance(raw.get("resource_requirements"), dict) else {}
+        normalized.append(
+            {
+                **raw,
+                "task_id": task_id,
+                "stage": raw.get("stage", ""),
+                "command": raw.get("command") or raw.get("resolved_command") or raw.get("launch_command") or "",
+                "estimated_minutes": _safe_positive_int(raw.get("estimated_minutes") or raw.get("duration_minutes"), default=60),
+                "dependencies": [str(item) for item in _as_list(raw.get("dependencies") or raw.get("depends_on")) if str(item).strip()],
+                "parallelizable": raw.get("parallelizable", True) is not False,
+                "resource_requirements": requirements,
+            }
+        )
+    return normalized
+
+
+def _task_min_gpu(task: dict[str, Any]) -> int:
+    req = task.get("resource_requirements", {}) if isinstance(task.get("resource_requirements"), dict) else {}
+    return _safe_positive_int(
+        req.get("min_gpu_count") or req.get("gpu_count") or task.get("min_gpu_count") or task.get("gpu_count"),
+        default=0,
+    )
+
+
+def _task_min_cpu(task: dict[str, Any]) -> int:
+    req = task.get("resource_requirements", {}) if isinstance(task.get("resource_requirements"), dict) else {}
+    return _safe_positive_int(
+        req.get("min_cpu_cores") or req.get("cpu_cores") or task.get("min_cpu_cores") or task.get("cpu_cores"),
+        default=1,
+    )
+
+
+def _task_tags(task: dict[str, Any]) -> set[str]:
+    req = task.get("resource_requirements", {}) if isinstance(task.get("resource_requirements"), dict) else {}
+    return {str(tag).strip() for tag in _as_list(req.get("tags") or task.get("tags")) if str(tag).strip()}
+
+
+def _task_allows_resource(task: dict[str, Any], resource: dict[str, Any]) -> bool:
+    req = task.get("resource_requirements", {}) if isinstance(task.get("resource_requirements"), dict) else {}
+    kind = str(resource.get("kind", "")).lower()
+    if req.get("local_only") is True and kind != "local":
+        return False
+    if req.get("remote_ok") is False and kind == "ssh":
+        return False
+    preferred_kind = str(req.get("kind") or req.get("resource_kind") or "").strip().lower()
+    if preferred_kind and preferred_kind != kind:
+        return False
+    min_gpu = _task_min_gpu(task)
+    min_cpu = _task_min_cpu(task)
+    if _safe_positive_int(resource.get("gpu_count"), default=0) < min_gpu:
+        return False
+    if _safe_positive_int(resource.get("cpu_cores"), default=0) < min_cpu:
+        return False
+    required_tags = _task_tags(task)
+    resource_tags = {str(tag).strip() for tag in _as_list(resource.get("tags")) if str(tag).strip()}
+    return not required_tags or required_tags.issubset(resource_tags)
+
+
+def _resource_slots(resources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    slots: list[dict[str, Any]] = []
+    for resource in resources:
+        gpu_ids = [str(item) for item in _as_list(resource.get("gpu_ids")) if str(item).strip()]
+        if gpu_ids:
+            for gpu_id in gpu_ids:
+                slots.append({**resource, "slot_id": f"{resource['resource_id']}:gpu:{gpu_id}", "slot_gpu_ids": [gpu_id]})
+        else:
+            slots.append({**resource, "slot_id": f"{resource['resource_id']}:cpu", "slot_gpu_ids": []})
+    return slots
+
+
+def _task_wave(task: dict[str, Any], task_to_wave: dict[str, int]) -> int:
+    if task.get("parallelizable") is False:
+        return max(task_to_wave.values(), default=-1) + 1
+    deps = [dep for dep in task.get("dependencies", []) if dep in task_to_wave]
+    return (max((task_to_wave[dep] for dep in deps), default=-1) + 1) if deps else 0
+
+
+def _assignment_command(task: dict[str, Any], resource: dict[str, Any], gpu_ids: list[str]) -> str:
+    command = str(task.get("command") or "").strip()
+    if not command:
+        command = "# command must be filled by Experiment Agent"
+    env_parts: list[str] = []
+    if gpu_ids:
+        env_parts.append("CUDA_VISIBLE_DEVICES=" + ",".join(gpu_ids))
+    cpu_cores = _task_min_cpu(task)
+    if cpu_cores:
+        env_parts.append(f"OMP_NUM_THREADS={cpu_cores}")
+        env_parts.append(f"MKL_NUM_THREADS={cpu_cores}")
+    local_command = " ".join([*env_parts, command]).strip()
+    if str(resource.get("kind", "")).lower() != "ssh":
+        return local_command
+    workspace = str(resource.get("workspace_path") or ".")
+    server = str(resource.get("ssh_alias") or resource.get("host") or resource.get("server_id") or resource.get("resource_id"))
+    return f"ssh {shlex.quote(server)} {shlex.quote(f'cd {workspace} && {local_command}')}"
+
+
+def allocate_tasks(project: Path, plan: dict[str, Any], task_queue: Path, *, stage: str = "") -> dict[str, Any]:
+    tasks = _load_task_queue(task_queue)
+    if stage:
+        tasks = [task for task in tasks if not task.get("stage") or str(task.get("stage")) == stage]
+    resources = _plan_resources(plan)
+    slots = _resource_slots(resources)
+    if not slots:
+        slots = [_normalize_pool_resource(_default_resource_from_plan(plan))]
+
+    slot_load: dict[str, int] = {str(slot["slot_id"]): 0 for slot in slots}
+    slot_next_wave: dict[str, int] = {str(slot["slot_id"]): 0 for slot in slots}
+    task_to_wave: dict[str, int] = {}
+    assignments: list[dict[str, Any]] = []
+    blocked: list[dict[str, Any]] = []
+
+    for task in tasks:
+        candidates = [slot for slot in slots if _task_allows_resource(task, slot)]
+        min_gpu = _task_min_gpu(task)
+        if min_gpu >= 2:
+            candidates = [
+                resource
+                for resource in resources
+                if _task_allows_resource(task, resource)
+                and _safe_positive_int(resource.get("gpu_count"), default=0) >= min_gpu
+            ]
+        if not candidates:
+            blocked.append(
+                {
+                    "task_id": task["task_id"],
+                    "reason": "no resource satisfies task resource_requirements",
+                    "resource_requirements": task.get("resource_requirements", {}),
+                }
+            )
+            continue
+
+        def score(resource: dict[str, Any]) -> tuple[int, int, int]:
+            resource_id = str(resource.get("slot_id") or resource.get("resource_id"))
+            return (
+                -slot_load.get(resource_id, 0),
+                _safe_positive_int(resource.get("gpu_count"), default=0),
+                _safe_positive_int(resource.get("cpu_cores"), default=0),
+            )
+
+        chosen = sorted(candidates, key=score, reverse=True)[0]
+        chosen_id = str(chosen.get("slot_id") or chosen.get("resource_id"))
+        duration = _safe_positive_int(task.get("estimated_minutes"), default=60)
+        slot_load[chosen_id] = slot_load.get(chosen_id, 0) + duration
+        if min_gpu >= 2:
+            gpu_ids = _gpu_ids_from_count(min_gpu, chosen.get("gpu_ids"))[:min_gpu]
+        else:
+            gpu_ids = [str(item) for item in _as_list(chosen.get("slot_gpu_ids")) if str(item).strip()]
+        dependency_wave = _task_wave(task, task_to_wave)
+        wave = max(dependency_wave, slot_next_wave.get(chosen_id, 0))
+        slot_next_wave[chosen_id] = wave + 1
+        task_to_wave[str(task["task_id"])] = wave
+        run_id = str(task.get("run_id") or task.get("task_id"))
+        monitor_path = f"experiments/runs/{run_id}/resource_monitor.csv"
+        assignments.append(
+            {
+                "task_id": task["task_id"],
+                "stage": task.get("stage") or stage,
+                "wave": wave,
+                "parallelizable": bool(task.get("parallelizable", True)) and not task.get("dependencies"),
+                "dependencies": task.get("dependencies", []),
+                "resource_id": chosen.get("resource_id"),
+                "resource_kind": chosen.get("kind"),
+                "server_id": chosen.get("server_id", ""),
+                "lease_id": chosen.get("lease_id", ""),
+                "slot_id": chosen.get("slot_id", chosen.get("resource_id")),
+                "gpu_ids": gpu_ids,
+                "cpu_cores": min(_task_min_cpu(task), _safe_positive_int(chosen.get("cpu_cores"), default=_task_min_cpu(task))),
+                "estimated_minutes": duration,
+                "command": task.get("command", ""),
+                "launch_command": _assignment_command(task, chosen, gpu_ids),
+                "resource_monitor": monitor_path,
+                "sync": {
+                    "push_before": bool(chosen.get("sync_required", False)),
+                    "pull_after": bool(chosen.get("sync_required", False)),
+                    "required_artifacts": [
+                        monitor_path,
+                        "metrics/results rows",
+                        "logs",
+                        "artifacts referenced by task output",
+                    ],
+                },
+                "fairness_key": task.get("fairness_key") or task.get("comparison_group") or "",
+            }
+        )
+
+    waves: list[dict[str, Any]] = []
+    for wave in sorted({int(item["wave"]) for item in assignments}):
+        wave_items = [item for item in assignments if int(item["wave"]) == wave]
+        waves.append(
+            {
+                "wave": wave,
+                "parallel_assignments": [item["task_id"] for item in wave_items],
+                "resource_ids": sorted({str(item["resource_id"]) for item in wave_items}),
+            }
+        )
+
+    return {
+        "schema_version": 1,
+        "generated_at": dt.datetime.now().isoformat(timespec="seconds"),
+        "project_root": str(project),
+        "stage": stage or "mixed",
+        "source_resource_plan": "experiments/configs/resource_plan.yaml",
+        "source_task_queue": str(task_queue.relative_to(project) if task_queue.is_relative_to(project) else task_queue),
+        "scheduling_policy": "dependency_aware_least_loaded_resource_slot",
+        "resources_considered": resources,
+        "assignments": assignments,
+        "blocked_tasks": blocked,
+        "waves": waves,
+        "execution_contract": {
+            "parallelize_assignments_in_same_wave": True,
+            "respect_dependencies_between_waves": True,
+            "each_assignment_requires_resource_monitor": True,
+            "remote_assignments_require_push_before_and_pull_after": True,
+            "results_tables_must_record_resource_id_and_monitor_path": True,
+            "baseline_and_ours_fairness": "same fairness_key should use the same resource class or document the override",
+        },
+    }
 
 
 def build_plan(project: Path) -> dict[str, Any]:
@@ -199,8 +677,7 @@ def build_plan(project: Path) -> dict[str, Any]:
     interval = _int_or_none(monitoring.get("interval_seconds")) or 10
     min_gpu = _int_or_none(monitoring.get("min_gpu_utilization_pct")) or 70
     min_cpu = _int_or_none(monitoring.get("min_cpu_utilization_pct")) or 60
-
-    return {
+    plan = {
         "schema_version": 1,
         "generated_at": dt.datetime.now().isoformat(timespec="seconds"),
         "project_root": str(project),
@@ -262,6 +739,15 @@ def build_plan(project: Path) -> dict[str, Any]:
             },
         },
     }
+    plan["resource_pool"] = build_resource_pool(
+        project,
+        config,
+        local_cpu=cpu,
+        local_gpus=gpus,
+        allocated_cpu=allocated_cpu,
+        allocated_gpu_ids=allocated_gpu_ids,
+    )
+    return plan
 
 
 def _gpu_samples() -> list[dict[str, Any]]:
@@ -401,6 +887,13 @@ def main(argv: list[str] | None = None) -> int:
     plan_p.add_argument("--project", default=".", help="Project root")
     plan_p.add_argument("--output", default="experiments/configs/resource_plan.yaml", help="Output YAML path")
 
+    alloc_p = sub.add_parser("allocate", help="Allocate an experiment task queue across resource_pool resources")
+    alloc_p.add_argument("--project", default=".", help="Project root")
+    alloc_p.add_argument("--plan", default="experiments/configs/resource_plan.yaml", help="Input resource plan YAML")
+    alloc_p.add_argument("--tasks", required=True, help="Task queue YAML with tasks/runs/slices")
+    alloc_p.add_argument("--stage", default="", help="Optional stage filter, e.g. M3S03 or M4S03")
+    alloc_p.add_argument("--output", default="", help="Output allocation YAML path")
+
     mon_p = sub.add_parser("monitor", help="Record CPU/GPU utilization samples")
     mon_p.add_argument("--output", required=True, help="CSV output path")
     mon_p.add_argument("--interval", type=int, default=10, help="Sampling interval in seconds")
@@ -424,6 +917,29 @@ def main(argv: list[str] | None = None) -> int:
         data = build_plan(project)
         _write_yaml(output, data)
         print(f"[RESOURCE_PLAN] Wrote {output}")
+        return 0
+    if args.cmd == "allocate":
+        project = Path(args.project).resolve()
+        plan_path = Path(args.plan)
+        task_path = Path(args.tasks)
+        if not plan_path.is_absolute():
+            plan_path = project / plan_path
+        if not task_path.is_absolute():
+            task_path = project / task_path
+        plan = _read_yaml(plan_path)
+        output = Path(args.output) if args.output else Path(
+            "experiments/configs/m4_task_allocation.yaml"
+            if args.stage == "M4S03"
+            else "experiments/configs/m3_task_allocation.yaml"
+        )
+        if not output.is_absolute():
+            output = project / output
+        data = allocate_tasks(project, plan, task_path, stage=args.stage)
+        _write_yaml(output, data)
+        print(f"[RESOURCE_ALLOC] Wrote {output}")
+        if data.get("blocked_tasks"):
+            print(f"[RESOURCE_ALLOC][WARN] blocked tasks: {len(data['blocked_tasks'])}", file=sys.stderr)
+            return 1
         return 0
     if args.cmd == "monitor":
         return monitor(Path(args.output), args.interval, duration=args.duration, pid=args.pid)

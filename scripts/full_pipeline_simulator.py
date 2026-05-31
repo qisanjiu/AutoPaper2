@@ -794,17 +794,17 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "## Comparability Contract\nbaseline same split.\n## 执行信封审计\nrealistic.\n",
         )
     elif stage == "M4S03":
-        _write(out, "# M4S03\n\n## 执行摘要\nok\n## Slice 执行记录\nok\n## 负面/失败结果记录\nfailed case.\n## 原始数据与日志\nlogs. sandbox_profile: experiments/configs/sandbox_profile.yaml.\n\n## Sandbox / Container Execution Record\nAna-1 sandbox mode venv; command `python analysis.py`; working dir experiments; allowed writes experiments/runs/; network policy restricted; resource limits timeout=24h cpu=4 gpu=0; log path experiments/runs/analysis_1/logs/run.log.\n\n## 初步审查摘要\nstage_in_fix continue; abnormal class: data metric method model environment.\n")
+        _write(out, "# M4S03\n\n## 执行摘要\nok\n## Slice 执行记录\nok; resource_id=local resource_kind=local server_id=none resource_monitor=experiments/runs/analysis_1/resource_monitor.csv.\n## 负面/失败结果记录\nfailed case.\n## 原始数据与日志\nlogs. sandbox_profile: experiments/configs/sandbox_profile.yaml.\n\n## Sandbox / Container Execution Record\nAna-1 sandbox mode venv; resource_id local; command `python analysis.py`; working dir experiments; allowed writes experiments/runs/; network policy restricted; resource limits timeout=24h cpu=4 gpu=0; log path experiments/runs/analysis_1/logs/run.log.\n\n## 初步审查摘要\nstage_in_fix continue; abnormal class: data metric method model environment.\n")
         _write(
             root / "experiments" / "analysis_results.tsv",
-            "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tnotes\n"
-            "Ana-1\tablation\tbaseline\tds\ttest\t42\tcfg-b\trun-b\taccuracy\t0.753\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t100\t9.8\t1900\tbaseline\n"
-            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-o\trun-o\taccuracy\t0.803\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t130\t10.5\t2100\tours\n"
-            "Ana-2\tmechanism\tbaseline\tds\ttest\t42\tcfg-b\trun-b\talignment_score\t0.410\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t80\t9.8\t1900\tbaseline\n"
-            "Ana-2\tmechanism\tours\tds\ttest\t42\tcfg-o\trun-o\talignment_score\t0.560\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t95\t10.5\t2100\tours\n"
-            "Ana-3\trobustness\tbaseline\tds\tnoise\t42\tcfg-b\trun-b\taccuracy_noise\t0.700\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t110\t9.8\t1900\tbaseline\n"
-            "Ana-3\trobustness\tours\tds\tnoise\t42\tcfg-o\trun-o\taccuracy_noise\t0.760\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t140\t10.5\t2100\tours\n"
-            "Ana-4\tfailure\tours\tds\thigh_noise\t42\tcfg-o\trun-o\taccuracy_high_noise\t0.610\toptional\texperiments/artifacts/analysis_experiment/Ana-4\t120\t10.5\t2100\tnegative\n",
+            "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tresource_id\tresource_kind\tserver_id\tgpu_ids\tresource_monitor\tnotes\n"
+            "Ana-1\tablation\tbaseline\tds\ttest\t42\tcfg-b\trun-b\taccuracy\t0.753\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t100\t9.8\t1900\tlocal\tlocal\t\t[]\texperiments/runs/run-b/resource_monitor.csv\tbaseline\n"
+            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-o\trun-o\taccuracy\t0.803\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t130\t10.5\t2100\tlocal\tlocal\t\t[]\texperiments/runs/run-o/resource_monitor.csv\tours\n"
+            "Ana-2\tmechanism\tbaseline\tds\ttest\t42\tcfg-b\trun-b\talignment_score\t0.410\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t80\t9.8\t1900\tlocal\tlocal\t\t[]\texperiments/runs/run-b/resource_monitor.csv\tbaseline\n"
+            "Ana-2\tmechanism\tours\tds\ttest\t42\tcfg-o\trun-o\talignment_score\t0.560\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t95\t10.5\t2100\tlocal\tlocal\t\t[]\texperiments/runs/run-o/resource_monitor.csv\tours\n"
+            "Ana-3\trobustness\tbaseline\tds\tnoise\t42\tcfg-b\trun-b\taccuracy_noise\t0.700\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t110\t9.8\t1900\tlocal\tlocal\t\t[]\texperiments/runs/run-b/resource_monitor.csv\tbaseline\n"
+            "Ana-3\trobustness\tours\tds\tnoise\t42\tcfg-o\trun-o\taccuracy_noise\t0.760\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t140\t10.5\t2100\tlocal\tlocal\t\t[]\texperiments/runs/run-o/resource_monitor.csv\tours\n"
+            "Ana-4\tfailure\tours\tds\thigh_noise\t42\tcfg-o\trun-o\taccuracy_high_noise\t0.610\toptional\texperiments/artifacts/analysis_experiment/Ana-4\t120\t10.5\t2100\tlocal\tlocal\t\t[]\texperiments/runs/run-o/resource_monitor.csv\tnegative\n",
         )
     elif stage == "M4S04":
         _write(

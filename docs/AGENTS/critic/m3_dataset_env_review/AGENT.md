@@ -75,6 +75,8 @@
 - [ ] resource plan 记录 visible GPU/CPU、实际 allocation、设备策略、DataLoader workers、线程环境变量、启动命令模板和监控阈值
 - [ ] 多 GPU 可见时，resource plan 默认使用 DDP 或 task_parallel；若只用单卡，必须有明确硬件/框架/公平性原因
 - [ ] 多核 CPU 可见时，resource plan 不得把 `num_workers` / `OMP_NUM_THREADS` / `MKL_NUM_THREADS` 留空或全部设为 1，除非有约束说明
+- [ ] 若 `resource_plan.yaml.resource_pool.enabled == true` 或 resources > 1，必须包含 local/ssh resource 列表、server_id/lease_id/workspace、GPU/CPU capacity、sync_required、公平性策略
+- [ ] 多资源场景必须预留或生成 `experiments/configs/m3_task_queue.yaml` / `m3_task_allocation.yaml` 的路径与 schema；若 M3S01 暂不能生成具体 run 队列，必须说明 M3S03 何时生成
 
 ---
 
@@ -133,7 +135,7 @@
 
 ## 4. Verdict 规则
 
-- **PASS**: 数据集真实可用、环境、依赖、硬件信息、sandbox profile、resource plan、长任务 ledger 完整，无 critical 问题
+- **PASS**: 数据集真实可用、环境、依赖、硬件信息、sandbox profile、resource plan、长任务 ledger 完整，多资源池（如有）可执行且同步/公平性策略完整，无 critical 问题
 - **REVISE**: 有可修复缺口，如路径/锁文件/环境字段缺失、sandbox profile 字段不足、resource plan 字段不足、长任务 ledger 字段不足；或数据集获取方式需要补充
 - **BACKTRACK**: 
   - 数据集不可获取且 Agent 未执行阻塞等待流程
@@ -141,6 +143,7 @@
   - 因"太大/太慢/需要等"跳过真实数据、checkpoint、远程上传或必要 smoke run，且没有阻塞报告
   - `execution.sandbox.enabled != true`、`sandbox.mode=none`、缺少凭证/文件/网络/资源边界，或实验脚本可写出项目目录/读取密钥
   - 多 GPU/多核机器未生成 resource plan，或 resource plan 固定单卡/单核且没有合理说明
+  - 用户提供多个服务器/多卡/local+ssh 混合资源，但 M3S01 没有 resource_pool、task allocation 路径、同步策略或公平性策略
   - 环境配置明显不可执行
   - 复现条件根本不成立
 

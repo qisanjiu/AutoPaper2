@@ -130,6 +130,7 @@ Phase 2: M4S02 Deep Analysis Experiment Design
   → 每个 slice 必须填写 Slice Evidence Contract
   → Comparability Contract + 执行信封审计
   → 产出: knowledge/M4/M4S02_analysis_experiment_design.md
+            + （如多资源）experiments/configs/m4_task_queue.yaml 草案字段/任务粒度约束
   → Stage Review: m4_analysis_design_review 审查
      → verdict: PASS → M4S03
      → verdict: REVISE → 回到 M4S02 修正
@@ -144,6 +145,7 @@ Phase 3: M4S03 Deep Analysis Experiment Execution
             + experiments/artifacts/analysis_experiment/
             + experiments/analysis_results.tsv
             + sandbox/container execution record referencing experiments/configs/sandbox_profile.yaml
+            + （如多资源）experiments/configs/m4_task_allocation.yaml 和每个 slice 的 resource_id/server_id/sync/monitor 记录
   → Stage Review: m4_analysis_execution_review 审查
      → verdict: PASS → M4S04
      → verdict: REVISE → 回到 M4S03 补执行或修正记录
@@ -208,6 +210,7 @@ Phase 6: Handoff & 完成
 - M4S03 只能在 M4S02 设计的干预范围内执行实验
 - 任何偏离 M4S02 设计的行为必须在产出中明确记录并说明原因
 - 每个 analysis slice 必须记录 sandbox/container mode、命令、working dir、allowed writes、network policy、resource limits、log path
+- 每个 analysis slice 必须记录 `resource_id`、`resource_kind`、GPU/CPU 分配、monitor path；若使用 SSH 资源，必须记录 server_id、lease_id、remote workspace、push/pull 同步证据；可并行的独立 slice 应按 `experiments/configs/m4_task_allocation.yaml` 分配到 local/ssh/GPU slot，存在未并行或未使用资源时必须写明依赖、显存、数据、baseline 公平性或配额原因。
 - `experiments/analysis_results.tsv` 必须包含 dataset/split/seed/config/run/artifact/resource 字段；若执行效率 slice，还必须记录参数量、时间、显存/内存、吞吐或 FLOPs/MACs 中的适用指标
 - M4S03 必须沿用 M3S01 的 `experiments/configs/sandbox_profile.yaml` 或说明兼容 profile；不得无隔离运行 LLM 生成的分析脚本
 - M4S03 的输出必须包含执行侧的初步异常分流摘要，但不得自判最终 verdict；最终 verdict 由独立 reviewer subagent 写入 review 文件

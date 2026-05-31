@@ -203,6 +203,8 @@ def _parse_create_args(args: list[str]) -> dict[str, Any]:
     auto_advance: bool = False
     execution_env: dict[str, Any] = {}
     ssh_server_id: Optional[str] = None
+    ssh_server_ids: list[str] = []
+    ssh_pool_count: Optional[int] = None
     ssh_lease_hours: Optional[int] = None
     ssh_min_gpu_count: int = 0
     ssh_min_vram_gb: Optional[float] = None
@@ -228,6 +230,22 @@ def _parse_create_args(args: list[str]) -> dict[str, Any]:
             execution_env["execution.mode"] = "ssh"
             execution_env["execution.server_id"] = ssh_server_id
             execution_env["execution.ssh.server_id"] = ssh_server_id
+            i += 2
+            continue
+        if arg == "--server-ids":
+            if i + 1 >= len(args):
+                raise SystemExit("[ERROR] --server-ids requires a comma-separated value")
+            ssh_server_ids = _split_value_items(args[i + 1])
+            execution_env["execution.resource_optimization.resource_pool.enabled"] = True
+            execution_env["execution.resource_optimization.resource_pool.include_local"] = True
+            i += 2
+            continue
+        if arg == "--server-pool-count":
+            if i + 1 >= len(args):
+                raise SystemExit("[ERROR] --server-pool-count requires a value")
+            ssh_pool_count = int(args[i + 1])
+            execution_env["execution.resource_optimization.resource_pool.enabled"] = True
+            execution_env["execution.resource_optimization.resource_pool.include_local"] = True
             i += 2
             continue
         if arg == "--lease-hours":
@@ -390,6 +408,8 @@ def _parse_create_args(args: list[str]) -> dict[str, Any]:
         "auto_advance": auto_advance,
         "execution_env": execution_env,
         "ssh_server_id": ssh_server_id,
+        "ssh_server_ids": ssh_server_ids,
+        "ssh_pool_count": ssh_pool_count,
         "ssh_lease_hours": ssh_lease_hours,
         "ssh_min_gpu_count": ssh_min_gpu_count,
         "ssh_min_vram_gb": ssh_min_vram_gb,
@@ -514,6 +534,8 @@ def cmd_create(
     auto_advance: bool = False,
     execution_env: Optional[dict[str, Any]] = None,
     ssh_server_id: Optional[str] = None,
+    ssh_server_ids: Optional[list[str]] = None,
+    ssh_pool_count: Optional[int] = None,
     ssh_lease_hours: Optional[int] = None,
     ssh_min_gpu_count: int = 0,
     ssh_min_vram_gb: Optional[float] = None,
@@ -544,7 +566,47 @@ def cmd_create(
         state.set_auto_advance(True)
         print(f"[SETTINGS] Auto-advance modules: enabled")
 
-    if ssh_server_id:
+    if ssh_server_ids or ssh_pool_count:
+        from spiral.ssh_registry import SSHRegistryError, allocate_server_pool, apply_lease_pool_to_project
+
+        try:
+            leases = allocate_server_pool(
+                Path(__file__).parent.parent.resolve(),
+                proj,
+                server_ids=ssh_server_ids or [],
+                count=ssh_pool_count or len(ssh_server_ids or []) or 1,
+                min_gpu_count=ssh_min_gpu_count,
+                min_vram_gb=ssh_min_vram_gb,
+                tags=ssh_server_tags or [],
+                lease_hours=ssh_lease_hours,
+                stage_scope="project",
+                reason="project creation resource pool",
+            )
+            apply_lease_pool_to_project(
+                Path(__file__).parent.parent.resolve(),
+                proj,
+                [lease["lease_id"] for lease in leases],
+                include_local=True,
+            )
+            checklist = proj / "state" / "onboarding_checklist.md"
+            if checklist.exists():
+                with checklist.open("a", encoding="utf-8") as handle:
+                    handle.write("\n## Managed SSH Resource Pool\n\n")
+                    for lease in leases:
+                        handle.write(
+                            f"- server_id: `{lease['server_id']}`; "
+                            f"lease_id: `{lease['lease_id']}`; "
+                            f"workspace_path: `{lease['workspace_path']}`; "
+                            f"expires_at: `{lease['expires_at']}`\n"
+                        )
+            print(f"[SSH] Allocated resource pool with {len(leases)} lease(s)")
+            print("      Applied to: config/execution_env.yaml and state/ssh_resource_pool.yaml")
+        except SSHRegistryError as exc:
+            print(f"[SSH][ERROR] Failed to allocate managed SSH resource pool: {exc}")
+            print(f"            Project remains created at: {proj}")
+            raise SystemExit(1)
+
+    if ssh_server_id and not (ssh_server_ids or ssh_pool_count):
         from spiral.ssh_registry import SSHRegistryError, allocate_server, apply_lease_to_project
 
         try:
@@ -1788,6 +1850,8 @@ def main(argv: list[str] | None = None) -> None:
             auto_advance=parsed.get("auto_advance", False),
             execution_env=parsed.get("execution_env"),
             ssh_server_id=parsed.get("ssh_server_id"),
+            ssh_server_ids=parsed.get("ssh_server_ids"),
+            ssh_pool_count=parsed.get("ssh_pool_count"),
             ssh_lease_hours=parsed.get("ssh_lease_hours"),
             ssh_min_gpu_count=parsed.get("ssh_min_gpu_count", 0),
             ssh_min_vram_gb=parsed.get("ssh_min_vram_gb"),

@@ -112,7 +112,7 @@ Phase 0: 进入 M3 前置检查
 
 Phase 1: M3S01 Dataset & Environment Review / Setup
   → Experiment Agent 执行
-  → 产出: knowledge/M3/M3S01_implementation.md + experiments/src/ + experiments/configs/ + experiments/requirements.lock + experiments/configs/sandbox_profile.yaml + experiments/configs/resource_plan.yaml + experiments/logs/m3s01_longrun_ledger.md
+  → 产出: knowledge/M3/M3S01_implementation.md + experiments/src/ + experiments/configs/ + experiments/requirements.lock + experiments/configs/sandbox_profile.yaml + experiments/configs/resource_plan.yaml + （如多资源）experiments/configs/m3_task_queue.yaml + experiments/configs/m3_task_allocation.yaml + experiments/logs/m3s01_longrun_ledger.md
   → Stage Review: m3_dataset_env_review → knowledge/reviews/M3S01_dataset_env_review.md
   → Review verdict 必须为 PASS；否则 Conductor 调用 backtrack() 后，**必须重新调用 Experiment Agent subagent 修正/重新执行 M3S01；主 agent 禁止直接修改**
   → Conductor advance: M3S01 → M3S02
@@ -126,7 +126,7 @@ Phase 2: M3S02 Baseline Result Review
 
 Phase 3: M3S03 Main Experiment Result Review
   → Experiment Agent 执行
-  → 产出: knowledge/M3/M3S03_main_experiment.md + experiments/results.tsv + experiments/runs/ + 每个正式 run 的 resource_monitor.csv + runtime watchdog 记录
+  → 产出: knowledge/M3/M3S03_main_experiment.md + experiments/results.tsv + experiments/runs/ + 每个正式 run 的 resource_monitor.csv + runtime watchdog 记录 + （如多资源）每个 run 的 resource_id/server_id/sync 记录
   → 对预计超过 2 小时的正式 run，Experiment Agent 必须周期巡检（默认每 4 小时，最长不超过 6 小时），读取训练日志、metric 曲线、resource_monitor 和 watchdog 告警；watchdog 只告警不终止，是否继续/修复/早停/回溯由 Experiment Agent 判断并记录
   → Stage Review: m3_main_result_review → knowledge/reviews/M3S03_main_result_review.md
   → Review verdict 必须为 PASS；否则 Conductor 调用 backtrack() 后，**必须重新调用 Experiment Agent subagent 修正/重新执行 M3S03；主 agent 禁止直接修改**
@@ -198,7 +198,7 @@ Phase 6: Handoff & 完成
 1. **数据集获取铁律（M3S01）**: **真实数据是唯一合法输入**。绝对禁止用仿真/合成/随机数据替代真实数据集。大数据集同样必须尝试下载或传输。无法自动获取时必须生成报告阻塞等待用户，严禁绕过。
 2. **长任务等待与权限 Ledger（M3S01）**: 任何长时间下载、上传、远程环境创建、依赖安装、checkpoint 获取或 smoke run 都必须记录到 `experiments/logs/m3s01_longrun_ledger.md`，包含命令、状态、日志路径、等待/轮询策略、恢复命令、权限/批准状态和完成标准；禁止以"太大/太慢/需要等"为由跳过。
 3. **Sandbox / Container Profile（M3/M4）**: `execution.sandbox.enabled` 必须为 true，且必须生成 `experiments/configs/sandbox_profile.yaml`，记录网络、文件系统、凭证、资源限制和可复现性边界；禁止无隔离运行 LLM 生成实验代码。
-4. **Resource Utilization Contract（M3S01/M3S03）**: 必须生成 `experiments/configs/resource_plan.yaml`，把可见 GPU/CPU 转成 DDP/单卡/CPU 并行/任务并行策略；M3S03 每个正式 run 必须记录 `resource_monitor.csv`，低利用率必须优化或说明不可优化原因。
+4. **Resource Utilization Contract（M3S01/M3S03）**: 必须生成 `experiments/configs/resource_plan.yaml`，把可见 GPU/CPU 转成 DDP/单卡/CPU 并行/任务并行策略；如果存在多张卡、多个服务器或 local+ssh 混合资源，必须在 `resource_plan.yaml.resource_pool` 中列出资源池，并生成 task queue/allocation，把可并行的独立任务合理分配到资源；M3S03 每个正式 run 必须记录 `resource_monitor.csv`，低利用率必须优化或说明不可优化原因。
 5. **Runtime Watchdog（M3S03）**: 预计超过 2 小时的正式 run 必须写入 `experiments/logs/runtime_events.jsonl` 和 `experiments/runs/<run_id>/watchdog_checks.jsonl`；出现 NaN/Inf、不收敛、OOM、异常退出、资源长期低利用率或早停候选时，写入 `watchdog_alerts.jsonl`，由 Experiment Agent 读取证据后决定 `continue` / `fix_and_rerun` / `early_stop` / `backtrack_request`，不得由脚本自动结束。
 6. **Comparator-First（M3S02）**: 优先 attach/import/verify-local-existing，非必要不 reproduce。Baseline 若依赖预训练权重，必须主动搜索并获取 checkpoint（GitHub Releases、README、HuggingFace、自动下载等），禁止跳过或用随机初始化替代。
 7. **Baseline 只读（M3S03）**: 主实验阶段 baseline 代码只读，确保比较公平
@@ -240,7 +240,7 @@ state.set_stage("M3S02", "in_progress")
 
 | 节点 | 检查项 | 失败处理 |
 |------|--------|---------|
-| M3S01 完成后 | 数据集、环境、依赖、硬件信息、sandbox profile、resource plan 完整；review PASS | REVISE / BACKTRACK → M3S01 |
+| M3S01 完成后 | 数据集、环境、依赖、硬件信息、sandbox profile、resource plan 完整；多资源场景下 task allocation 完整；review PASS | REVISE / BACKTRACK → M3S01 |
 | M3S02 完成后 | baseline 本地验证、metric contract、smoke test、review PASS | REVISE / BACKTRACK → M3S02 / M3S01 |
 | M3S03 完成后 | `results.tsv` 完整、固定 seed=42、baseline 对比、resource_monitor 完整、runtime watchdog 巡检/告警/Agent 决策记录完整、review PASS | REVISE / BACKTRACK → M3S03 / M3S02 |
 | M3S04 完成后 | 统计分析、最终决策、回溯建议完整 | FIX / BACKTRACK → M3S03 / M3S02 / M3S01 |

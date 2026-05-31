@@ -2185,6 +2185,10 @@ def _check_m3s01_resource_plan(
         else:
             messages.append(f"[PASS] M3S01: resource_plan.yaml includes {label}")
 
+    pool_ok, pool_msgs = _check_resource_pool_plan(root, plan, label="M3S01")
+    messages.extend(pool_msgs)
+    ok = ok and pool_ok
+
     available = plan.get("available", {}) if isinstance(plan.get("available"), dict) else {}
     allocation = plan.get("allocation", {}) if isinstance(plan.get("allocation"), dict) else {}
     strategy = plan.get("strategy", {}) if isinstance(plan.get("strategy"), dict) else {}
@@ -2239,6 +2243,112 @@ def _safe_int(value: Any, *, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _resource_pool_resources(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    pool = plan.get("resource_pool", {}) if isinstance(plan.get("resource_pool"), dict) else {}
+    resources = pool.get("resources", []) if isinstance(pool.get("resources"), list) else []
+    return [resource for resource in resources if isinstance(resource, dict) and resource.get("enabled", True) is not False]
+
+
+def _resource_pool_enabled(plan: dict[str, Any]) -> bool:
+    pool = plan.get("resource_pool", {}) if isinstance(plan.get("resource_pool"), dict) else {}
+    return bool(pool.get("enabled") is True or len(_resource_pool_resources(plan)) > 1)
+
+
+def _check_resource_pool_plan(
+    root: Path,
+    plan: dict[str, Any],
+    *,
+    label: str,
+    require_allocation: bool = False,
+    allocation_name: str = "m3_task_allocation.yaml",
+    doc_text: str = "",
+) -> tuple[bool, list[str]]:
+    messages: list[str] = []
+    ok = True
+    pool = plan.get("resource_pool", {}) if isinstance(plan.get("resource_pool"), dict) else {}
+    resources = _resource_pool_resources(plan)
+    if not _resource_pool_enabled(plan):
+        messages.append(f"[PASS] {label}: multi-resource pool not enabled")
+        return True, messages
+
+    messages.append(f"[PASS] {label}: multi-resource pool enabled with {len(resources)} resource(s)")
+    if len(resources) < 2:
+        messages.append(f"[FAIL] {label}: resource_pool enabled but fewer than 2 enabled resources are listed")
+        ok = False
+
+    pool_text = json.dumps(pool, ensure_ascii=False, sort_keys=True).lower()
+    required_terms = {
+        "resource identifiers": ("resource_id", "kind"),
+        "capacity": ("gpu_count", "cpu_cores"),
+        "scheduling policy": ("parallel", "fairness", "task", "sync"),
+    }
+    for field, terms in required_terms.items():
+        if not all(term in pool_text for term in terms):
+            messages.append(f"[FAIL] {label}: resource_pool missing {field}")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: resource_pool includes {field}")
+
+    for resource in resources:
+        kind = str(resource.get("kind", "")).lower()
+        rid = str(resource.get("resource_id") or resource.get("server_id") or "resource")
+        if kind == "ssh":
+            if not str(resource.get("server_id", "")).strip() or not str(resource.get("lease_id", "")).strip():
+                messages.append(f"[FAIL] {label}: SSH resource {rid} missing server_id/lease_id")
+                ok = False
+            elif not str(resource.get("workspace_path", "")).strip():
+                messages.append(f"[FAIL] {label}: SSH resource {rid} missing workspace_path")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: SSH resource {rid} has server/lease/workspace")
+
+    if require_allocation:
+        allocation_path = root / "experiments" / "configs" / allocation_name
+        if not allocation_path.exists():
+            messages.append(f"[FAIL] {label}: experiments/configs/{allocation_name} not found for multi-resource execution")
+            ok = False
+            return ok, messages
+        try:
+            import yaml
+
+            allocation = yaml.safe_load(allocation_path.read_text(encoding="utf-8")) or {}
+        except Exception as exc:
+            messages.append(f"[FAIL] {label}: {allocation_name} unreadable: {exc}")
+            ok = False
+            return ok, messages
+        if not isinstance(allocation, dict):
+            messages.append(f"[FAIL] {label}: {allocation_name} must contain a mapping")
+            ok = False
+            return ok, messages
+        assignments = allocation.get("assignments", [])
+        waves = allocation.get("waves", [])
+        if not isinstance(assignments, list) or not assignments:
+            messages.append(f"[FAIL] {label}: {allocation_name} missing nonempty assignments")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: {allocation_name} has {len(assignments)} assignment(s)")
+        if not isinstance(waves, list) or not waves:
+            messages.append(f"[FAIL] {label}: {allocation_name} missing execution waves")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: {allocation_name} has execution waves")
+        assignment_text = json.dumps(assignments, ensure_ascii=False, sort_keys=True).lower()
+        for term in ("resource_id", "resource_kind", "gpu_ids", "resource_monitor"):
+            if term not in assignment_text:
+                messages.append(f"[FAIL] {label}: {allocation_name} assignments missing {term}")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: {allocation_name} assignments include {term}")
+        blocked = allocation.get("blocked_tasks", [])
+        if isinstance(blocked, list) and blocked:
+            if not _contains_any(doc_text + "\n" + json.dumps(blocked, ensure_ascii=False), ("blocked", "reason", "依赖", "显存", "同步", "fairness", "配额", "不可达", "原因")):
+                messages.append(f"[FAIL] {label}: blocked allocation tasks lack explanation in stage output")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: blocked allocation tasks have explanation")
+    return ok, messages
 
 
 def _resource_monitor_summary(path: Path) -> tuple[bool, str]:
@@ -2302,6 +2412,18 @@ def _check_m3s03_resource_execution(root: Path, *, doc_text: str = "") -> tuple[
     allocation = plan.get("allocation", {}) if isinstance(plan.get("allocation"), dict) else {}
     strategy = plan.get("strategy", {}) if isinstance(plan.get("strategy"), dict) else {}
     allocated_gpu_count = _safe_int(allocation.get("gpu_count"), default=0)
+
+    pool_ok, pool_msgs = _check_resource_pool_plan(
+        root,
+        plan,
+        label="M3S03",
+        require_allocation=True,
+        allocation_name="m3_task_allocation.yaml",
+        doc_text=doc_text,
+    )
+    messages.extend(pool_msgs)
+    ok = ok and pool_ok
+
     if allocated_gpu_count >= 2:
         combined = doc_text + "\n" + json.dumps(strategy, ensure_ascii=False)
         if not _contains_any(combined, ("ddp", "distributed", "torchrun", "task_parallel", "多卡", "任务并行")):
@@ -2316,6 +2438,13 @@ def _check_m3s03_resource_execution(root: Path, *, doc_text: str = "") -> tuple[
             ok = False
         else:
             messages.append("[PASS] M3S03: low utilization has optimize-or-document outcome")
+
+    if _resource_pool_enabled(plan):
+        if not _contains_any(doc_text, ("resource_id", "resource kind", "resource_kind", "server_id", "m3_task_allocation", "同步", "sync")):
+            messages.append("[FAIL] M3S03: multi-resource execution missing resource_id/server/sync record in main doc")
+            ok = False
+        else:
+            messages.append("[PASS] M3S03: multi-resource execution record present in main doc")
 
     return ok, messages
 
@@ -3098,6 +3227,26 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                             ok = False
                         else:
                             messages.append("[PASS] M3S03: results.tsv records fixed seed 42")
+                    plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
+                    if plan_path.exists():
+                        try:
+                            import yaml
+
+                            plan_data = yaml.safe_load(plan_path.read_text(encoding="utf-8")) or {}
+                        except Exception:
+                            plan_data = {}
+                        if isinstance(plan_data, dict) and _resource_pool_enabled(plan_data):
+                            headers = {str(key).strip().lower() for key in (rows[0].keys() if rows else [])}
+                            resource_headers = {"resource_id", "resource_kind", "resource_monitor"}
+                            missing_resource_headers = sorted(resource_headers - headers)
+                            if missing_resource_headers:
+                                messages.append(
+                                    "[FAIL] M3S03: multi-resource results.tsv missing columns: "
+                                    + ", ".join(missing_resource_headers)
+                                )
+                                ok = False
+                            else:
+                                messages.append("[PASS] M3S03: results.tsv includes multi-resource columns")
                 except Exception as exc:
                     messages.append(f"[FAIL] M3S03: results.tsv seed parsing failed: {exc}")
                     ok = False
@@ -3304,6 +3453,26 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 ok = False
             else:
                 messages.append("[PASS] M4S02: literature/database basis present")
+            plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
+            if plan_path.exists():
+                try:
+                    import yaml
+
+                    plan = yaml.safe_load(plan_path.read_text(encoding="utf-8")) or {}
+                except Exception:
+                    plan = {}
+                if isinstance(plan, dict) and _resource_pool_enabled(plan):
+                    for label, terms in {
+                        "parallelizable slice flags": ("parallelizable", "可并行"),
+                        "slice dependencies": ("dependencies", "依赖"),
+                        "resource requirements": ("resource_requirements", "资源需求"),
+                        "fairness key": ("fairness_key", "公平"),
+                    }.items():
+                        if not _contains_any(text, terms):
+                            messages.append(f"[FAIL] M4S02: multi-resource design missing {label}")
+                            ok = False
+                        else:
+                            messages.append(f"[PASS] M4S02: multi-resource design includes {label}")
 
         review_ok, review_msgs = _check_stage_reviews(root, stage)
         messages.extend(review_msgs)
@@ -3368,6 +3537,11 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                     "runtime_sec",
                     "params_m",
                     "peak_mem_mb",
+                    "resource_id",
+                    "resource_kind",
+                    "server_id",
+                    "gpu_ids",
+                    "resource_monitor",
                     "notes",
                 }
                 missing_headers = sorted(required_headers - headers)
@@ -3383,6 +3557,34 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
         sandbox_ok, sandbox_msgs = _check_experiment_sandbox_profile(root, require_m4_execution_doc=True)
         messages.extend(sandbox_msgs)
         ok = ok and sandbox_ok
+
+        plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
+        if plan_path.exists():
+            try:
+                import yaml
+
+                plan = yaml.safe_load(plan_path.read_text(encoding="utf-8")) or {}
+            except Exception as exc:
+                messages.append(f"[FAIL] M4S03: resource_plan.yaml unreadable: {exc}")
+                ok = False
+                plan = {}
+            if isinstance(plan, dict) and _resource_pool_enabled(plan):
+                doc_text = doc.read_text(encoding="utf-8") if doc.exists() else ""
+                pool_ok, pool_msgs = _check_resource_pool_plan(
+                    root,
+                    plan,
+                    label="M4S03",
+                    require_allocation=True,
+                    allocation_name="m4_task_allocation.yaml",
+                    doc_text=doc_text,
+                )
+                messages.extend(pool_msgs)
+                ok = ok and pool_ok
+                if not _contains_any(doc_text, ("resource_id", "resource_kind", "server_id", "m4_task_allocation", "sync", "同步")):
+                    messages.append("[FAIL] M4S03: multi-resource execution record missing resource/sync evidence")
+                    ok = False
+                else:
+                    messages.append("[PASS] M4S03: multi-resource execution record includes resource/sync evidence")
 
         review_ok, review_msgs = _check_stage_reviews(root, stage)
         messages.extend(review_msgs)

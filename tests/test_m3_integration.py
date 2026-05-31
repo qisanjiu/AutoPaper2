@@ -519,6 +519,106 @@ class TestM3StageGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("execution.mode must be explicitly local or ssh" in message for message in messages), messages)
 
+    def test_m3s03_stage_gate_accepts_multi_resource_allocation(self) -> None:
+        self._write_m3s03_files(include_monitor=True, include_watchdog=True)
+        (self.root / "experiments" / "runs" / "run_002").mkdir(parents=True, exist_ok=True)
+        (self.root / "experiments" / "runs" / "run_002" / "resource_monitor.csv").write_text(
+            "timestamp,command_pid,cpu_load_pct,mem_available_mb,gpu_index,gpu_util_pct,gpu_mem_used_mb,gpu_mem_total_mb\n"
+            "2026-05-29T12:00:00,124,70,16000,0,80,8000,24576\n",
+            encoding="utf-8",
+        )
+        (self.root / "knowledge" / "M3" / "M3S03_main_experiment.md").write_text(
+            "# M3S03 Main Experiment\n\n"
+            "## Run Contract\nResource Plan: `experiments/configs/resource_plan.yaml`; "
+            "multi-resource allocation: `experiments/configs/m3_task_allocation.yaml`.\n\n"
+            "## 实验环境\nresource_id/local and ssh:lab-a server_id lab-a are used with sync push/pull evidence.\n\n"
+            "## 资源利用率执行记录\n"
+            "| Run ID | resource_id | resource_kind | Resource monitor | 低利用率处理 |\n"
+            "|---|---|---|---|---|\n"
+            "| run_001 | local | local | `experiments/runs/run_001/resource_monitor.csv` | none |\n"
+            "| run_002 | ssh:lab-a | ssh | `experiments/runs/run_002/resource_monitor.csv` | sync completed |\n\n"
+            "## Runtime Watchdog 与告警记录\n"
+            "`experiments/logs/runtime_events.jsonl` and watchdog checks record periodic 巡检. "
+            "Watchdog only records alerts and does not automatically terminate the run. Agent 决策: continue.\n\n"
+            "## Baseline 结果\nbaseline rows are included.\n\n"
+            "## 迭代循环记录\niterations with resource_monitor.csv.\n\n"
+            "## Evidence Ladder\nminimum and solid reached.\n\n"
+            "## 随机种子\nSeed: 42.\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "configs" / "resource_plan.yaml").write_text(
+            "schema_version: 1\n"
+            "available:\n"
+            "  cpu: {cores: 8}\n"
+            "  gpus: []\n"
+            "allocation:\n"
+            "  cpu_cores: 8\n"
+            "  gpu_count: 0\n"
+            "  gpu_ids: []\n"
+            "strategy:\n"
+            "  device_mode: task_parallel\n"
+            "  dataloader: {num_workers: 4}\n"
+            "launch:\n"
+            "  command_template: python experiments/src/train.py\n"
+            "monitoring:\n"
+            "  enabled: true\n"
+            "  min_gpu_utilization_pct: 70\n"
+            "  min_cpu_utilization_pct: 60\n"
+            "resource_pool:\n"
+            "  enabled: true\n"
+            "  task_allocation_policy: dependency_aware_task_parallel\n"
+            "  parallelism_contract:\n"
+            "    fairness_policy: baseline_and_ours_same_resource_class\n"
+            "    result_sync_policy: remote pull logs monitors artifacts\n"
+            "  resources:\n"
+            "    - resource_id: local\n"
+            "      kind: local\n"
+            "      cpu_cores: 8\n"
+            "      gpu_count: 0\n"
+            "      gpu_ids: []\n"
+            "    - resource_id: ssh:lab-a\n"
+            "      kind: ssh\n"
+            "      server_id: lab-a\n"
+            "      lease_id: lease-a\n"
+            "      workspace_path: ~/AutoPaper2/projects/demo\n"
+            "      cpu_cores: 16\n"
+            "      gpu_count: 1\n"
+            "      gpu_ids: ['0']\n"
+            "      sync_required: true\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "configs" / "m3_task_allocation.yaml").write_text(
+            "schema_version: 1\n"
+            "assignments:\n"
+            "  - task_id: run_001\n"
+            "    resource_id: local\n"
+            "    resource_kind: local\n"
+            "    gpu_ids: []\n"
+            "    resource_monitor: experiments/runs/run_001/resource_monitor.csv\n"
+            "  - task_id: run_002\n"
+            "    resource_id: ssh:lab-a\n"
+            "    resource_kind: ssh\n"
+            "    server_id: lab-a\n"
+            "    gpu_ids: ['0']\n"
+            "    resource_monitor: experiments/runs/run_002/resource_monitor.csv\n"
+            "waves:\n"
+            "  - wave: 0\n"
+            "    parallel_assignments: [run_001, run_002]\n"
+            "blocked_tasks: []\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "results.tsv").write_text(
+            "method\tseed\tmetric\tvalue\tresource_id\tresource_kind\tresource_monitor\n"
+            "baseline\t42\taccuracy\t0.70\tlocal\tlocal\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\t42\taccuracy\t0.80\tssh:lab-a\tssh\texperiments/runs/run_002/resource_monitor.csv\n",
+            encoding="utf-8",
+        )
+
+        ok, messages = check_stage(self.root, "M3S03")
+
+        self.assertTrue(ok, "\n".join(messages))
+        self.assertTrue(any("multi-resource pool enabled" in message for message in messages), messages)
+
     def test_m3s01_stage_gate_requires_local_env_fields(self) -> None:
         self._write_m3s01_files(include_ledger=True, local_env_manager="")
 
