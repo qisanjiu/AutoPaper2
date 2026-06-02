@@ -1,175 +1,247 @@
 # AutoPaper2
 
-> **一个将研究主题从初始界定到最终投稿、审稿与修改的完整自主研究框架。**
+> **一个以状态机和多 Agent 分工为核心的自主研究框架，用于把研究主题推进到调研、方法设计、实验、论文写作、投稿、审稿解析、反驳与修改。**
 
-AutoPaper2 是一个结构化、Agent 驱动的学术论文自动化流水线框架。它将完整的论文生命周期划分为六个模块（M1–M6），每个模块包含明确的 Stage、专属 Agent、Stage 级审查以及 Gate 评审。框架严格执行**编排者–执行者分离**：主编排器（Conductor）只负责调度与回溯，具体 Stage 内容和审查工作必须由子 Agent 完成。
+AutoPaper2 将学术研究流程视为一条有门禁的软件流水线。每个项目都会经过六个模块（M1-M6），每个模块由明确 Stage、持久化状态、子 Agent prompt、审查分发包和 Gate Critic 组成。框架的核心规则是严格的**编排者-执行者分离**：主 Agent / Conductor 只负责状态编排、分发、审查路由和回溯；Stage 内容执行和审查必须委托给 `docs/AGENTS/` 下对应的子 Agent。
 
 ---
 
 ## 目录
 
 - [项目概览](#项目概览)
+- [仓库结构](#仓库结构)
 - [系统架构](#系统架构)
 - [六大模块](#六大模块)
-  - [M1 – 领域调研](#m1--领域调研)
-  - [M2 – 方法设计](#m2--方法设计)
-  - [M3 – 实验执行](#m3--实验执行)
-  - [M4 – 深度分析](#m4--深度分析)
-  - [M5 – 论文写作](#m5--论文写作)
-  - [M6 – 投稿、审稿与修改](#m6--投稿审稿与修改)
 - [Gate 与审查体系](#gate-与审查体系)
+- [分发工作流](#分发工作流)
 - [螺旋回溯机制](#螺旋回溯机制)
 - [快速开始](#快速开始)
+- [项目入口与 Anchors](#项目入口与-anchors)
 - [项目目录结构](#项目目录结构)
 - [配置说明](#配置说明)
-- [Claude Code Skill 集成](#claude-code-skill-集成)
+- [Skills 与跨 CLI 兼容](#skills-与跨-cli-兼容)
+- [质量检查](#质量检查)
 - [许可证](#许可证)
 
 ---
 
 ## 项目概览
 
-AutoPaper2 将论文写作视为**软件流水线**：
+AutoPaper2 是一个结构化、Agent 辅助的论文生产框架。它不是把完整研究过程塞进一个长 prompt，而是使用以下机制：
 
-1. **状态驱动** – 每个项目携带 `pipeline_state.yaml`，记录当前模块、Stage、状态、历史与回溯日志。
-2. **Agent 专业化** – 调研 Agent、方法 Agent、实验 Agent、写作 Agent、评审 Critic 团队各司其职。
-3. **审查门禁** – 任何模块在未通过 Stage 审查和最终 Gate 评审前，不得进入下一模块。
-4. **自我修正** – 当审查失败时，Conductor 发起**螺旋回溯**，将下游 Stage 标记为过期，并重新执行。
+1. **持久化项目状态** - 每个项目都有 `state/pipeline_state.yaml`、决策日志、螺旋日志、分发包和 onboarding 状态。
+2. **专业化 Agent** - 调研、创意、方法、实验、分析、写作、投稿、反驳、修改、SSH 运维和 Critic Agent 分别有独立 prompt 契约。
+3. **基于路径的委托** - dispatch packet 使用 `project:<relative-path>` 和 `framework:<relative-path>` 引用，子 Agent 必须直接读取源文件。
+4. **审查门禁** - Stage 与模块必须经过 Reviewer 和 Gate Critic 检查后才可信地进入下游。
+5. **结构化回溯** - 审查失败会转化为明确 backtrack advice，包括目标 Stage、必要修复、成功标准、证据路径、重建模式和重跑范围。
+6. **跨 CLI 运行** - Claude Code 可自动发现 `.claude/skills/`；Codex、KimiCode 和其他 CLI 直接从 `skills/` 读取项目内 canonical skill。
+
+---
+
+## 仓库结构
+
+| 路径 | 作用 |
+|------|------|
+| `spiral/` | 核心状态、项目创建、Conductor、dispatch、公共文献库、SSH registry 和路由逻辑。 |
+| `scripts/state_manager.py` | 主 CLI：创建项目、查看状态、分发、推进、回溯、公共文献库操作。 |
+| `scripts/orchestrator_guard.py` | 编排者写入边界检查，防止主 Agent 写入执行者/审查者产出。 |
+| `scripts/subagent_launch_prompt.py` | 从 dispatch packet 中提取 compact launch prompt。 |
+| `docs/AGENTS/` | Stage 执行、审查、Critic、SSH 运维和构建验证的 canonical role prompts。 |
+| `skills/` | AutoPaper2 项目内 canonical skills。 |
+| `.claude/skills/` | Claude Code 自动发现用的 `skills/` 镜像。 |
+| `templates/stage/` | Stage 输出草稿模板。 |
+| `templates/venue/` | 会议/期刊 LaTeX 模板。 |
+| `config/` | Venue registry、执行环境默认配置、Gate rubrics、公共文献库、图像生成和需求追踪元数据。 |
+| `tests/` | Pipeline、dispatch、CLI 兼容、SSH registry、资源规划等测试。 |
 
 ---
 
 ## 系统架构
 
-```
-+------------------+     +------------------+     +------------------+
-|   Conductor      |---->|  子 Agent        |---->|   Critic 团队    |
-|   (主编排器)     |     | (Stage 执行)     |     | (审查 & Gate)    |
-+------------------+     +------------------+     +------------------+
-         |                        |                        |
-         v                        v                        v
-   pipeline_state.yaml      knowledge/M*             reviews/
-   decision_log.md          drafts/                  gate_aggregate.md
-   spiral_log.md            experiments/
+```text
++------------------+       +-----------------------+       +------------------+
+|   Conductor      | ----> | Durable Dispatch       | ----> |   Subagents      |
+|  orchestration   |       | state/dispatch/*.md    |       | stage/review work|
++------------------+       +-----------------------+       +------------------+
+        |                              |                              |
+        v                              v                              v
+ pipeline_state.yaml          project:/framework: refs       knowledge/, drafts/,
+ decision_log.md              no parent-context rule         artifacts/, reviews/
+ spiral_log.md
+        |
+        v
++------------------+
+|   Gate Critics   |
+| review & verdict |
++------------------+
 ```
 
-- **Conductor** (`spiral/conductor.py`) – 绝不直接写入 Stage 产出；只负责调度、分发与回溯。
-- **State Manager** (`spiral/state.py`) – 持久化项目状态，包括过期追踪、螺旋计数器、Gate 重审标志。
-- **Project Manager** (`spiral/project.py`) – 创建项目、初始化模板、绑定会议配置。
-- **Dispatch System** (`scripts/state_manager.py`) – 生成分发包，子 Agent 据此读取输入、写入输出。
+核心组件：
+
+- **Conductor** (`spiral/conductor.py`) 生成执行计划、推进状态、安排审查并记录回溯。
+- **PipelineState** (`spiral/state.py`) 持久化当前模块/Stage、状态、过期 Stage、Gate 重审标记和 spiral 计数器。
+- **ProjectManager** (`spiral/project.py`) 创建带时间戳的项目，初始化模板，写入 `state/research_brief.yaml`，复制 venue 资源，并探测执行环境。
+- **Dispatch System** (`spiral/dispatch.py`, `scripts/state_manager.py dispatch`) 为 Stage 执行、Stage Review、Gate Review、SSH Ops 和 Revision Routing 写入持久化分发包。
+- **Boundary Guard** (`scripts/orchestrator_guard.py`) 阻止编排者写入 `knowledge/M*/M*S*.md`、审查文件和最终论文 artifact 等子 Agent 拥有的路径。
 
 ---
 
 ## 六大模块
 
-### M1 – 领域调研
+### M1 - 领域调研
 
 | Stage | 说明 |
 |-------|------|
-| **M1S01** | 主题界定 – 明确研究问题、关键词与锚定论文。 |
-| **M1S02** | 文献深度调研 – 三轮迭代搜索，生成结构化 Source Log。 |
-| **M1S03** | 缺口与机会分析 – 识别尚未解决的问题。 |
-| **M1S04** | 预想法草稿 – 头脑风暴解决方向。 |
-| **M1S05** | 想法最终确定 – 锁定核心主张与方法。 |
+| `M1S01` | 主题界定：研究问题、关键词、边界与 anchor papers。 |
+| `M1S02` | 文献深度调研：迭代搜索与结构化 source log。 |
+| `M1S03` | 缺口与机会分析。 |
+| `M1S04` | 预想法草稿与候选方向。 |
+| `M1S05` | 想法最终确定与 M1 到 M2 handoff。 |
 
-**Gate G1** – 逻辑 + 覆盖度 Critic 评审调研完整性与缺口分析有效性。
+**Gate G1** 检查调研逻辑、覆盖度、来源质量和缺口有效性。
 
-### M2 – 方法设计
-
-| Stage | 说明 |
-|-------|------|
-| **M2S01** | 跨领域搜索 – 从相邻领域寻找可迁移方法。 |
-| **M2S02** | 迁移分析 – 将外部技术映射到目标问题。 |
-| **M2S03** | 方法架构设计 – 定义整体流程。 |
-| **M2S04** | 算法与理论设计 – 形式化目标函数、证明与复杂度分析。 |
-| **M2S05** | 实验设置设计 – 数据集、指标、基线与公平对比规则。 |
-| **M2S06** | 完整实验计划 – 整合为可执行计划。 |
-
-**Gate G2** – 逻辑 + 方法 + 新颖性 Critic。
-
-### M3 – 实验执行
+### M2 - 方法设计
 
 | Stage | 说明 |
 |-------|------|
-| **M3S01** | 数据集与环境搭建 – 锁定依赖、硬件与可复现配置。 |
-| **M3S02** | 基线锁定 – 运行基线并验证公平对比。 |
-| **M3S03** | 主实验执行 – 运行所提方法。 |
-| **M3S04** | 结果验证与证据打包 – 统计检验、Claim Ledger、Evidence Ladder。 |
+| `M2S01` | 跨领域搜索可迁移方法。 |
+| `M2S02` | 从外部技术到目标问题的迁移分析。 |
+| `M2S03` | 方法架构设计。 |
+| `M2S04` | 算法与理论设计。 |
+| `M2S05` | 实验设置设计：数据集、指标、基线、公平对比规则。 |
+| `M2S06` | 完整实验计划与 M2 到 M3 handoff。 |
 
-**Gate G3** – 方法 + 证据 Critic。
+**Gate G2** 检查逻辑、方法可靠性、新颖性和实验计划可执行性。
 
-### M4 – 深度分析
-
-| Stage | 说明 |
-|-------|------|
-| **M4S01** | 实验后审计与发现整合 – 汇总所有观察。 |
-| **M4S02** | 深度分析实验设计 – 消融实验、机制研究、鲁棒性测试。 |
-| **M4S03** | 深度分析执行 – 运行设计的分析实验。 |
-| **M4S04** | 分析结果整合 – 为论文打包证据。 |
-
-**Gate G4** – 逻辑 + 证据 + 新颖性 Critic。
-
-### M5 – 论文写作
+### M3 - 实验实现与执行
 
 | Stage | 说明 |
 |-------|------|
-| **M5S01** | 写作前审计 – 明确贡献并挑选风格参照论文。 |
-| **M5S02** | 论文大纲 – 情节规划、术语表、章节预算。 |
-| **M5S04** | 方法 |
-| **M5S05** | 实验与结果 |
-| **M5S06** | 分析与讨论 – 与实验结果一一对应。 |
-| **M5S03** | 引言与相关工作 – 在实验完成后撰写以锁定故事线。 |
-| **M5S07** | 摘要与结论 |
-| **M5S08** | 完整草稿组装与编译 – LaTeX 构建、图表检查。 |
-| **M5S09** | 全文润色与叙事连贯性审阅 – 最终 LaTeX/PDF 润色与跨章节一致性检查。 |
+| `M3S01` | 数据集与环境搭建。 |
+| `M3S02` | 基线锁定与 smoke tests。 |
+| `M3S03` | 主实验执行。 |
+| `M3S04` | 结果验证、证据打包与 M3 到 M4 handoff。 |
 
-**Gate G5** – 逻辑 + 写作 + 证据 + 新颖性 + 伦理 Critic。可选同行评审模拟。
+**Gate G3** 检查方法实现、基线公平性、结果有效性和证据充分性。
 
-### M6 – 投稿、审稿与修改
+### M4 - 深度分析
 
 | Stage | 说明 |
 |-------|------|
-| **M6S01** | 投稿前审计与打包 – 会议合规性检查表。 |
-| **M6S02** | 外部审稿提交 – 如 paperreview.ai。 |
-| **M6S03** | 审稿接收与解析 – IMAP 监控 + 原子化审稿矩阵。 |
-| **M6S04** | 反驳策略与行动计划 – 针对每条审稿意见规划回溯。 |
-| **M6S05** | 修改执行 – 根据需要路由回早期 Stage。 |
-| **M6S06** | 修改验证与完成裁决。 |
+| `M4S01` | 实验后审计与发现整合。 |
+| `M4S02` | 分析实验设计：消融、机制、鲁棒性检查。 |
+| `M4S03` | 深度分析执行。 |
+| `M4S04` | 分析结果整合与 M4 到 M5 handoff。 |
 
-**Gate G6** – 解决度 Critic 验证所有审稿意见是否已被充分回应。
+**Gate G4** 检查分析是否足以支撑论文主张。
+
+### M5 - 论文写作与定稿
+
+| Stage | 说明 |
+|-------|------|
+| `M5S01` | 写作前审计与贡献表述。 |
+| `M5S02` | 论文大纲、作图计划、术语表和章节预算。 |
+| `M5S04` | Methodology。 |
+| `M5S05` | Experiments and Results。 |
+| `M5S06` | Analysis and Discussion。 |
+| `M5S03` | Introduction and Related Work，在证据锁定后撰写。 |
+| `M5S07` | Abstract and Conclusion。 |
+| `M5S08` | 完整草稿组装与 LaTeX 编译。 |
+| `M5S09` | 全文润色与叙事连贯性审查。 |
+
+**Gate G5** 检查逻辑、写作、证据、新颖性、伦理和编译状态。
+
+### M6 - 投稿、审稿与修改
+
+| Stage | 说明 |
+|-------|------|
+| `M6S01` | 投稿前审计与材料打包。 |
+| `M6S02` | 外部审稿提交，例如 `paperreview.ai`。 |
+| `M6S03` | 审稿接收与解析为原子化 review matrix。 |
+| `M6S04` | 反驳策略与可执行 action plan。 |
+| `M6S05` | 修改执行，必要时路由回早期 Stage。 |
+| `M6S06` | 修改验证与完成裁决。 |
+
+**Gate G6** 检查所有审稿意见是否已由可追踪证据充分解决。
 
 ---
 
 ## Gate 与审查体系
 
-每个模块结束时有 **Gate**，由独立 Critic 评估：
+每个模块结束时都有 Gate。Gate Critic 与 Stage Executor 相互独立。
 
-| Gate | Critic 组合 |
-|------|------------|
-| G1 | 逻辑、覆盖度 |
-| G2 | 逻辑、方法、新颖性 |
-| G3 | 方法、证据 |
-| G4 | 逻辑、证据、新颖性 |
-| G5 | 逻辑、写作、证据、新颖性、伦理 |
-| G6 | 逻辑、证据、写作、解决度 |
+| Gate | 主要 Critic |
+|------|-------------|
+| `G1` | 逻辑、覆盖度、调研/source 质量 |
+| `G2` | 逻辑、方法、新颖性 |
+| `G3` | 方法、证据 |
+| `G4` | 逻辑、证据、新颖性 |
+| `G5` | 逻辑、写作、证据、新颖性、伦理 |
+| `G6` | 逻辑、证据、写作、解决度 |
 
-**裁决类型**：`PASS`、`REVISE`、`REWORK`、`BACKTRACK`、`FIX`、`HALT`。
+支持的 verdict 包括 `PASS`、`REVISE`、`REWORK`、`BACKTRACK`、`FIX` 和 `HALT`。
 
-**Stage 审查**在模块内部运行（例如 M2S03 完成后由设计审查 Critic 检查与 M2S02 的一致性）。这种早期拦截防止错误累积到 Gate。
+模块内部可按需运行 Stage Review。Reviewer 必须写入自己的 review 文件；若 verdict 不是 PASS，必须给出结构化 repair advice，供 Conductor 转化为回溯。
+
+---
+
+## 分发工作流
+
+常规运行循环：
+
+```bash
+python scripts/state_manager.py status
+python scripts/state_manager.py dispatch next --write
+python scripts/subagent_launch_prompt.py --packet projects/<project>/state/dispatch/<packet>.md
+```
+
+然后把打印出的 compact launch prompt 交给匹配的子 Agent。子 Agent 必须读取 packet 和其中引用的 `docs/AGENTS/**/AGENT.md`，不得依赖父对话上下文。
+
+常用分发命令：
+
+```bash
+python scripts/state_manager.py dispatch stage M2S03 --write
+python scripts/state_manager.py dispatch reviews M2S03 --write
+python scripts/state_manager.py dispatch gate G2 --write
+python scripts/state_manager.py dispatch ssh allocation --write
+python scripts/agent_dispatch.py --project projects/<project> --write next
+```
+
+编排者写项目路径前先检查边界：
+
+```bash
+python scripts/orchestrator_guard.py projects/<project> <target_path>
+```
+
+退出码为 `1` 表示目标路径属于 Stage Executor 或 Reviewer，必须通过 dispatch 处理。
 
 ---
 
 ## 螺旋回溯机制
 
-当审查或 Gate 失败时，Conductor 发起**回溯**：
+当审查或 Gate 失败时，Conductor 会：
 
-1. 在 `pipeline_state.yaml` 中记录原因、必要修复与成功标准。
-2. 将所有下游 Stage 标记为**过期（stale）**。
-3. 为目标模块增加**螺旋计数器**（默认上限 10 次）。
-4. 通过对应子 Agent 重新执行目标 Stage，并附带完整回溯建议。
+1. 在 `pipeline_state.yaml` 中记录失败原因和修复契约。
+2. 将下游 Stage 标记为 stale。
+3. 增加目标模块的 spiral 计数器。
+4. 为目标 Stage 生成新的 dispatch packet。
+5. 委托对应子 Agent 重新生成。
+
+结构化回溯示例：
+
+```bash
+python scripts/state_manager.py backtrack M3S04 M3S02 \
+  "baseline protocol mismatch" \
+  --required-fix "Re-lock baselines using the M2S05 metric contract" \
+  --success-criteria "M3S02 reports runnable baselines, seeds, metrics, and artifact paths" \
+  --rebuild-mode full_regenerate \
+  --evidence-paths knowledge/M2/M2S05_experiment_setup.md,experiments/results.tsv
+```
 
 两种重建模式：
-- **full_regenerate** – 将旧文件仅视为历史审计，禁止复制粘贴。
-- **incremental_replay** – 可参考旧文件，但所有保留内容必须针对当前上游输入重新验证。
+
+- `full_regenerate` - 旧下游文件只能作为历史审计证据。
+- `incremental_replay` - 可以参考旧文件，但保留内容必须针对当前上游输入重新验证。
 
 ---
 
@@ -183,130 +255,223 @@ cd AutoPaper2
 pip install -e ".[dev]"
 ```
 
-### 2. 创建项目
+要求 Python 3.10+。
 
-```python
-from spiral.project import ProjectManager
-
-proj = ProjectManager.create(
-    topic="基于强化学习的图像语义通信",
-    display_name="SemCom-Image-RL",
-    venue="neurips",          # 可选 arxiv, icml, iclr, acl, cvpr, ieee_trans
-    keywords=["semantic communication", "reinforcement learning", "image compression"],
-)
-print(proj)
-```
-
-### 3. 查看状态并完成初始化
+### 2. 查看支持的 venue
 
 ```bash
-python scripts/state_manager.py status
-# 填写 config/execution_env.yaml 和 config/author_info.yaml
-python scripts/state_manager.py onboarding-done /path/to/project
+python scripts/state_manager.py list-venues
 ```
 
-### 4. 运行模块（通过 Claude Code Skills）
+支持的 venue ID 包括 `arxiv`、`neurips`、`icml`、`iclr`、`acl`、`cvpr` 和 `ieee_trans`。
 
-```
-/AutoPaper2_m1_survey   # 开始领域调研
-/AutoPaper2_m2_method_design  # M1 完成后进入方法设计
-/AutoPaper2_m3_experiment     # M2 完成后进入实验执行
-...
+### 3. 创建项目
+
+```bash
+python scripts/state_manager.py create \
+  "Semantic Communication for Image Transmission via Reinforcement Learning" \
+  "SemCom-Image-RL" \
+  neurips \
+  --keywords "semantic communication,reinforcement learning,image compression" \
+  --reference "doi:10.0000/example-reference" \
+  --foundation "arxiv:2401.00000"
 ```
 
-或手动运行：
+默认项目目录为 `projects/{sanitized_name}-{YYYYMMDD-HHMMSS}/`。可通过 `SPIRAL_PROJECTS_ROOT` 覆盖项目根目录。
+
+### 4. 选择项目并完成 onboarding
+
+```bash
+python scripts/state_manager.py list-projects
+python scripts/state_manager.py use projects/SemCom-Image-RL-YYYYMMDD-HHMMSS
+
+# 编辑项目配置：
+#   config/execution_env.yaml
+#   config/author_info.yaml
+
+python scripts/state_manager.py onboarding-done
+```
+
+项目创建时会 best-effort 自动运行 `scripts/env_probe.py`，并生成 `state/onboarding_checklist.md`。
+
+### 5. 生成并委托下一项任务
+
+```bash
+python scripts/state_manager.py dispatch next --write
+python scripts/subagent_launch_prompt.py --packet projects/<project>/state/dispatch/<packet>.md
+```
+
+将输出的 compact launch prompt 交给指定子 Agent。子 Agent 写入目标产出后，再通过 `advance` 或模块 skill 流程继续推进。
+
+高级编排辅助命令：
 
 ```bash
 python scripts/state_manager.py run-module M1
+python scripts/state_manager.py auto-run
+python scripts/state_manager.py set-auto-advance on
 ```
+
+这些辅助命令仍需遵守 Conductor-Executor 边界：Stage 输出和审查文件属于被委托的子 Agent。
+
+---
+
+## 项目入口与 Anchors
+
+项目创建会把灵活输入标准化为 `state/research_brief.yaml`。下游 Stage 通过该文件理解主题、关键词和 anchor 材料。
+
+支持的入口输入：
+
+```bash
+--keywords "keyword1,keyword2"
+--reference "paper title, DOI, arXiv id, URL, or local PDF path"
+--foundation "baseline or lineage paper/code"
+--anchor "both:https://github.com/example/repo"
+--input-manifest path/to/manifest.yaml
+--note "Important project constraint or user preference"
+```
+
+本地 PDF anchor 会被复制到项目输入区。Paper 和 code anchor 会被分配 recommended stages，便于调研、方法、实验和写作 Agent 在合适位置使用。
 
 ---
 
 ## 项目目录结构
 
-每个项目创建于 `projects/{ sanitized_name }-{YYYYMMDD-HHMMSS}/`：
-
-```
-my-project-20260115-143022/
+```text
+projects/<name>-<timestamp>/
 ├── state/
-│   ├── pipeline_state.yaml      # 全局状态
-│   ├── decision_log.md          # 可读决策日志
-│   ├── spiral_log.md            # 回溯历史
-│   └── onboarding_checklist.md  # 初始化检查清单
+│   ├── pipeline_state.yaml
+│   ├── research_brief.yaml
+│   ├── decision_log.md
+│   ├── spiral_log.md
+│   ├── onboarding_checklist.md
+│   └── dispatch/
 ├── knowledge/
-│   ├── M1/ ... M6/              # Stage 产出
-│   └── reviews/                 # Stage & Gate 评审文件
+│   ├── M1/ ... M6/
+│   ├── reviews/
+│   ├── handoff_M1_M2.md
+│   ├── handoff_M2_M3.md
+│   ├── handoff_M3_M4.md
+│   ├── handoff_M4_M5.md
+│   ├── handoff_M5_completion.md
+│   └── handoff_M6_completion.md
 ├── drafts/
-│   └── M1S01/ ... M6S06/        # 工作草稿
+│   └── M1S01/ ... M6S06/
 ├── experiments/
+│   ├── src/
+│   ├── configs/
+│   ├── artifacts/
+│   ├── logs/
 │   ├── results.tsv
-│   ├── analysis_results.tsv
-│   ├── src/                     # 实验代码
-│   └── configs/                 # 实验配置
+│   └── analysis_results.tsv
 ├── artifacts/
 │   ├── paper.tex
 │   ├── paper.pdf
 │   ├── refs.bib
-│   └── latex_template/          # 会议专用 LaTeX 模板
+│   └── latex_template/
 └── config/
-    ├── execution_env.yaml       # 硬件、SSH、conda 等环境配置
-    └── author_info.yaml         # 作者信息
+    ├── execution_env.yaml
+    └── author_info.yaml
 ```
 
 ---
 
 ## 配置说明
 
-### 会议注册表
+### Venue Registry
 
-支持的会议/期刊定义在 `config/venue_registry.yaml`：
-
-| 会议/期刊 | 页数限制 | 格式 |
-|----------|---------|------|
-| arXiv | – | 预印本 |
-| NeurIPS | 9 + 参考文献 | 会议 |
-| ICML | 9 + 参考文献 | 会议 |
-| ICLR | 9 + 参考文献 | 会议 |
-| ACL | 8 + 参考文献 | 会议 |
-| CVPR | 8 + 参考文献 | 会议 |
-| IEEE Trans | ~10–14 | 期刊 |
+Venue 配置位于 `config/venue_registry.yaml`。项目创建时会把所选 venue 的 LaTeX 资源复制到 `artifacts/latex_template/`。
 
 ### 执行环境
 
-`config/execution_env.yaml`（每个项目自动生成）支持：
-- **local** 模式 – 在当前机器运行。
-- **ssh** 模式 – 将实验分发到已分配租约的远程 GPU 服务器。
+每个项目都会得到 `config/execution_env.yaml`，支持：
 
-项目创建时自动运行环境探测（`scripts/env_probe.py` 检测 CUDA、Python 版本、GPU 数量与框架版本）。SSH 服务器库位于 `config/ssh_servers.yaml`，由 `scripts/ssh_manager.py` 管理；onboarding 可用一次性密码推送专用 SSH key，随后 `probe` 会记录远程 GPU/软件能力以及远程数据集缓存中已有的数据集。创建项目时可用 `--server-id auto` 或具体 server id 自动分配。
+- `local` 模式，在当前机器执行。
+- `ssh` 模式，在远程 GPU 服务器执行。
+- resource-pool 规划，支持本地/远程混合实验队列。
+
+常用 SSH 命令：
+
+```bash
+python scripts/ssh_manager.py server list
+python scripts/ssh_manager.py server add <server_id> --host <host> --user <user>
+python scripts/ssh_manager.py probe <server_id>
+python scripts/ssh_manager.py lease alloc --project projects/<project> --server-id auto --apply
+python scripts/ssh_manager.py lease alloc-pool --project projects/<project> --count 2 --apply
+```
+
+创建项目时也可直接请求托管 SSH 分配：
+
+```bash
+python scripts/state_manager.py create "Topic" "Name" neurips \
+  --env-mode ssh --server-id auto --lease-hours 48 --min-gpu-count 1
+```
+
+### 公共文献库
+
+`config/public_db.yaml` 控制框架级 SQLite 文献数据库。该数据库首次使用时自动初始化，并在多个项目之间共享。
+
+```bash
+python scripts/state_manager.py public-db status
+python scripts/state_manager.py public-db stats
+python scripts/state_manager.py public-db search "semantic communication"
+python scripts/state_manager.py public-db import-project projects/<project>
+```
+
+M1 survey memory 会连接该数据库，以便跨项目复用 source log。
+
+### 图像与图表生成
+
+图像/图表默认配置位于：
+
+- `config/image_generation.yaml`
+- `config/figure_style_profiles.yaml`
+
+本地 API 凭据应放在被 git 忽略的 local config 或环境变量中，例如 `OPENAI_API_KEY` 与 `OPENAI_BASE_URL`。`scripts/generate_image.py` 支持 M5 作图规划中的图像生成和 Draw.io 风格 diagram 工作流。
 
 ---
 
-## Claude Code Skill 集成
+## Skills 与跨 CLI 兼容
 
-AutoPaper2 设计为一组 **Claude Code Skills**，位于 `.claude/skills/` 和 `skills/`：
-
-`skills/` 是项目内 canonical skill source。`.claude/skills/` 是给 Claude Code 自动发现用的镜像。Codex、KimiCode 和其他 CLI 应先读取 `AGENTS.md`，再从本仓库直接打开对应的 `skills/<skill_name>/SKILL.md`；不得依赖用户全局 skill 目录。
+`skills/` 是 AutoPaper2 的 canonical skill source。`.claude/skills/` 是 Claude Code 自动发现用镜像。非 Claude 运行时应先读取 `AGENTS.md`，再直接打开本仓库内的 `skills/<skill_name>/SKILL.md`。
 
 | Skill | 说明 |
 |-------|------|
-| `AutoPaper2_env_probe` | 检测本地 GPU/Python/CUDA 并填充 `execution_env.yaml`。 |
-| `AutoPaper2_ssh_ops` | 管理 SSH 服务器库、租约、探测、远程同步和 SSH Ops 派发。 |
-| `AutoPaper2_ssh_server_onboarding` | 引导新增 SSH 服务器条目并验证连接。 |
-| `AutoPaper2_m1_survey` | M1 完整流程：主题界定 → 文献搜索 → 创意生成 → G1。 |
-| `AutoPaper2_m2_method_design` | M2 完整流程：跨领域搜索 → 迁移分析 → 架构设计 → G2。 |
-| `AutoPaper2_m3_experiment` | M3 完整流程：环境搭建 → 基线 → 主实验 → G3。 |
-| `AutoPaper2_m4_deep_analysis` | M4 完整流程：审计 → 消融设计 → 执行 → G4。 |
-| `AutoPaper2_m5_writing` | M5 完整流程：大纲 → 分节写作 → 编译 → G5。 |
-| `AutoPaper2_m6_submission_review` | M6 完整流程：投稿 → 审稿解析 → 反驳 → 修改 → G6。 |
-| `AutoPaper2_project_auto_run` | 端到端自动运行所有模块。 |
-| `AutoPaper2_project_backtrack` | 处理手动回溯请求。 |
+| `AutoPaper2_project_onboarding` | 项目创建后的 onboarding 与检查。 |
 | `AutoPaper2_project_router` | 根据当前状态路由到正确模块。 |
+| `AutoPaper2_project_auto_run` | 端到端编排辅助。 |
+| `AutoPaper2_project_backtrack` | 结构化人工回溯。 |
+| `AutoPaper2_manual_import` | 导入文献到公共 DB 或注册共享数据集。 |
+| `AutoPaper2_env_probe` | 探测本地 CUDA/Python/GPU 环境。 |
+| `AutoPaper2_ssh_ops` | 管理 SSH registry、租约、探测、同步和远程命令证据。 |
+| `AutoPaper2_ssh_server_onboarding` | 引导新增 SSH 服务器并验证。 |
+| `AutoPaper2_m1_survey` | M1 领域调研到 G1。 |
+| `AutoPaper2_m2_method_design` | M2 方法设计到 G2。 |
+| `AutoPaper2_m3_experiment` | M3 实现与实验到 G3。 |
+| `AutoPaper2_m4_deep_analysis` | M4 深度分析到 G4。 |
+| `AutoPaper2_m5_writing` | M5 写作、编译与润色到 G5。 |
+| `AutoPaper2_m6_submission_review` | M6 投稿、审稿解析、反驳、修改与 G6。 |
 
-使用以下命令验证跨 CLI 的本地 skill 与 prompt 兼容性：
+验证本地 skill 和 prompt 兼容性：
 
 ```bash
 python scripts/cli_compat_check.py
 ```
+
+---
+
+## 质量检查
+
+修改框架行为前建议运行：
+
+```bash
+python scripts/cli_compat_check.py
+python scripts/agent_consistency_check.py
+python scripts/requirement_trace_check.py
+python scripts/test_health_check.py
+python -m unittest discover -s tests
+```
+
+仓库也在 `pyproject.toml` 中配置了 `pytest`，安装 dev 依赖后可使用 `pytest`。
 
 ---
 

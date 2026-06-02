@@ -1,181 +1,253 @@
 # AutoPaper2
 
-> **An autonomous research framework that guides a topic from initial scoping all the way through to camera-ready submission and rebuttal.**
+> **A state-driven autonomous research framework for taking a topic from scoping to experiments, paper writing, submission, review parsing, rebuttal, and revision.**
 
-AutoPaper2 is a structured, agent-driven pipeline for automated academic research. It breaks the full paper lifecycle into six modules (M1–M6), each with explicit stages, dedicated agents, stage-level reviews, and gate critics. The framework enforces a strict **Conductor–Executor separation**: the main orchestrator schedules work and handles backtracking, while sub-agents execute stage content and reviews.
+AutoPaper2 treats academic research as a guarded software pipeline. A project moves through six modules (M1-M6), each made of explicit stages, durable state, subagent prompts, review packets, and gate critics. The central rule is strict **Conductor-Executor separation**: the main agent orchestrates state, dispatch, review routing, and backtracking; stage execution and review work must be delegated to the matching subagent prompt under `docs/AGENTS/`.
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Repository Map](#repository-map)
 - [System Architecture](#system-architecture)
 - [The Six Modules](#the-six-modules)
-  - [M1 – Domain Survey](#m1--domain-survey)
-  - [M2 – Method Design](#m2--method-design)
-  - [M3 – Experiment Implementation & Execution](#m3--experiment-implementation--execution)
-  - [M4 – Deep Analysis](#m4--deep-analysis)
-  - [M5 – Writing & Finalization](#m5--writing--finalization)
-  - [M6 – Submission, Review & Revision](#m6--submission-review--revision)
 - [Gate & Review System](#gate--review-system)
+- [Dispatch Workflow](#dispatch-workflow)
 - [Spiral Backtracking](#spiral-backtracking)
 - [Quick Start](#quick-start)
+- [Project Entry & Anchors](#project-entry--anchors)
 - [Project Layout](#project-layout)
 - [Configuration](#configuration)
-- [Skills (Claude Code Integration)](#skills-claude-code-integration)
+- [Skills & CLI Compatibility](#skills--cli-compatibility)
+- [Quality Checks](#quality-checks)
 - [License](#license)
 
 ---
 
 ## Overview
 
-AutoPaper2 treats paper writing as a **software pipeline**:
+AutoPaper2 is a framework for structured, agent-assisted paper production. It does not collapse the research process into one long prompt. Instead it uses:
 
-1. **State-driven** – every project carries a `pipeline_state.yaml` that records the current module, stage, status, history, and backtrack log.
-2. **Agent-specialized** – survey agents, method agents, experiment agents, writing agents, and critic teams each handle their own domain.
-3. **Review-gated** – no module can advance to the next until it passes both stage reviews and a final gate review by independent critics.
-4. **Self-correcting** – when a review fails, the Conductor initiates a **spiral backtrack** to the appropriate stage, marks downstream work as stale, and re-executes.
+1. **Durable project state** - each project has `state/pipeline_state.yaml`, decision logs, spiral logs, dispatch packets, and onboarding state.
+2. **Specialized agents** - survey, ideation, method, experiment, analysis, writing, submission, rebuttal, revision, SSH ops, and critic agents have separate prompt contracts.
+3. **Path-based delegation** - dispatch packets pass `project:<relative-path>` and `framework:<relative-path>` references. Subagents read source files directly.
+4. **Review-gated advancement** - stages and modules are checked by reviewers and gate critics before downstream work is trusted.
+5. **Structured backtracking** - failed reviews become explicit backtrack advice with target stage, required fix, success criteria, evidence paths, rebuild mode, and rerun scope.
+6. **Cross-CLI operation** - Claude Code can discover `.claude/skills/`; Codex, KimiCode, and other CLIs load canonical skills directly from `skills/`.
+
+---
+
+## Repository Map
+
+| Path | Purpose |
+|------|---------|
+| `spiral/` | Core state, project, conductor, dispatch, public DB, SSH registry, and routing logic. |
+| `scripts/state_manager.py` | Main CLI for project creation, status, dispatch, advancement, backtracking, and public DB operations. |
+| `scripts/orchestrator_guard.py` | Runtime write-boundary guard for orchestrator-mode agents. |
+| `scripts/subagent_launch_prompt.py` | Extracts the compact launch prompt from a dispatch packet. |
+| `docs/AGENTS/` | Canonical role prompts for stage executors, reviewers, critics, SSH ops, and build verification. |
+| `skills/` | Canonical project-local AutoPaper2 skills. |
+| `.claude/skills/` | Claude Code mirror of `skills/` for auto-discovery. |
+| `templates/stage/` | Draft templates for stage outputs. |
+| `templates/venue/` | Venue-specific LaTeX templates. |
+| `config/` | Venue registry, execution environment defaults, gate rubrics, public DB config, image generation config, and requirement trace metadata. |
+| `tests/` | Integration and guard tests for pipeline behavior, dispatch packets, CLI compatibility, SSH registry, and resource planning. |
 
 ---
 
 ## System Architecture
 
-```
-+------------------+     +------------------+     +------------------+
-|   Conductor      |---->|  Sub-Agents      |---->|   Critic Team    |
-|  (Orchestrator)  |     | (Stage Execution)|     | (Review & Gate)  |
-+------------------+     +------------------+     +------------------+
-         |                        |                        |
-         v                        v                        v
-   pipeline_state.yaml      knowledge/M*             reviews/
-   decision_log.md          drafts/                  gate_aggregate.md
-   spiral_log.md            experiments/
+```text
++------------------+       +-----------------------+       +------------------+
+|   Conductor      | ----> | Durable Dispatch       | ----> |   Subagents      |
+|  orchestration   |       | state/dispatch/*.md    |       | stage/review work|
++------------------+       +-----------------------+       +------------------+
+        |                              |                              |
+        v                              v                              v
+ pipeline_state.yaml          project:/framework: refs       knowledge/, drafts/,
+ decision_log.md              no parent-context rule         artifacts/, reviews/
+ spiral_log.md
+        |
+        v
++------------------+
+|   Gate Critics   |
+| review & verdict |
++------------------+
 ```
 
-- **Conductor** (`spiral/conductor.py`) – never writes stage outputs directly; only dispatches, schedules, and handles backtracking.
-- **State Manager** (`spiral/state.py`) – durable project state with staleness tracking, spiral counters, and gate re-review flags.
-- **Project Manager** (`spiral/project.py`) – creates projects, initializes templates, and wires up venue configurations.
-- **Dispatch System** (`scripts/state_manager.py`) – generates dispatch packets so sub-agents know exactly what to read and where to write.
+Core components:
+
+- **Conductor** (`spiral/conductor.py`) builds execution plans, advances state, schedules reviews, and records backtracks.
+- **PipelineState** (`spiral/state.py`) persists current module/stage, statuses, stale stages, gate re-review flags, and spiral counters.
+- **ProjectManager** (`spiral/project.py`) creates timestamped projects, initializes templates, writes `state/research_brief.yaml`, copies venue assets, and probes the execution environment.
+- **Dispatch System** (`spiral/dispatch.py`, `scripts/state_manager.py dispatch`) writes durable packets for stage execution, stage review, gate review, SSH ops, and revision routing.
+- **Boundary Guard** (`scripts/orchestrator_guard.py`) prevents the orchestrator from writing executor/reviewer-owned outputs such as `knowledge/M*/M*S*.md`, review files, and final paper artifacts.
 
 ---
 
 ## The Six Modules
 
-### M1 – Domain Survey
+### M1 - Domain Survey
 
 | Stage | Purpose |
 |-------|---------|
-| **M1S01** | Topic Scoping – define the research question, keywords, and anchor papers. |
-| **M1S02** | Literature Deep-Dive – 3-round iterative search with structured source logging. |
-| **M1S03** | Gap & Opportunity Analysis – identify unresolved problems. |
-| **M1S04** | Pre-Idea Draft – brainstorm solution directions. |
-| **M1S05** | Idea Finalization – lock the core claim and approach. |
+| `M1S01` | Topic scoping: research question, keywords, boundaries, and anchor papers. |
+| `M1S02` | Literature deep dive: iterative search plus structured source logging. |
+| `M1S03` | Gap and opportunity analysis. |
+| `M1S04` | Pre-idea draft and candidate solution directions. |
+| `M1S05` | Idea finalization and M1-to-M2 handoff. |
 
-**Gate G1** – Logic + Coverage Critic reviews completeness of the survey and validity of the gap analysis.
+**Gate G1** checks survey logic, coverage, source quality, and gap validity.
 
-### M2 – Method Design
-
-| Stage | Purpose |
-|-------|---------|
-| **M2S01** | Cross-Domain Search – find methods from adjacent fields. |
-| **M2S02** | Migration Analysis – map external techniques to the target problem. |
-| **M2S03** | Method Architecture Design – define the overall pipeline. |
-| **M2S04** | Algorithm & Theory Design – formalize objectives, proofs, and complexity. |
-| **M2S05** | Experiment Setup Design – datasets, metrics, baselines, and fair-comparison rules. |
-| **M2S06** | Full Experiment Plan – consolidate into an executable plan. |
-
-**Gate G2** – Logic + Method + Novelty Critic.
-
-### M3 – Experiment Implementation & Execution
+### M2 - Method Design
 
 | Stage | Purpose |
 |-------|---------|
-| **M3S01** | Dataset & Environment Setup – lock dependencies, hardware, and reproducibility config. |
-| **M3S02** | Baseline Lock – run baselines and verify fair comparison. |
-| **M3S03** | Main Experiment Execution – run the proposed method. |
-| **M3S04** | Result Validation & Evidence Packaging – statistical tests, claim-ledgers, and evidence ladders. |
+| `M2S01` | Cross-domain search for transferable methods. |
+| `M2S02` | Migration analysis from external techniques to the target problem. |
+| `M2S03` | Method architecture design. |
+| `M2S04` | Algorithm and theory design. |
+| `M2S05` | Experiment setup design: datasets, metrics, baselines, fairness rules. |
+| `M2S06` | Full experiment plan and M2-to-M3 handoff. |
 
-**Gate G3** – Method + Evidence Critic.
+**Gate G2** checks logic, method soundness, novelty, and experiment-plan readiness.
 
-### M4 – Deep Analysis
-
-| Stage | Purpose |
-|-------|---------|
-| **M4S01** | Post-Experiment Audit & Findings Consolidation – summarize all observations. |
-| **M4S02** | Deep Analysis Experiment Design – ablations, mechanism studies, robustness tests. |
-| **M4S03** | Deep Analysis Execution – run the designed analyses. |
-| **M4S04** | Analysis Results Integration – package evidence for the paper. |
-
-**Gate G4** – Logic + Evidence + Novelty Critic.
-
-### M5 – Writing & Finalization
+### M3 - Experiment Implementation & Execution
 
 | Stage | Purpose |
 |-------|---------|
-| **M5S01** | Pre-Write Audit – articulate contributions and pick style-reference papers. |
-| **M5S02** | Paper Outline – plotting plan, terminology table, section budget. |
-| **M5S04** | Methodology |
-| **M5S05** | Experiments & Results |
-| **M5S06** | Analysis & Discussion – one-to-one mapping with experiments. |
-| **M5S03** | Introduction & Related Work – written after experiments to lock the story. |
-| **M5S07** | Abstract & Conclusion |
-| **M5S08** | Full Draft Assembly & Compilation – LaTeX build, figure/table checks. |
-| **M5S09** | Full-Polish & Narrative Coherence Review – final LaTeX/PDF polish and cross-section consistency. |
+| `M3S01` | Dataset and environment setup. |
+| `M3S02` | Baseline lock and smoke tests. |
+| `M3S03` | Main experiment execution. |
+| `M3S04` | Result validation, evidence packaging, and M3-to-M4 handoff. |
 
-**Gate G5** – Logic + Writing + Evidence + Novelty + Ethics Critic. Optional peer-review simulation.
+**Gate G3** checks method implementation, baseline fairness, result validity, and evidence sufficiency.
 
-### M6 – Submission, Review & Revision
+### M4 - Deep Analysis
 
 | Stage | Purpose |
 |-------|---------|
-| **M6S01** | Pre-Submission Audit & Package Assembly – venue compliance checklist. |
-| **M6S02** | External Review Submission – e.g., paperreview.ai. |
-| **M6S03** | Review Reception & Parsing – IMAP monitor + atomic review matrix. |
-| **M6S04** | Rebuttal Strategy & Action Plan – backtrack planning for each review item. |
-| **M6S05** | Revision Execution – routed back to earlier stages as needed. |
-| **M6S06** | Revision Validation & Completion Verdict. |
+| `M4S01` | Post-experiment audit and findings consolidation. |
+| `M4S02` | Analysis experiment design: ablations, mechanisms, robustness checks. |
+| `M4S03` | Deep analysis execution. |
+| `M4S04` | Analysis result integration and M4-to-M5 handoff. |
 
-**Gate G6** – Resolution Critic validates that all reviewer concerns are addressed.
+**Gate G4** checks whether the analysis supports the paper's intended claims.
+
+### M5 - Writing & Finalization
+
+| Stage | Purpose |
+|-------|---------|
+| `M5S01` | Pre-write audit and contribution articulation. |
+| `M5S02` | Paper outline, plotting plan, terminology table, and section budget. |
+| `M5S04` | Methodology section. |
+| `M5S05` | Experiments and results section. |
+| `M5S06` | Analysis and discussion section. |
+| `M5S03` | Introduction and related work, written after evidence is locked. |
+| `M5S07` | Abstract and conclusion. |
+| `M5S08` | Full draft assembly and LaTeX compilation. |
+| `M5S09` | Full polish and narrative coherence review. |
+
+**Gate G5** checks logic, writing quality, evidence, novelty, ethics, and compilation readiness.
+
+### M6 - Submission, Review & Revision
+
+| Stage | Purpose |
+|-------|---------|
+| `M6S01` | Pre-submission audit and package assembly. |
+| `M6S02` | External review submission, for example through `paperreview.ai`. |
+| `M6S03` | Review reception and parsing into an atomic review matrix. |
+| `M6S04` | Rebuttal strategy and executable action plan. |
+| `M6S05` | Revision execution, routed back to earlier stages when needed. |
+| `M6S06` | Revision validation and completion verdict. |
+
+**Gate G6** checks whether reviewer concerns have been resolved with traceable evidence.
 
 ---
 
 ## Gate & Review System
 
-Every module ends with a **Gate** where independent critics evaluate the work:
+Every module ends with a gate. Gate critics are independent from stage executors.
 
-| Gate | Critics |
-|------|---------|
-| G1 | Logic, Coverage |
-| G2 | Logic, Method, Novelty |
-| G3 | Method, Evidence |
-| G4 | Logic, Evidence, Novelty |
-| G5 | Logic, Writing, Evidence, Novelty, Ethics |
-| G6 | Logic, Evidence, Writing, Resolution |
+| Gate | Main Critics |
+|------|--------------|
+| `G1` | Logic, coverage, survey/source quality |
+| `G2` | Logic, method, novelty |
+| `G3` | Method, evidence |
+| `G4` | Logic, evidence, novelty |
+| `G5` | Logic, writing, evidence, novelty, ethics |
+| `G6` | Logic, evidence, writing, resolution |
 
-**Verdicts**: `PASS`, `REVISE`, `REWORK`, `BACKTRACK`, `FIX`, `HALT`.
+Supported verdicts include `PASS`, `REVISE`, `REWORK`, `BACKTRACK`, `FIX`, and `HALT`.
 
-**Stage Reviews** run *within* a module (e.g., after M2S03 a design-review critic checks consistency with M2S02). This catches errors early rather than letting them accumulate to the gate.
+Stage reviews run inside modules where needed. Reviewers must write their own review file and, for non-PASS verdicts, include structured repair advice that the Conductor can convert into a backtrack.
+
+---
+
+## Dispatch Workflow
+
+The normal runtime loop is:
+
+```bash
+python scripts/state_manager.py status
+python scripts/state_manager.py dispatch next --write
+python scripts/subagent_launch_prompt.py --packet projects/<project>/state/dispatch/<packet>.md
+```
+
+Then launch the matching subagent with the compact prompt. The subagent must read the packet and the referenced `docs/AGENTS/**/AGENT.md` file directly. It must not rely on the parent conversation.
+
+Useful dispatch commands:
+
+```bash
+python scripts/state_manager.py dispatch stage M2S03 --write
+python scripts/state_manager.py dispatch reviews M2S03 --write
+python scripts/state_manager.py dispatch gate G2 --write
+python scripts/state_manager.py dispatch ssh allocation --write
+python scripts/agent_dispatch.py --project projects/<project> --write next
+```
+
+Before an orchestrator writes to a project path, check the boundary:
+
+```bash
+python scripts/orchestrator_guard.py projects/<project> <target_path>
+```
+
+Exit code `1` means the target belongs to a stage executor or reviewer and must be handled through dispatch.
 
 ---
 
 ## Spiral Backtracking
 
-When a review or gate fails, the Conductor initiates a **backtrack**:
+When a review or gate fails, the Conductor:
 
-1. Records the reason, required fix, and success criteria in `pipeline_state.yaml`.
-2. Marks all downstream stages as **stale**.
-3. Increments the **spiral counter** for the target module (default limit = 10).
-4. Re-executes the target stage via the appropriate sub-agent with full backtrack advice.
+1. Records the failure reason and repair contract in `pipeline_state.yaml`.
+2. Marks downstream stages as stale.
+3. Increments the target module's spiral counter.
+4. Generates a new dispatch packet for the target stage.
+5. Delegates regeneration to the matching subagent.
 
-Two rebuild modes:
-- **full_regenerate** – treat old files as historical audit only; no copy-paste.
-- **incremental_replay** – may reference old files, but all retained content must be re-validated.
+Structured backtrack example:
+
+```bash
+python scripts/state_manager.py backtrack M3S04 M3S02 \
+  "baseline protocol mismatch" \
+  --required-fix "Re-lock baselines using the M2S05 metric contract" \
+  --success-criteria "M3S02 reports runnable baselines, seeds, metrics, and artifact paths" \
+  --rebuild-mode full_regenerate \
+  --evidence-paths knowledge/M2/M2S05_experiment_setup.md,experiments/results.tsv
+```
+
+Rebuild modes:
+
+- `full_regenerate` - old downstream files are historical audit evidence only.
+- `incremental_replay` - old files may be referenced, but retained content must be re-validated against current upstream inputs.
 
 ---
 
 ## Quick Start
 
-### 1. Clone & Install
+### 1. Clone and install
 
 ```bash
 git clone git@github.com:qisanjiu/AutoPaper2.git
@@ -183,73 +255,121 @@ cd AutoPaper2
 pip install -e ".[dev]"
 ```
 
-### 2. Create a Project
+Python 3.10+ is required.
 
-```python
-from spiral.project import ProjectManager
-
-proj = ProjectManager.create(
-    topic="Semantic Communication for Image Transmission via Reinforcement Learning",
-    display_name="SemCom-Image-RL",
-    venue="neurips",          # or arxiv, icml, iclr, acl, cvpr, ieee_trans
-    keywords=["semantic communication", "reinforcement learning", "image compression"],
-)
-print(proj)
-```
-
-### 3. Check State & Onboarding
+### 2. Inspect supported venues
 
 ```bash
-python scripts/state_manager.py status
-# Complete config/execution_env.yaml and config/author_info.yaml
-python scripts/state_manager.py onboarding-done /path/to/project
+python scripts/state_manager.py list-venues
 ```
 
-### 4. Run a Module (via Claude Code Skills)
+Supported venue IDs include `arxiv`, `neurips`, `icml`, `iclr`, `acl`, `cvpr`, and `ieee_trans`.
 
-```
-/AutoPaper2_m1_survey   # Start Domain Survey
-/AutoPaper2_m2_method_design  # After M1 completes
-/AutoPaper2_m3_experiment     # After M2 completes
-...
+### 3. Create a project
+
+```bash
+python scripts/state_manager.py create \
+  "Semantic Communication for Image Transmission via Reinforcement Learning" \
+  "SemCom-Image-RL" \
+  neurips \
+  --keywords "semantic communication,reinforcement learning,image compression" \
+  --reference "doi:10.0000/example-reference" \
+  --foundation "arxiv:2401.00000"
 ```
 
-Or run manually:
+Project folders are created under `projects/{sanitized_name}-{YYYYMMDD-HHMMSS}/` unless `SPIRAL_PROJECTS_ROOT` is set.
+
+### 4. Select the project and finish onboarding
+
+```bash
+python scripts/state_manager.py list-projects
+python scripts/state_manager.py use projects/SemCom-Image-RL-YYYYMMDD-HHMMSS
+
+# Edit project config files:
+#   config/execution_env.yaml
+#   config/author_info.yaml
+
+python scripts/state_manager.py onboarding-done
+```
+
+Project creation auto-runs `scripts/env_probe.py` on a best-effort basis and creates `state/onboarding_checklist.md`.
+
+### 5. Generate and delegate the next task
+
+```bash
+python scripts/state_manager.py dispatch next --write
+python scripts/subagent_launch_prompt.py --packet projects/<project>/state/dispatch/<packet>.md
+```
+
+Pass the printed compact launch prompt to the assigned subagent. After the subagent writes the requested output, use `advance` or the module skill flow to continue.
+
+For high-level orchestration helpers:
 
 ```bash
 python scripts/state_manager.py run-module M1
+python scripts/state_manager.py auto-run
+python scripts/state_manager.py set-auto-advance on
 ```
+
+These helpers still preserve the Conductor-Executor boundary: stage outputs and reviews belong to delegated subagents.
+
+---
+
+## Project Entry & Anchors
+
+Project creation normalizes flexible input into `state/research_brief.yaml`. Downstream stages read that file to understand the topic, keywords, and anchor material.
+
+Supported entry inputs:
+
+```bash
+--keywords "keyword1,keyword2"
+--reference "paper title, DOI, arXiv id, URL, or local PDF path"
+--foundation "baseline or lineage paper/code"
+--anchor "both:https://github.com/example/repo"
+--input-manifest path/to/manifest.yaml
+--note "Important project constraint or user preference"
+```
+
+Local PDF anchors are copied into the project input area. Paper and code anchors are assigned recommended stages so survey, method, experiment, and writing agents know where they are relevant.
 
 ---
 
 ## Project Layout
 
-Each project is created under `projects/{sanitized_name}-{YYYYMMDD-HHMMSS}/`:
-
-```
-my-project-20260115-143022/
+```text
+projects/<name>-<timestamp>/
 ├── state/
-│   ├── pipeline_state.yaml      # Global state
-│   ├── decision_log.md          # Human-readable decisions
-│   ├── spiral_log.md            # Backtrack history
-│   └── onboarding_checklist.md
+│   ├── pipeline_state.yaml
+│   ├── research_brief.yaml
+│   ├── decision_log.md
+│   ├── spiral_log.md
+│   ├── onboarding_checklist.md
+│   └── dispatch/
 ├── knowledge/
-│   ├── M1/ ... M6/              # Stage outputs
-│   └── reviews/                 # Stage & gate reviews
+│   ├── M1/ ... M6/
+│   ├── reviews/
+│   ├── handoff_M1_M2.md
+│   ├── handoff_M2_M3.md
+│   ├── handoff_M3_M4.md
+│   ├── handoff_M4_M5.md
+│   ├── handoff_M5_completion.md
+│   └── handoff_M6_completion.md
 ├── drafts/
-│   └── M1S01/ ... M6S06/        # Working drafts
+│   └── M1S01/ ... M6S06/
 ├── experiments/
-│   ├── results.tsv
-│   ├── analysis_results.tsv
 │   ├── src/
-│   └── configs/
+│   ├── configs/
+│   ├── artifacts/
+│   ├── logs/
+│   ├── results.tsv
+│   └── analysis_results.tsv
 ├── artifacts/
 │   ├── paper.tex
 │   ├── paper.pdf
 │   ├── refs.bib
-│   └── latex_template/          # Venue-specific LaTeX files
+│   └── latex_template/
 └── config/
-    ├── execution_env.yaml       # Hardware, SSH, conda, etc.
+    ├── execution_env.yaml
     └── author_info.yaml
 ```
 
@@ -259,54 +379,99 @@ my-project-20260115-143022/
 
 ### Venue Registry
 
-Supported venues are defined in `config/venue_registry.yaml`:
-
-| Venue | Page Limit | Format |
-|-------|-----------|--------|
-| arXiv | – | preprint |
-| NeurIPS | 9 + refs | conference |
-| ICML | 9 + refs | conference |
-| ICLR | 9 + refs | conference |
-| ACL | 8 + refs | conference |
-| CVPR | 8 + refs | conference |
-| IEEE Trans | ~10–14 | journal |
+Venue settings live in `config/venue_registry.yaml`. Project creation copies the selected venue's LaTeX assets into `artifacts/latex_template/`.
 
 ### Execution Environment
 
-`config/execution_env.yaml` (auto-generated per project) supports:
-- **local** mode – run on the current machine.
-- **ssh** mode – dispatch experiments to a managed remote GPU server lease.
+Each project receives `config/execution_env.yaml`. It supports:
 
-Environment is auto-probed on project creation (`scripts/env_probe.py` detects CUDA, Python version, GPU count, and framework versions). SSH servers are registered in `config/ssh_servers.yaml` and managed with `scripts/ssh_manager.py`; onboarding can use a one-time password to push a dedicated SSH key, then `probe` records GPU/software capabilities and the datasets already present under the remote dataset cache. Project creation can allocate a server with `--server-id auto` or a concrete server id.
+- `local` mode for current-machine execution.
+- `ssh` mode for remote GPU execution.
+- Resource-pool planning for mixed local/remote experiment queues.
+
+Common SSH commands:
+
+```bash
+python scripts/ssh_manager.py server list
+python scripts/ssh_manager.py server add <server_id> --host <host> --user <user>
+python scripts/ssh_manager.py probe <server_id>
+python scripts/ssh_manager.py lease alloc --project projects/<project> --server-id auto --apply
+python scripts/ssh_manager.py lease alloc-pool --project projects/<project> --count 2 --apply
+```
+
+Project creation can also request managed SSH allocation:
+
+```bash
+python scripts/state_manager.py create "Topic" "Name" neurips \
+  --env-mode ssh --server-id auto --lease-hours 48 --min-gpu-count 1
+```
+
+### Public Literature Database
+
+`config/public_db.yaml` controls the framework-wide SQLite literature database. It is initialized on first use and shared across projects.
+
+```bash
+python scripts/state_manager.py public-db status
+python scripts/state_manager.py public-db stats
+python scripts/state_manager.py public-db search "semantic communication"
+python scripts/state_manager.py public-db import-project projects/<project>
+```
+
+M1 survey memory connects to this database so source logs can be reused across projects.
+
+### Figure and Diagram Generation
+
+Figure defaults live in:
+
+- `config/image_generation.yaml`
+- `config/figure_style_profiles.yaml`
+
+Local API credentials should go in ignored local config files or environment variables, for example `OPENAI_API_KEY` and `OPENAI_BASE_URL`. `scripts/generate_image.py` supports image-generation and Draw.io-style diagram workflows for M5 figure planning.
 
 ---
 
-## Skills (Claude Code Integration)
+## Skills & CLI Compatibility
 
-AutoPaper2 is designed to run as a set of **Claude Code Skills** under `.claude/skills/` and `skills/`:
-
-`skills/` is the canonical project-local source. `.claude/skills/` is a mirror for Claude Code auto-discovery. Codex, KimiCode, and other CLIs should read `AGENTS.md`, then load the relevant `skills/<skill_name>/SKILL.md` directly from this repository; they must not rely on user-global skill directories.
+`skills/` is the canonical AutoPaper2 skill source. `.claude/skills/` is a mirror for Claude Code auto-discovery. Non-Claude runtimes should read `AGENTS.md` and then load the relevant `skills/<skill_name>/SKILL.md` directly from this repository.
 
 | Skill | Purpose |
 |-------|---------|
-| `AutoPaper2_env_probe` | Detect local GPU/Python/CUDA and fill `execution_env.yaml`. |
-| `AutoPaper2_ssh_ops` | Manage SSH server registry, leases, probes, remote sync, and SSH Ops dispatch. |
-| `AutoPaper2_ssh_server_onboarding` | Guided creation and validation of new SSH server entries. |
-| `AutoPaper2_m1_survey` | Full M1 pipeline: topic scoping → literature search → ideation → G1. |
-| `AutoPaper2_m2_method_design` | Full M2 pipeline: cross-domain search → migration → architecture → G2. |
-| `AutoPaper2_m3_experiment` | Full M3 pipeline: env setup → baselines → main experiments → G3. |
-| `AutoPaper2_m4_deep_analysis` | Full M4 pipeline: audit → ablation design → execution → G4. |
-| `AutoPaper2_m5_writing` | Full M5 pipeline: outline → section drafting → compilation → G5. |
-| `AutoPaper2_m6_submission_review` | Full M6 pipeline: submission → review parsing → rebuttal → revision → G6. |
-| `AutoPaper2_project_auto_run` | Run all modules end-to-end automatically. |
-| `AutoPaper2_project_backtrack` | Handle manual backtrack requests. |
+| `AutoPaper2_project_onboarding` | Project setup and onboarding checks. |
 | `AutoPaper2_project_router` | Route to the correct module based on current state. |
+| `AutoPaper2_project_auto_run` | End-to-end orchestration helper. |
+| `AutoPaper2_project_backtrack` | Structured manual backtracking. |
+| `AutoPaper2_manual_import` | Import literature into the public DB or register shared datasets. |
+| `AutoPaper2_env_probe` | Probe local CUDA/Python/GPU environment. |
+| `AutoPaper2_ssh_ops` | Manage SSH registry, leases, probes, sync, and remote command evidence. |
+| `AutoPaper2_ssh_server_onboarding` | Guided SSH server creation and validation. |
+| `AutoPaper2_m1_survey` | Domain survey through G1. |
+| `AutoPaper2_m2_method_design` | Method design through G2. |
+| `AutoPaper2_m3_experiment` | Implementation and experiments through G3. |
+| `AutoPaper2_m4_deep_analysis` | Deep analysis through G4. |
+| `AutoPaper2_m5_writing` | Paper writing, compilation, and polish through G5. |
+| `AutoPaper2_m6_submission_review` | Submission, review parsing, rebuttal, revision, and G6. |
 
-Verify cross-CLI local skill and prompt compatibility with:
+Validate local skill and prompt compatibility with:
 
 ```bash
 python scripts/cli_compat_check.py
 ```
+
+---
+
+## Quality Checks
+
+Recommended checks before changing framework behavior:
+
+```bash
+python scripts/cli_compat_check.py
+python scripts/agent_consistency_check.py
+python scripts/requirement_trace_check.py
+python scripts/test_health_check.py
+python -m unittest discover -s tests
+```
+
+The repository also defines `pytest` configuration in `pyproject.toml`, so `pytest` can be used when the development dependency is installed.
 
 ---
 
