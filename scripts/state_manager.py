@@ -1802,41 +1802,45 @@ def cmd_backtrack(
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+def _print_help() -> None:
+    print("AutoPaper2 State Manager")
+    print("Commands: create, status, module-status, advance, human-review,")
+    print("          auto-stage, auto-module, auto-backtrack, auto-run,")
+    print("          run-module, list/list-projects, use, list-venues, set-venue,")
+    print("          set-auto-advance, dispatch, backtrack, public-db")
+    print("Create usage: create <topic> <display_name> [venue]")
+    print("  [--auto-advance] [--env-mode local|ssh]")
+    print("  [--ssh-host HOST] [--ssh-user USER] [--ssh-port PORT]")
+    print("  [--ssh-workspace PATH] [--ssh-conda-env NAME]")
+    print("  [--server-id ID|auto] [--lease-hours N] [--min-gpu-count N]")
+    print("  [--min-vram-gb GB] [--server-tags tag1,tag2]")
+    print("  [--python-version VER] [--cuda-version VER] [--env-manager TOOL]")
+    print("  [--keywords ...] [--reference ...] [--foundation ...] [--anchor ...]")
+    print("")
+    print("Backtrack (structured advice):")
+    print("  backtrack <from> <to> <reason> [direction]")
+    print("  backtrack <from> <to> <reason> --review-file <review.md>")
+    print("  backtrack <from> <to> <reason> [--required-fix ...] [--success-criteria ...]")
+    print("    [--rebuild-mode MODE] [--rerun-scope ...] [--evidence-paths p1,p2]")
+    print("")
+    print("Auto-run:")
+    print("  set-auto-advance <on|off>     Enable/disable automatic module transition")
+    print("  dispatch next|stage|reviews|gate|ssh [target] [--write] [--format json|markdown]")
+    print("")
+    print("Public DB subcommands:")
+    print("  public-db status              Show database location and size")
+    print("  public-db stats               Show tag statistics and top papers")
+    print("  public-db list-papers [tag]   List papers (optionally filter by tag)")
+    print("  public-db search <keywords>   Full-text search across titles/abstracts")
+    print("  public-db show-paper <id>     Show full details of a paper")
+    print("  public-db list-tags           List all domain tags")
+    print("  public-db import-project <dir> Import a project's source log")
+
+
 def main(argv: list[str] | None = None) -> None:
     args = argv if argv is not None else sys.argv[1:]
     if not args:
-        print("AutoPaper2 State Manager")
-        print("Commands: create, status, module-status, advance, human-review,")
-        print("          auto-stage, auto-module, auto-backtrack, auto-run,")
-        print("          run-module, list-projects, use, list-venues, set-venue,")
-        print("          set-auto-advance, dispatch, backtrack, public-db")
-        print("Create usage: create <topic> <display_name> [venue]")
-        print("  [--auto-advance] [--env-mode local|ssh]")
-        print("  [--ssh-host HOST] [--ssh-user USER] [--ssh-port PORT]")
-        print("  [--ssh-workspace PATH] [--ssh-conda-env NAME]")
-        print("  [--server-id ID|auto] [--lease-hours N] [--min-gpu-count N]")
-        print("  [--min-vram-gb GB] [--server-tags tag1,tag2]")
-        print("  [--python-version VER] [--cuda-version VER] [--env-manager TOOL]")
-        print("  [--keywords ...] [--reference ...] [--foundation ...] [--anchor ...]")
-        print("")
-        print("Backtrack (structured advice):")
-        print("  backtrack <from> <to> <reason> [direction]")
-        print("  backtrack <from> <to> <reason> --review-file <review.md>")
-        print("  backtrack <from> <to> <reason> [--required-fix ...] [--success-criteria ...]")
-        print("    [--rebuild-mode MODE] [--rerun-scope ...] [--evidence-paths p1,p2]")
-        print("")
-        print("Auto-run:")
-        print("  set-auto-advance <on|off>     Enable/disable automatic module transition")
-        print("  dispatch next|stage|reviews|gate|ssh [target] [--write] [--format json|markdown]")
-        print("")
-        print("Public DB subcommands:")
-        print("  public-db status              Show database location and size")
-        print("  public-db stats               Show tag statistics and top papers")
-        print("  public-db list-papers [tag]   List papers (optionally filter by tag)")
-        print("  public-db search <keywords>   Full-text search across titles/abstracts")
-        print("  public-db show-paper <id>     Show full details of a paper")
-        print("  public-db list-tags           List all domain tags")
-        print("  public-db import-project <dir> Import a project's source log")
+        _print_help()
         sys.exit(0)
 
     # Handle --project flag before command parsing
@@ -1847,6 +1851,9 @@ def main(argv: list[str] | None = None) -> None:
 
     cmd = args[0]
     remaining = args[1:]
+    if cmd in {"--help", "-h", "help"}:
+        _print_help()
+        sys.exit(0)
 
     if cmd == "create":
         try:
@@ -1935,7 +1942,7 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(1)
         cmd_run_module(proj, remaining[0])
 
-    elif cmd == "list-projects":
+    elif cmd in {"list", "list-projects"}:
         cmd_list_projects()
 
     elif cmd == "use":
