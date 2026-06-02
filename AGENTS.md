@@ -77,7 +77,8 @@ AutoPaper2 的 Skill **只以项目内文件为可信来源**，不得假设 Cla
    ```bash
    python scripts/cli_compat_check.py
    ```
-6. 生成 dispatch packet 后，传给 subagent 的 prompt 必须保留完整 `agent_md` 路径；subagent 必须直接读取该路径，而不是依赖主 Agent 摘要。
+6. 生成 dispatch packet 后，传给 subagent 的 prompt 必须保留完整且可解析的 `agent_md` 路径引用；subagent 必须直接读取该路径，而不是依赖主 Agent 摘要。
+7. Dispatch packet 中的持久化路径不得写入当前机器绝对路径。项目内路径使用 `project:<relative-path>`，框架内路径使用 `framework:<relative-path>`；运行时由 `SPIRAL_FRAMEWORK_ROOT`、当前 AutoPaper2 根目录、或 packet 所在的 `<project>/state/dispatch/` 位置解析。
 
 ### 2.1 Main Agent Boundary
 
@@ -93,6 +94,8 @@ python scripts/state_manager.py dispatch gate <Gx> --write
 ```
 
 The main Agent must not write any output path listed inside `state/dispatch/*.md`; those paths belong to the assigned subagent.
+
+Dispatch packets must pass paths, not copied content. The compact launch prompt should contain only the packet reference, task type/role, stage or gate, required output, role spec reference, and the no-parent-context rule.
 
 #### Orchestrator Identity Persistence（编排者身份持久化）
 
@@ -130,11 +133,11 @@ When a backtrack is triggered (by stage review, gate critic, or human review):
 2. **Conductor must NOT directly modify any stage output file** in `knowledge/` or `drafts/`.
 3. **Re-execution must be performed by the corresponding subagent**, not by the main agent. Conductor must construct a complete execution plan (via `run_stage()`) and delegate to the subagent using the `Agent` tool.
 4. **The subagent prompt must include**:
-   - Full path to the corresponding `docs/AGENTS/{role}/AGENT.md`
-   - Current stage and project root
-   - All upstream input document paths (pass paths only, never summaries)
+   - Portable path reference to the corresponding `docs/AGENTS/{role}/AGENT.md`
+   - Current stage and project root reference
+   - All upstream input document path references (pass paths only, never summaries)
    - Complete `backtrack_advice` (blocking_reason, required_fix, success_criteria, rebuild_mode, evidence_paths, rerun_scope)
-   - Output file path
+   - Output file path reference
 5. **Rebuild mode enforcement**:
    - `full_regenerate` (default): subagent must treat old downstream files as historical audit only; no copy-paste allowed.
    - `incremental_replay`: subagent may reference old files to reduce redundancy, but all retained content must be re-validated against current upstream inputs.

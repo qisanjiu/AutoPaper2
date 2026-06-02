@@ -152,47 +152,111 @@ def _check_dispatch_packets(root: Path, messages: list[str]) -> bool:
     from spiral.dispatch import build_gate_review_packets, build_stage_execution_packet, build_stage_review_packets
     from spiral.conductor import STAGE_CHECKERS
     from spiral.project import GATE_STAGES, MODULE_STAGES
+    from scripts.context_budget import resolve_packet_path
 
     ok = True
     execution_packets = 0
     review_packets = 0
     gate_packets = 0
 
+    def resolve(packet: dict[str, Any], value: str) -> Path:
+        return resolve_packet_path(value, packet, project_root=root, framework_root=root)
+
+    def check_no_absolute_packet_paths(packet: dict[str, Any], label: str) -> None:
+        nonlocal ok
+        path_keys = ("project_root", "agent_md", "md_protocol", "subject_output", "output_path", "role_spec")
+        for key in path_keys:
+            value = str(packet.get(key, "") or "")
+            if value and Path(value).is_absolute():
+                messages.append(f"[FAIL] {label}: {key} should be portable, got absolute path: {value}")
+                ok = False
+        for key in ("input_docs", "shared_contracts"):
+            for value in packet.get(key, []) or []:
+                text = str(value)
+                if text and Path(text).is_absolute():
+                    messages.append(f"[FAIL] {label}: {key} should be portable, got absolute path: {text}")
+                    ok = False
+
+    def check_contract_paths(packet: dict[str, Any], label: str) -> None:
+        nonlocal ok
+        for key in ("role_spec",):
+            value = str(packet.get(key, "") or "")
+            if value:
+                path = resolve(packet, value)
+                if not path.exists() or not path.read_text(encoding="utf-8").strip():
+                    messages.append(f"[FAIL] {label}: {key} missing or empty: {path}")
+                    ok = False
+        for value in packet.get("shared_contracts", []):
+            path = resolve(packet, str(value))
+            if not path.exists() or not path.read_text(encoding="utf-8").strip():
+                messages.append(f"[FAIL] {label}: shared contract missing or empty: {path}")
+                ok = False
+
     for stage in [stage for stage_list in MODULE_STAGES.values() for stage in stage_list]:
         packet = build_stage_execution_packet(root, stage)
         execution_packets += 1
-        agent_md = Path(packet.get("agent_md", ""))
+        check_no_absolute_packet_paths(packet, f"dispatch stage {stage}")
+        agent_md = resolve(packet, str(packet.get("agent_md", "")))
         prompt = str(packet.get("subagent_prompt", ""))
+        launch_prompt = str(packet.get("subagent_launch_prompt", ""))
+        context_policy = packet.get("context_policy", {})
         if not agent_md.exists():
             messages.append(f"[FAIL] dispatch stage {stage}: agent_md missing: {agent_md}")
             ok = False
         if "Role instructions:" not in prompt or "Project root:" not in prompt:
             messages.append(f"[FAIL] dispatch stage {stage}: subagent_prompt missing role/project path")
             ok = False
+        if "dispatch packet" not in launch_prompt or "Do not use the parent conversation" not in launch_prompt:
+            messages.append(f"[FAIL] dispatch stage {stage}: compact launch prompt missing packet/no-parent-context rule")
+            ok = False
+        if not isinstance(context_policy, dict) or context_policy.get("no_parent_context") is not True:
+            messages.append(f"[FAIL] dispatch stage {stage}: context_policy.no_parent_context must be true")
+            ok = False
+        check_contract_paths(packet, f"dispatch stage {stage}")
 
         if stage in STAGE_CHECKERS:
             for review_packet in build_stage_review_packets(root, stage):
                 review_packets += 1
-                review_agent = Path(review_packet.get("agent_md", ""))
+                check_no_absolute_packet_paths(review_packet, f"dispatch review {stage}")
+                review_agent = resolve(review_packet, str(review_packet.get("agent_md", "")))
                 review_prompt = str(review_packet.get("subagent_prompt", ""))
+                review_launch = str(review_packet.get("subagent_launch_prompt", ""))
+                review_policy = review_packet.get("context_policy", {})
                 if not review_agent.exists():
                     messages.append(f"[FAIL] dispatch review {stage}: agent_md missing: {review_agent}")
                     ok = False
                 if "Input paths (read directly; do not rely on summaries):" not in review_prompt:
                     messages.append(f"[FAIL] dispatch review {stage}: prompt missing direct-read instruction")
                     ok = False
+                if "dispatch packet" not in review_launch or "Do not use the parent conversation" not in review_launch:
+                    messages.append(f"[FAIL] dispatch review {stage}: compact launch prompt missing packet/no-parent-context rule")
+                    ok = False
+                if not isinstance(review_policy, dict) or review_policy.get("no_parent_context") is not True:
+                    messages.append(f"[FAIL] dispatch review {stage}: context_policy.no_parent_context must be true")
+                    ok = False
+                check_contract_paths(review_packet, f"dispatch review {stage}")
 
     for gate_id in sorted(GATE_STAGES):
         for gate_packet in build_gate_review_packets(root, gate_id):
             gate_packets += 1
-            gate_agent = Path(gate_packet.get("agent_md", ""))
+            check_no_absolute_packet_paths(gate_packet, f"dispatch gate {gate_id}")
+            gate_agent = resolve(gate_packet, str(gate_packet.get("agent_md", "")))
             gate_prompt = str(gate_packet.get("subagent_prompt", ""))
+            gate_launch = str(gate_packet.get("subagent_launch_prompt", ""))
+            gate_policy = gate_packet.get("context_policy", {})
             if not gate_agent.exists():
                 messages.append(f"[FAIL] dispatch gate {gate_id}: agent_md missing: {gate_agent}")
                 ok = False
             if "Rubric Results" not in gate_prompt:
                 messages.append(f"[FAIL] dispatch gate {gate_id}: gate rubric missing from prompt")
                 ok = False
+            if "dispatch packet" not in gate_launch or "Do not use the parent conversation" not in gate_launch:
+                messages.append(f"[FAIL] dispatch gate {gate_id}: compact launch prompt missing packet/no-parent-context rule")
+                ok = False
+            if not isinstance(gate_policy, dict) or gate_policy.get("no_parent_context") is not True:
+                messages.append(f"[FAIL] dispatch gate {gate_id}: context_policy.no_parent_context must be true")
+                ok = False
+            check_contract_paths(gate_packet, f"dispatch gate {gate_id}")
 
     if ok:
         messages.append(

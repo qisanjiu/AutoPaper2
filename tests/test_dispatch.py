@@ -6,8 +6,15 @@ from pathlib import Path
 
 import yaml
 
+from scripts.context_budget import resolve_packet_path
 from spiral.conductor import Conductor
-from spiral.dispatch import build_packets, build_stage_execution_packet, build_stage_review_packets, build_ssh_ops_packet
+from spiral.dispatch import (
+    build_packets,
+    build_stage_execution_packet,
+    build_stage_review_packets,
+    build_ssh_ops_packet,
+    write_packets,
+)
 from spiral.revision_router import build_revision_routes
 from spiral.state import PipelineState
 from utils.stage_gate import check_stage
@@ -154,6 +161,38 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertTrue(packet["agent_md"].endswith("docs/AGENTS/method/AGENT.md"))
         self.assertTrue(packet["output_path"].endswith("knowledge/M2/M2S01_cross_domain_search.md"))
         self.assertIn("must not edit knowledge/", "\n".join(packet["main_agent_boundaries"]))
+
+    def test_stage_execution_packet_has_compact_launch_contract(self) -> None:
+        packet = build_stage_execution_packet(self.root, "M2S01")
+
+        self.assertEqual(packet["schema_version"], "dispatch.v2")
+        self.assertEqual(packet["project_root"], "project:.")
+        self.assertEqual(packet["context_policy"]["handoff_mode"], "packet_path_only")
+        self.assertIs(packet["context_policy"]["no_parent_context"], True)
+        self.assertTrue(any(path == "framework:docs/AGENTS/_shared/runtime_contract.md" for path in packet["shared_contracts"]))
+        self.assertTrue(resolve_packet_path(packet["role_spec"], packet, project_root=self.root).exists())
+        self.assertTrue(packet["agent_md"].startswith("framework:"))
+        self.assertTrue(packet["output_path"].startswith("project:"))
+        self.assertTrue(packet["role_spec"].endswith("docs/AGENTS/_specs/method.md"))
+        self.assertIn("Do not use the parent conversation", packet["subagent_launch_prompt"])
+        self.assertIn("Read and execute this AutoPaper2 dispatch packet", packet["subagent_launch_prompt"])
+        self.assertIn("Resolve project: refs", packet["subagent_launch_prompt"])
+        self.assertIn("Role spec:", packet["subagent_launch_prompt"])
+        self.assertIn("docs/AGENTS/_specs/method.md", packet["subagent_launch_prompt"])
+        self.assertLessEqual(len(packet["subagent_launch_prompt"]), packet["context_policy"]["max_initial_prompt_chars"])
+
+    def test_written_markdown_packet_exposes_only_compact_launch_prompt(self) -> None:
+        packet = build_stage_execution_packet(self.root, "M2S01")
+        paths = write_packets(self.root, [packet], fmt="markdown")
+
+        text = paths[0].read_text(encoding="utf-8")
+        self.assertIn("packet_path: `project:state/dispatch/", text)
+        self.assertIn("## Compact Launch Prompt", text)
+        self.assertIn("## Context Policy", text)
+        self.assertIn("handoff_mode: packet_path_only", text)
+        self.assertIn("role_spec:", text)
+        self.assertIn("docs/AGENTS/_specs/method.md", text)
+        self.assertNotIn("## Subagent Prompt", text)
 
     def test_ssh_ops_packet_targets_ssh_agent(self) -> None:
         (self.root / "config").mkdir(exist_ok=True)

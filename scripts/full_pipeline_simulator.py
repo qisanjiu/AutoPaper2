@@ -35,6 +35,7 @@ from spiral.project import AGENT_FOR_STAGE, GATE_STAGES, MODULE_STAGES, ProjectM
 from spiral.state import PipelineState
 from utils.file_guard import get_canonical_output_path
 from utils.gate_rubric import get_gate_rubric
+from scripts.context_budget import resolve_packet_path
 from scripts.state_manager import cmd_advance
 
 
@@ -295,7 +296,7 @@ def _write_stage_reviews(root: Path, stage: str, *, repair: bool = False) -> int
     if packets:
         write_packets(root, packets, fmt="markdown")
     for packet in packets:
-        out = Path(packet["output_path"])
+        out = resolve_packet_path(packet["output_path"], packet, project_root=root, framework_root=_framework_root)
         if stage == "M6S01" and out.name == "M6S01_internal_peer_review.md":
             _write(out, _internal_peer_review())
         elif repair:
@@ -313,7 +314,8 @@ def _write_gate_reviews(root: Path, gate_id: str) -> int:
     packets = build_gate_review_packets(root, gate_id)
     write_packets(root, packets, fmt="markdown")
     for packet in packets:
-        _write(Path(packet["output_path"]), _passing_review(packet.get("role", "Gate Review")))
+        out = resolve_packet_path(packet["output_path"], packet, project_root=root, framework_root=_framework_root)
+        _write(out, _passing_review(packet.get("role", "Gate Review")))
     _write(root / "knowledge" / "reviews" / f"{gate_id}_aggregate.md", _gate_aggregate_review(root, gate_id))
     return len(packets)
 

@@ -21,6 +21,13 @@ from .project import GATE_STAGES
 from .revision_router import build_revision_routes
 
 
+PATH_RESOLUTION = {
+    "project": "`project:<relative-path>` resolves from the project root. The packet path normally lives under `<project>/state/dispatch/`, so the project root can be recovered from the packet location.",
+    "framework": "`framework:<relative-path>` resolves from SPIRAL_FRAMEWORK_ROOT or the current AutoPaper2 framework root.",
+    "legacy": "Absolute paths are not required in dispatch packets; legacy absolute paths may be resolved only for backwards compatibility.",
+}
+
+
 M1S02_ROUND_REVIEW_OUTPUTS: dict[int, str] = {
     1: "knowledge/reviews/M1S02_round1_review.md",
     2: "knowledge/reviews/M1S02_round2_review.md",
@@ -78,6 +85,33 @@ SSH_OPS_BOUNDARIES = [
 ]
 
 
+LONG_CONTEXT_STAGES = {
+    "M3S01",
+    "M3S03",
+    "M4S03",
+    "M5S08",
+    "M5S09",
+    "M6S01",
+    "M6S05",
+}
+
+
+ROLE_SPEC_PATHS = {
+    "survey": "docs/AGENTS/_specs/survey.md",
+    "ideation": "docs/AGENTS/_specs/survey.md",
+    "method": "docs/AGENTS/_specs/method.md",
+    "experiment": "docs/AGENTS/_specs/experiment.md",
+    "analysis": "docs/AGENTS/_specs/analysis.md",
+    "writing": "docs/AGENTS/_specs/writing.md",
+    "submission": "docs/AGENTS/_specs/submission_rebuttal.md",
+    "rebuttal": "docs/AGENTS/_specs/submission_rebuttal.md",
+    "revision": "docs/AGENTS/_specs/submission_rebuttal.md",
+    "ssh": "docs/AGENTS/_specs/ops.md",
+    "build_verifier": "docs/AGENTS/_specs/ops.md",
+    "review": "docs/AGENTS/_specs/critic_reviews.md",
+}
+
+
 def _slug(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", text).strip("._-") or "task"
 
@@ -115,6 +149,258 @@ def _review_output_for_gate(root: Path, gate_id: str, critic: str) -> Path:
     return root / "knowledge" / "reviews" / f"{gate_id}_{critic}_review.md"
 
 
+def _framework_root() -> Path:
+    return Path(__file__).parent.parent.resolve()
+
+
+def _as_posix(path: Path) -> str:
+    return path.as_posix()
+
+
+def _path_ref(value: str | Path, project_root: Path, *, default_scope: str | None = None) -> str:
+    """Return a portable dispatch path reference.
+
+    Dispatch packets are durable project artifacts.  They must not bake in the
+    local server mount point; subagents resolve these refs at launch time.
+    """
+    text = str(value).strip()
+    if not text:
+        return ""
+    if text.startswith(("project:", "framework:")):
+        return text
+
+    path = Path(text)
+    project = Path(project_root).resolve()
+    framework = _framework_root()
+    if path.is_absolute():
+        resolved = path.resolve()
+        if default_scope == "framework":
+            try:
+                return f"framework:{_as_posix(resolved.relative_to(framework))}"
+            except ValueError:
+                pass
+        try:
+            return f"project:{_as_posix(resolved.relative_to(project))}"
+        except ValueError:
+            pass
+        try:
+            return f"framework:{_as_posix(resolved.relative_to(framework))}"
+        except ValueError:
+            pass
+        return text
+
+    rel = _as_posix(path)
+    if default_scope == "framework":
+        return f"framework:{rel}"
+    if default_scope == "project":
+        return f"project:{rel}"
+    if rel.startswith(("docs/", "skills/", ".claude/", "templates/", "scripts/")):
+        return f"framework:{rel}"
+    return f"project:{rel}"
+
+
+def _packet_path_ref(value: str | Path, project_root: Path) -> str:
+    text = str(value).strip()
+    if not text:
+        return ""
+    path = Path(text)
+    if not path.is_absolute():
+        return _path_ref(path, project_root)
+    resolved = path.resolve()
+    try:
+        return f"framework:{_as_posix(resolved.relative_to(_framework_root()))}"
+    except ValueError:
+        pass
+    try:
+        return f"project:{_as_posix(resolved.relative_to(Path(project_root).resolve()))}"
+    except ValueError:
+        pass
+    return path.name
+
+
+def _path_refs(values: list[str | Path], project_root: Path) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        ref = _path_ref(value, project_root)
+        if ref and ref not in seen:
+            out.append(ref)
+            seen.add(ref)
+    return out
+
+
+def _replace_root_fragments(text: str, project_root: Path) -> str:
+    project = str(Path(project_root).resolve())
+    framework = str(_framework_root())
+    replacements = (
+        (project + "/", "project:"),
+        (project, "project:."),
+        (framework + "/", "framework:"),
+        (framework, "framework:."),
+    )
+    out = text
+    for old, new in replacements:
+        out = out.replace(old, new)
+    return out
+
+
+_PATH_KEYS = {
+    "action_plan_path",
+    "agent_md",
+    "aggregate_output",
+    "framework_root",
+    "md_protocol",
+    "output_doc",
+    "output_path",
+    "packet_path",
+    "project_root",
+    "role_spec",
+    "source_action_plan",
+    "subject_output",
+}
+
+_PATH_LIST_KEYS = {
+    "evidence_paths",
+    "input_docs",
+    "shared_contracts",
+}
+
+
+def _portable_value(value: Any, project_root: Path, *, key: str = "") -> Any:
+    if isinstance(value, Path):
+        scope = "framework" if key in {"agent_md", "md_protocol", "role_spec", "framework_root"} else None
+        return _path_ref(value, project_root, default_scope=scope)
+    if isinstance(value, dict):
+        return {item_key: _portable_value(item_value, project_root, key=str(item_key)) for item_key, item_value in value.items()}
+    if isinstance(value, list):
+        if key in _PATH_LIST_KEYS:
+            return [_path_ref(item, project_root) if isinstance(item, (str, Path)) else item for item in value]
+        return [_portable_value(item, project_root, key=key) for item in value]
+    if isinstance(value, str):
+        if key in _PATH_KEYS or key.endswith(("_path", "_paths", "_doc", "_output", "_root")):
+            scope = "framework" if key in {"agent_md", "md_protocol", "role_spec", "framework_root"} else None
+            return _path_ref(value, project_root, default_scope=scope)
+        return _replace_root_fragments(value, project_root)
+    return value
+
+
+def _agent_sections_for(packet: dict[str, Any]) -> list[str]:
+    sections = ["identity", "boundaries"]
+    task_type = packet.get("task_type", "")
+    stage = str(packet.get("stage", "") or "")
+    if stage:
+        sections.append(stage)
+    if task_type in {"stage_review", "gate_review"}:
+        sections.extend(["review_protocol", "verdict_schema"])
+    if task_type == "revision_routing":
+        sections.append("revision_routing")
+    if packet.get("backtrack_advice"):
+        sections.append("backtrack_advice")
+    if packet.get("gate_rubric"):
+        sections.append("gate_rubric")
+    sections.append("context_recovery")
+    return sections
+
+
+def _task_objective(packet: dict[str, Any]) -> str:
+    task_type = packet.get("task_type", "")
+    role = packet.get("role", "subagent")
+    stage = packet.get("stage", "")
+    output = packet.get("output_path", "")
+    if task_type == "stage_execution":
+        return f"Execute stage {stage} as the {role} subagent and write the assigned stage output at {output}."
+    if task_type == "stage_review":
+        subject = packet.get("subject_output", "")
+        return f"Review {subject} for stage {stage} as {role} and write exactly one review file at {output}."
+    if task_type == "gate_review":
+        gate = packet.get("gate_id", "")
+        return f"Run the {gate} gate review as {role} and write exactly one critic review at {output}."
+    if task_type == "revision_routing":
+        return f"Route and record M6S05 revision execution using the script-generated routing plan, then write {output}."
+    if task_type == "ssh_ops":
+        op = packet.get("ssh_operation", "")
+        return f"Perform the SSH operation '{op}' within the AutoPaper2 SSH boundaries."
+    return f"Handle AutoPaper2 task {packet.get('task_id', '')} as {role}."
+
+
+def _context_policy(packet: dict[str, Any]) -> dict[str, Any]:
+    stage = str(packet.get("stage", "") or "")
+    task_type = str(packet.get("task_type", "") or "")
+    task_id = _slug(str(packet.get("task_id", "task")))
+    return {
+        "handoff_mode": "packet_path_only",
+        "no_parent_context": True,
+        "read_strategy": "read_packet_first_then_role_sections_then_needed_inputs",
+        "max_initial_prompt_chars": 1200,
+        "max_direct_file_read_chars": 50000,
+        "large_input_policy": "For large files or directories, inspect headings, manifests, file stats, indexes, or tails first; do not paste whole logs or papers into the active prompt.",
+        "directory_policy": "List/index directories before reading contained files; only open files needed for the assigned task.",
+        "resume_required": stage in LONG_CONTEXT_STAGES or task_type in {"revision_routing", "ssh_ops"},
+        "worklog_path": f"project:state/agent_runs/{task_id}.yaml",
+    }
+
+
+def _contract_paths(packet: dict[str, Any]) -> list[str]:
+    paths = ["framework:docs/AGENTS/_shared/runtime_contract.md"]
+    if packet.get("task_type") in {"stage_review", "gate_review"}:
+        paths.append("framework:docs/AGENTS/_shared/review_contract.md")
+    if packet.get("role") == "conductor":
+        paths.append("framework:docs/AGENTS/_shared/orchestrator_contract.md")
+    return paths
+
+
+def _role_spec_path(packet: dict[str, Any]) -> str:
+    task_type = str(packet.get("task_type", "") or "")
+    role = str(packet.get("role", "") or "")
+    if task_type in {"stage_review", "gate_review"}:
+        return "framework:docs/AGENTS/_specs/critic_reviews.md"
+    rel = ROLE_SPEC_PATHS.get(role, "")
+    return f"framework:{rel}" if rel else ""
+
+
+def _display_path(value: str | Path) -> str:
+    path = Path(value)
+    framework_root = Path(__file__).parent.parent.resolve()
+    try:
+        return str(path.relative_to(framework_root))
+    except ValueError:
+        return str(path)
+
+
+def render_compact_launch_prompt(packet: dict[str, Any], packet_path: str | Path | None = None) -> str:
+    """Return the only text the conductor should pass to a subagent."""
+    path = str(packet.get("packet_path") or packet_path or "<dispatch packet path>")
+    lines = [
+        "Read and execute this AutoPaper2 dispatch packet:",
+        path,
+        "",
+        f"Task: {packet.get('task_type', '')} / {packet.get('role', '')}",
+    ]
+    if packet.get("stage"):
+        lines.append(f"Stage: {packet['stage']}")
+    if packet.get("gate_id"):
+        lines.append(f"Gate: {packet['gate_id']}")
+    if packet.get("output_path"):
+        lines.append(f"Required output: {packet['output_path']}")
+    if packet.get("role_spec"):
+        lines.append(f"Role spec: {packet['role_spec']}")
+    lines.extend(
+        [
+            "",
+            "Do not use the parent conversation as task context.",
+            "Resolve project: refs from the packet project root; resolve framework: refs from SPIRAL_FRAMEWORK_ROOT or the current AutoPaper2 root.",
+            "First read the packet, then read the role instructions and input paths listed inside it.",
+            "Read files selectively according to the packet context_policy; do not paste whole large inputs into context.",
+            "Write only the requested output path and any explicitly allowed evidence/worklog paths.",
+        ]
+    )
+    policy = packet.get("context_policy") or {}
+    worklog = policy.get("worklog_path", "")
+    if policy.get("resume_required") and worklog:
+        lines.append(f"If context grows, update the worklog and ask the conductor to resume with the same packet: {worklog}")
+    return "\n".join(lines).strip() + "\n"
+
+
 def _packet(
     *,
     task_type: str,
@@ -130,15 +416,23 @@ def _packet(
         "task_id": task_id,
         "task_type": task_type,
         "delegation_required": task_type in DELEGATED_TASK_TYPES,
-        "project_root": str(project_root),
+        "project_root": "project:.",
+        "path_resolution": PATH_RESOLUTION,
         "role": role,
-        "agent_md": str(agent_md),
-        "input_docs": _as_path_list(input_docs),
-        "output_path": str(output_path) if output_path else "",
+        "agent_md": _path_ref(agent_md, project_root, default_scope="framework"),
+        "input_docs": _path_refs(input_docs, project_root),
+        "output_path": _path_ref(output_path, project_root, default_scope="project") if output_path else "",
         "main_agent_boundaries": MAIN_AGENT_BOUNDARIES,
     }
     if extra:
-        data.update(extra)
+        data.update(_portable_value(extra, project_root))
+    data.setdefault("schema_version", "dispatch.v2")
+    data.setdefault("task_objective", _task_objective(data))
+    data.setdefault("agent_sections", _agent_sections_for(data))
+    data.setdefault("context_policy", _context_policy(data))
+    data.setdefault("shared_contracts", _contract_paths(data))
+    data.setdefault("role_spec", _role_spec_path(data))
+    data.setdefault("subagent_launch_prompt", render_compact_launch_prompt(data))
     data["subagent_prompt"] = render_subagent_prompt(data)
     return data
 
@@ -453,7 +747,8 @@ def build_next_action_packets(project_root: str | Path) -> list[dict[str, Any]]:
             "task_id": _slug(f"control_{action_name or 'unknown'}"),
             "task_type": "control",
             "delegation_required": False,
-            "project_root": str(root),
+            "project_root": "project:.",
+            "path_resolution": PATH_RESOLUTION,
             "action": action_name,
             "reason": action.get("reason", ""),
             "suggested_cmd": action.get("suggested_cmd", ""),
@@ -484,7 +779,10 @@ def render_subagent_prompt(packet: dict[str, Any]) -> str:
     task_type = packet.get("task_type", "")
     role = packet.get("role", "")
     lines.append(f"You are the AutoPaper2 {role} subagent for task {packet.get('task_id')}.")
+    lines.append("Use this packet as the task source of truth; do not inherit or rely on the parent conversation.")
     lines.append("")
+    if packet.get("task_objective"):
+        lines.append(f"Objective: {packet['task_objective']}")
     lines.append(f"Task type: {task_type}")
     if packet.get("stage"):
         lines.append(f"Stage: {packet['stage']}")
@@ -500,6 +798,30 @@ def render_subagent_prompt(packet: dict[str, Any]) -> str:
     lines.append(f"Role instructions: {packet.get('agent_md')}")
     if packet.get("md_protocol"):
         lines.append(f"Markdown protocol: {packet.get('md_protocol')}")
+    if packet.get("shared_contracts"):
+        lines.append("Shared contracts:")
+        for path in packet.get("shared_contracts", []):
+            lines.append(f"- {path}")
+    if packet.get("role_spec"):
+        lines.append(f"Role spec: {packet.get('role_spec')}")
+    sections = packet.get("agent_sections", [])
+    if sections:
+        lines.append(f"Relevant role-instruction sections: {', '.join(sections)}")
+    policy = packet.get("context_policy") or {}
+    if policy:
+        lines.append("")
+        lines.append("Context policy:")
+        for key in (
+            "handoff_mode",
+            "read_strategy",
+            "max_direct_file_read_chars",
+            "large_input_policy",
+            "directory_policy",
+            "worklog_path",
+        ):
+            value = policy.get(key, "")
+            if value != "":
+                lines.append(f"- {key}: {value}")
     lines.append("")
     lines.append("Input paths (read directly; do not rely on summaries):")
     for path in packet.get("input_docs", []):
@@ -598,10 +920,16 @@ def packet_to_markdown(packet: dict[str, Any]) -> str:
     lines = [
         f"# AutoPaper2 Dispatch Packet: {packet.get('task_id')}",
         "",
+        "This file is the durable task contract. The conductor should pass only the compact launch prompt below to the subagent, not the parent conversation or upstream document contents.",
+        "",
         f"- task_type: {packet.get('task_type', '')}",
+        f"- schema_version: {packet.get('schema_version', '')}",
         f"- delegation_required: {packet.get('delegation_required', False)}",
         f"- project_root: `{packet.get('project_root', '')}`",
+        f"- agent_md: `{packet.get('agent_md', '')}`",
     ]
+    if packet.get("packet_path"):
+        lines.append(f"- packet_path: `{packet['packet_path']}`")
     if packet.get("role"):
         lines.append(f"- role: `{packet['role']}`")
     if packet.get("stage"):
@@ -612,7 +940,64 @@ def packet_to_markdown(packet: dict[str, Any]) -> str:
         lines.append(f"- ssh_operation: `{packet['ssh_operation']}`")
     if packet.get("output_path"):
         lines.append(f"- output_path: `{packet['output_path']}`")
-    lines.extend(["", "## Subagent Prompt", "", "```text", packet.get("subagent_prompt", "").rstrip(), "```", ""])
+    if packet.get("task_objective"):
+        lines.append(f"- task_objective: {packet['task_objective']}")
+    if packet.get("shared_contracts"):
+        lines.append(f"- shared_contracts: `{', '.join(packet['shared_contracts'])}`")
+    if packet.get("role_spec"):
+        lines.append(f"- role_spec: `{packet['role_spec']}`")
+    if packet.get("agent_sections"):
+        lines.append(f"- agent_sections: `{', '.join(packet['agent_sections'])}`")
+    resolution = packet.get("path_resolution") or PATH_RESOLUTION
+    if resolution:
+        lines.extend(["", "## Path Resolution", ""])
+        for key, value in resolution.items():
+            lines.append(f"- {key}: {value}")
+    lines.extend(
+        [
+            "",
+            "## Compact Launch Prompt",
+            "",
+            "Pass only this prompt plus the packet path to the subagent:",
+            "",
+            "```text",
+            packet.get("subagent_launch_prompt", render_compact_launch_prompt(packet)).rstrip(),
+            "```",
+            "",
+            "## Context Policy",
+            "",
+        ]
+    )
+    policy = packet.get("context_policy") or {}
+    for key, value in policy.items():
+        lines.append(f"- {key}: {value}")
+    lines.extend(["", "## Input Paths", ""])
+    for path in packet.get("input_docs", []):
+        lines.append(f"- `{path}`")
+    if packet.get("subject_output"):
+        lines.append(f"- subject_output: `{packet['subject_output']}`")
+    if packet.get("md_protocol"):
+        lines.append(f"- md_protocol: `{packet['md_protocol']}`")
+    if packet.get("gate_rubric"):
+        lines.extend(["", "## Gate Rubric", "", packet["gate_rubric"].rstrip()])
+    advice = packet.get("backtrack_advice") or {}
+    if advice:
+        lines.extend(["", "## Backtrack Advice", ""])
+        for key, value in advice.items():
+            lines.append(f"- {key}: {value}")
+    routing = packet.get("revision_routing") or {}
+    if routing:
+        lines.extend(["", "## Revision Routing", "", "```json", json.dumps(routing, ensure_ascii=False, indent=2), "```"])
+    lines.extend(["", "## Boundaries", ""])
+    for rule in packet.get("subagent_boundaries", []):
+        lines.append(f"- {rule}")
+    for rule in packet.get("main_agent_boundaries", []):
+        lines.append(f"- {rule}")
+    after = packet.get("after_completion", [])
+    if after:
+        lines.extend(["", "## After Completion", ""])
+        for item in after:
+            lines.append(f"- {item}")
     return "\n".join(lines)
 
 
@@ -636,9 +1021,12 @@ def write_packets(
 
     for packet in packets:
         path = target_dir / f"{timestamp}_{_slug(str(packet.get('task_id', 'task')))}.{suffix}"
+        written_packet = dict(packet)
+        written_packet["packet_path"] = _packet_path_ref(path, root)
+        written_packet["subagent_launch_prompt"] = render_compact_launch_prompt(written_packet, path)
         if fmt == "json":
-            path.write_text(json.dumps(packet, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            path.write_text(json.dumps(written_packet, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         else:
-            path.write_text(packet_to_markdown(packet), encoding="utf-8")
+            path.write_text(packet_to_markdown(written_packet), encoding="utf-8")
         paths.append(path)
     return paths

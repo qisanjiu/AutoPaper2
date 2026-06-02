@@ -1669,15 +1669,32 @@ def cmd_dispatch(
     actual subagent delegation.  They make the required agent role, input paths,
     output path, and main-agent boundaries explicit.
     """
-    from spiral.dispatch import build_packets, packet_to_markdown, packets_to_json, write_packets
+    from spiral.dispatch import (
+        build_packets,
+        packet_to_markdown,
+        packets_to_json,
+        render_compact_launch_prompt,
+        write_packets,
+    )
 
     packets = build_packets(project_dir, scope, target or None)
     if write:
         paths = write_packets(project_dir, packets, fmt=fmt, out_dir=out_dir or None)
         print("[DISPATCH] Wrote subagent packet(s):")
-        for path in paths:
-            print(f"  {path}")
-        print("  Pass these packet paths to the matching subagent. Main agent must not write stage/review content directly.")
+        for packet, path in zip(packets, paths):
+            try:
+                display_path = path.resolve().relative_to(Path.cwd().resolve())
+            except ValueError:
+                display_path = Path(os.path.relpath(path.resolve(), Path.cwd().resolve()))
+            print(f"  {display_path}")
+            print(f"  Context preflight: python scripts/context_budget.py --packet {display_path}")
+            print(f"  Launch prompt extractor: python scripts/subagent_launch_prompt.py --packet {display_path}")
+            print("  Compact subagent launch prompt:")
+            for line in render_compact_launch_prompt(packet, display_path).rstrip().splitlines():
+                print(f"    {line}")
+        print("  Pass only the compact launch prompt/packet path to the matching subagent.")
+        print("  Do not paste the parent conversation or upstream document contents into the subagent prompt.")
+        print("  Main agent must not write stage/review content directly.")
         return
 
     if fmt == "json":
