@@ -271,6 +271,86 @@ class TestM3StageGate(unittest.TestCase):
                 encoding="utf-8",
             )
 
+    def _write_m3s02_files(
+        self,
+        *,
+        include_lock: bool = True,
+        m3s03_eligible: bool = True,
+        verification_verdict: str = "verified_match",
+        caveat_waiver_reason: str = "",
+        comparison_scope_limit: str = "",
+        relative_deviation: float = 0.0,
+        checkpoint_required: bool = False,
+        checkpoint_verified: bool = False,
+    ) -> None:
+        for rel in (
+            "knowledge/M3",
+            "knowledge/reviews",
+            "experiments/baselines/baseline_1",
+        ):
+            (self.root / rel).mkdir(parents=True, exist_ok=True)
+
+        (self.root / "knowledge" / "M3" / "M3S02_baseline_lock.md").write_text(
+            "# M3S02 Baseline Lock\n\n"
+            "### Baseline 1\n"
+            "Verification path: verify-local-existing.\n"
+            f"verification_verdict: {verification_verdict}.\n"
+            "Paper value: 0.75; local value: 0.75.\n\n"
+            "## Smoke Test\n"
+            "Smoke Test passed with correct metric computation and checkpoint loading status.\n\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "baselines" / "baseline_1" / "metric_contract.yaml").write_text(
+            "baseline_id: baseline_1\n"
+            f"verification_verdict: {verification_verdict}\n"
+            "metrics:\n"
+            "  primary:\n"
+            "    key: accuracy\n"
+            "    value: 0.75\n",
+            encoding="utf-8",
+        )
+        if include_lock:
+            (self.root / "experiments" / "baselines" / "baseline_lock.yaml").write_text(
+                "schema_version: 1\n"
+                "baseline_code_immutable_after_lock: true\n"
+                "baselines:\n"
+                "  - baseline_id: baseline_1\n"
+                "    name: Demo baseline\n"
+                "    comparison_role: primary\n"
+                "    source: verify-local-existing\n"
+                "    implementation_path: experiments/baselines/baseline_1/\n"
+                "    metric_contract: experiments/baselines/baseline_1/metric_contract.yaml\n"
+                "    dataset: demo\n"
+                "    split: test\n"
+                "    metric: accuracy\n"
+                "    paper_value: 0.75\n"
+                "    local_value: 0.75\n"
+                f"    relative_deviation: {relative_deviation}\n"
+                f"    verification_verdict: {verification_verdict}\n"
+                f"    m3s03_eligible: {'true' if m3s03_eligible else 'false'}\n"
+                f"    caveat_waiver_reason: \"{caveat_waiver_reason}\"\n"
+                f"    comparison_scope_limit: \"{comparison_scope_limit}\"\n"
+                "    checkpoint:\n"
+                f"      required: {'true' if checkpoint_required else 'false'}\n"
+                f"      status: {'verified_loadable' if checkpoint_verified else 'not_applicable'}\n"
+                f"      verified_loadable: {'true' if checkpoint_verified else 'false'}\n"
+                "m3s03_contract:\n"
+                "  primary_baseline_id: baseline_1\n"
+                "  metric_contract: experiments/baselines/baseline_1/metric_contract.yaml\n"
+                "  dataset: demo\n"
+                "  split: test\n"
+                "  metric: accuracy\n",
+                encoding="utf-8",
+            )
+        (self.root / "knowledge" / "reviews" / "M3S02_baseline_result_review.md").write_text(
+            "# M3S02 Baseline Result Review\n\nVerdict: PASS\n",
+            encoding="utf-8",
+        )
+        (self.root / "knowledge" / "reviews" / "M3S02_baseline_lock_audit.md").write_text(
+            "# M3S02 Baseline Lock Audit\n\nVerdict: PASS\n",
+            encoding="utf-8",
+        )
+
     def _write_m3s04_report(self, *, decision: str = "KEEP", complete: bool = True) -> None:
         (self.root / "knowledge" / "M3").mkdir(parents=True, exist_ok=True)
         if not complete:
@@ -651,6 +731,51 @@ class TestM3StageGate(unittest.TestCase):
         self.assertTrue(ok, "\n".join(messages))
         self.assertTrue(any("implementation doc records ssh/remote execution mode" in message for message in messages), messages)
         self.assertTrue(any("SSH mode ledger includes remote execution/rsync evidence" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_accepts_baseline_lock_manifest(self) -> None:
+        self._write_m3s02_files()
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertTrue(ok, "\n".join(messages))
+        self.assertTrue(any("primary baseline(s) eligible for M3S03" in message for message in messages), messages)
+        self.assertTrue(any("stage review m3_baseline_lock_audit PASS" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_rejects_alternate_review_copy(self) -> None:
+        self._write_m3s02_files()
+        (self.root / "knowledge" / "reviews" / "M3S02_baseline_result_review_revised.md").write_text(
+            "# M3S02 Baseline Result Review\n\nVerdict: PASS\n",
+            encoding="utf-8",
+        )
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("alternate stage review file" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_requires_baseline_lock_manifest(self) -> None:
+        self._write_m3s02_files(include_lock=False)
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("baseline_lock.yaml not found" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_requires_primary_eligible_baseline(self) -> None:
+        self._write_m3s02_files(m3s03_eligible=False)
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("primary baseline must set m3s03_eligible" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_requires_caveat_waiver_for_trusted_baseline(self) -> None:
+        self._write_m3s02_files(verification_verdict="trusted_with_caveats")
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("trusted_with_caveats requires caveat_waiver_reason" in message for message in messages), messages)
 
     def test_m3s03_stage_gate_accepts_resource_monitor(self) -> None:
         self._write_m3s03_files(include_monitor=True, multi_gpu=True)

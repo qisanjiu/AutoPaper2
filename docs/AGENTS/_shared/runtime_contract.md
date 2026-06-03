@@ -17,6 +17,12 @@ This contract applies to every delegated subagent.
 - Executors must not write review verdicts and must not call `state_manager.py advance`.
 - If a required input is missing or blocked, write a bounded blocked record at the assigned output path with evidence paths and next action.
 
+## Output Write Policy
+- The packet `output_path` is the only canonical Markdown output for the assigned task.
+- On backtrack, re-execution, revision, or re-review, update or overwrite the same `output_path` in place.
+- Do not create sibling Markdown copies with suffixes such as `_v2`, `_new`, `_revised`, `_revision`, `_backtrack`, `_fixed`, `_updated`, `_draft`, or `_copy`.
+- Historical outputs may be read as audit evidence only when the packet allows it; they must not become new canonical outputs.
+
 ## Reviewer Boundary
 - Reviewers do not modify subject outputs. They write exactly one review file at packet `output_path`.
 - Reviewers read original paths directly and must not rely on executor summaries.

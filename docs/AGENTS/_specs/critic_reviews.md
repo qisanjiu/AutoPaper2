@@ -56,6 +56,9 @@ Check M3S01 dataset first, env lock, sandbox profile, resource plan, hardware pr
 ## m3_baseline_result_review
 Check M3S02 baseline verification, checkpoint acquisition/loadability, metric contract, smoke run, fairness, paper/history deviation, and locked comparator immutability.
 
+## m3_baseline_lock_audit
+Audit whether M3S02 is safe to unlock M3S03. Require a structured baseline lock manifest, at least one primary comparator with `m3s03_eligible: true`, loadable checkpoints when applicable, acceptable paper/local metric deviation or an explicit waiver, immutable baseline code after lock, and a clearly bounded comparison scope. PASS only if the locked comparator can be used by M3S03 without changing baseline assumptions.
+
 ## m3_main_result_review
 Check M3S03 run contract, results.tsv, logs/configs/seeds, baseline comparison, resource utilization, watchdog decisions, negative attempts, and evidence ladder.
 
@@ -64,6 +67,9 @@ Check M4S01 consolidation of main/negative/unexpected findings, claim candidates
 
 ## m4_analysis_design_review
 Check M4S02 analysis slices: how/where/why coverage, ablation one-factor discipline, baseline inclusion, literature basis, efficiency need, executable commands/evidence plan.
+
+## m4_execution_readiness_review
+Audit whether M4S02 can be executed by M4S03 without redesign. Require `experiments/configs/m4_task_queue.yaml`, concrete `Ana-*` task ids matching the design document, commands or blocked reasons, dependencies, resource requirements, baseline inclusion/fairness keys, expected artifacts, success criteria, and no unresolved design-to-execution gaps.
 
 ## m4_analysis_execution_review
 Check M4S03 executed planned slices, `analysis_results.tsv`, baseline rows, resource monitor, sandbox/container record, artifacts, abnormal triage, no hidden negative results or secret leakage.

@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from utils.file_guard import get_canonical_output_path
+from utils.file_guard import ALTERNATE_OUTPUT_SUFFIXES, get_canonical_output_path
 from utils.gate_rubric import render_gate_rubric_block
 
 from .conductor import Conductor, GATE_CRITICS
@@ -340,6 +340,19 @@ def _context_policy(packet: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _output_write_policy(output_ref: str) -> dict[str, Any]:
+    if not output_ref:
+        return {}
+    return {
+        "mode": "canonical_in_place",
+        "target_path": output_ref,
+        "overwrite_existing": True,
+        "if_target_exists": "Update or overwrite this exact file in place; do not create a sibling Markdown file.",
+        "forbid_alternate_outputs": True,
+        "forbidden_suffixes": list(ALTERNATE_OUTPUT_SUFFIXES),
+    }
+
+
 def _contract_paths(packet: dict[str, Any]) -> list[str]:
     paths = ["framework:docs/AGENTS/_shared/runtime_contract.md"]
     if packet.get("task_type") in {"stage_review", "gate_review"}:
@@ -392,6 +405,7 @@ def render_compact_launch_prompt(packet: dict[str, Any], packet_path: str | Path
             "First read the packet, then read the role instructions and input paths listed inside it.",
             "Read files selectively according to the packet context_policy; do not paste whole large inputs into context.",
             "Write only the requested output path and any explicitly allowed evidence/worklog paths.",
+            "If the requested output already exists, update or overwrite that exact canonical file in place; do not create v2/new/revised/backtrack Markdown copies.",
         ]
     )
     policy = packet.get("context_policy") or {}
@@ -424,6 +438,8 @@ def _packet(
         "output_path": _path_ref(output_path, project_root, default_scope="project") if output_path else "",
         "main_agent_boundaries": MAIN_AGENT_BOUNDARIES,
     }
+    if data["output_path"]:
+        data["output_write_policy"] = _output_write_policy(data["output_path"])
     if extra:
         data.update(_portable_value(extra, project_root))
     data.setdefault("schema_version", "dispatch.v2")
@@ -457,6 +473,7 @@ def build_stage_execution_packet(project_root: str | Path, stage: str | None = N
         "subagent_boundaries": EXECUTOR_BOUNDARIES,
         "after_completion": [
             f"Ensure output exists: {output_path}",
+            "If this is a re-execution/backtrack and the output already existed, confirm the same canonical file was updated in place.",
             "Return changed paths and a concise completion summary to the conductor.",
             "Do not call state_manager.py advance from inside the executor subagent.",
         ],
@@ -508,6 +525,7 @@ def build_m6s05_revision_routing_packet(project_root: str | Path) -> dict[str, A
             "after_completion": [
                 "Run or delegate the routed target-stage work before final M6S05 reporting.",
                 f"Ensure execution record exists only after evidence is available: {output_path}",
+                "If the execution record already existed, confirm the same canonical file was updated in place.",
                 "Return routed item statuses, evidence paths, and the execution-record path to the conductor.",
                 "Do not call state_manager.py advance from inside the revision subagent.",
             ],
@@ -541,6 +559,13 @@ def build_stage_review_packets(project_root: str | Path, stage: str) -> list[dic
                 root / "experiments" / "requirements.txt",
             ]
         )
+    if stage == "M3S02":
+        extra_expected.extend(
+            [
+                root / "experiments" / "baselines" / "baseline_lock.yaml",
+                root / "experiments" / "baselines",
+            ]
+        )
     if stage == "M3S03":
         extra_expected.extend(
             [
@@ -548,6 +573,20 @@ def build_stage_review_packets(project_root: str | Path, stage: str) -> list[dic
                 root / "experiments" / "runs",
                 root / "experiments" / "configs" / "resource_plan.yaml",
                 root / "experiments" / "logs" / "runtime_events.jsonl",
+            ]
+        )
+    if stage in {"M4S02", "M4S03"}:
+        extra_expected.extend(
+            [
+                root / "experiments" / "configs" / "m4_task_queue.yaml",
+            ]
+        )
+    if stage == "M4S03":
+        extra_expected.extend(
+            [
+                root / "experiments" / "analysis_results.tsv",
+                root / "experiments" / "configs" / "m4_task_allocation.yaml",
+                root / "experiments" / "artifacts" / "analysis_experiment",
             ]
         )
 
@@ -576,6 +615,7 @@ def build_stage_review_packets(project_root: str | Path, stage: str) -> list[dic
                     "subagent_boundaries": REVIEWER_BOUNDARIES,
                     "after_completion": [
                         f"Ensure review exists: {output}",
+                        "If this review already existed, confirm the same canonical review file was updated in place.",
                         "Return verdict and the review path to the conductor.",
                     ],
                 },
@@ -631,6 +671,7 @@ def _build_m1s02_round_review_packets(root: Path, conductor: Conductor) -> list[
                     "subagent_boundaries": REVIEWER_BOUNDARIES,
                     "after_completion": [
                         f"Ensure round review exists: {output}",
+                        "If this round review already existed, confirm the same canonical review file was updated in place.",
                         "Return verdict and the review path to the conductor.",
                     ],
                 },
@@ -685,6 +726,7 @@ def build_gate_review_packets(
                     "subagent_boundaries": REVIEWER_BOUNDARIES,
                     "after_completion": [
                         f"Ensure gate critic review exists: {output}",
+                        "If this gate critic review already existed, confirm the same canonical review file was updated in place.",
                         "Return verdict and the review path to the conductor.",
                         f"The conductor aggregates all critic reviews into {aggregate_output}.",
                         "The aggregate review must include the configured Rubric Results table before advancement.",
@@ -831,6 +873,20 @@ def render_subagent_prompt(packet: dict[str, Any]) -> str:
     if packet.get("output_path"):
         lines.append("")
         lines.append(f"Required output path: {packet['output_path']}")
+    write_policy = packet.get("output_write_policy") or {}
+    if write_policy:
+        lines.append("Output write policy:")
+        for key in (
+            "mode",
+            "target_path",
+            "overwrite_existing",
+            "if_target_exists",
+            "forbid_alternate_outputs",
+            "forbidden_suffixes",
+        ):
+            value = write_policy.get(key, "")
+            if value != "":
+                lines.append(f"- {key}: {value}")
     if packet.get("aggregate_output"):
         lines.append(f"Gate aggregate path for conductor: {packet['aggregate_output']}")
     if packet.get("gate_rubric"):
@@ -942,6 +998,8 @@ def packet_to_markdown(packet: dict[str, Any]) -> str:
         lines.append(f"- output_path: `{packet['output_path']}`")
     if packet.get("task_objective"):
         lines.append(f"- task_objective: {packet['task_objective']}")
+    if packet.get("output_write_policy"):
+        lines.append(f"- output_write_policy: `{json.dumps(packet['output_write_policy'], ensure_ascii=False)}`")
     if packet.get("shared_contracts"):
         lines.append(f"- shared_contracts: `{', '.join(packet['shared_contracts'])}`")
     if packet.get("role_spec"):

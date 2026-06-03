@@ -139,6 +139,7 @@ STAGE_REVIEW_OUTPUTS: dict[str, dict[str, str]] = {
     },
     "M3S02": {
         "m3_baseline_result_review": "knowledge/reviews/M3S02_baseline_result_review.md",
+        "m3_baseline_lock_audit": "knowledge/reviews/M3S02_baseline_lock_audit.md",
     },
     "M3S03": {
         "m3_main_result_review": "knowledge/reviews/M3S03_main_result_review.md",
@@ -148,6 +149,7 @@ STAGE_REVIEW_OUTPUTS: dict[str, dict[str, str]] = {
     },
     "M4S02": {
         "m4_analysis_design_review": "knowledge/reviews/M4S02_analysis_design_review.md",
+        "m4_execution_readiness_review": "knowledge/reviews/M4S02_execution_readiness_review.md",
     },
     "M4S03": {
         "m4_analysis_execution_review": "knowledge/reviews/M4S03_analysis_execution_review.md",

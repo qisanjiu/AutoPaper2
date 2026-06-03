@@ -3,7 +3,7 @@
 > **Stage**: M3S02
 > **Agent**: Experiment Agent
 > **输入**: `knowledge/M3/M3S01_implementation.md`, `knowledge/M2/M2S05_experiment_setup.md` 或等价实验计划, `knowledge/M1/M1S02_literature_deepdive.md`
-> **输出**: `knowledge/M3/M3S02_baseline_lock.md` + `experiments/baselines/*/metric_contract.yaml`
+> **输出**: `knowledge/M3/M3S02_baseline_lock.md` + `experiments/baselines/*/metric_contract.yaml` + `experiments/baselines/baseline_lock.yaml`
 >
 > **审查重点**: baseline 本地实验结果、metric contract、与论文/历史记录的偏差、smoke test 是否通过
 
@@ -132,3 +132,50 @@ verification_verdict: "..."
 - **Smoke test 是否通过**: ...
 - **已知的环境差异**: ...
 - **建议的 M3S03 Run Contract 中的比较基准**: ...
+
+---
+
+## 7. Baseline Lock Manifest（必须）
+
+必须同步写入 `experiments/baselines/baseline_lock.yaml`。该文件是 M3S03 的准入契约；没有 primary 且 `m3s03_eligible: true` 的 baseline，不得进入 M3S03。
+
+```yaml
+schema_version: 1
+baseline_code_immutable_after_lock: true
+baselines:
+  - baseline_id: baseline_1
+    name: "..."
+    comparison_role: primary
+    source: official_code / pip_package / reimplementation / imported_project
+    implementation_path: experiments/baselines/baseline_1/
+    metric_contract: experiments/baselines/baseline_1/metric_contract.yaml
+    dataset: "..."
+    split: "..."
+    metric: "accuracy"
+    paper_value: 0.0
+    local_value: 0.0
+    relative_deviation: 0.0
+    verification_verdict: verified_match / verified_close / trusted_with_caveats
+    m3s03_eligible: true
+    caveat_waiver_reason: ""
+    comparison_scope_limit: ""
+    checkpoint:
+      required: true
+      source_url: "..."
+      local_path: experiments/baselines/baseline_1/checkpoints/model.pth
+      checksum: "sha256:..."
+      verified_loadable: true
+    smoke_test:
+      command: "..."
+      status: pass
+      log_path: experiments/baselines/baseline_1/logs/smoke_test.log
+m3s03_contract:
+  primary_baseline_id: baseline_1
+  metric_contract: experiments/baselines/baseline_1/metric_contract.yaml
+  dataset: "..."
+  split: "..."
+  metric: "accuracy"
+  run_contract_note: "M3S03 must compare against this locked baseline without changing baseline code, split, metric, or checkpoint."
+```
+
+`trusted_with_caveats` 只有在 `caveat_waiver_reason` 和 `comparison_scope_limit` 都明确时才可进入 M3S03。若 baseline 依赖 checkpoint，`checkpoint.verified_loadable` 必须为 `true`。

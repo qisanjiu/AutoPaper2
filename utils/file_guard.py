@@ -18,6 +18,28 @@ ALLOWED_EXTRA_STAGE_OUTPUTS = {
     "M6S04": {"M6S04_action_plan.md"},
 }
 
+ALTERNATE_OUTPUT_SUFFIXES = (
+    "_v2",
+    "-v2",
+    ".v2",
+    "_new",
+    "-new",
+    "_revised",
+    "-revised",
+    "_revision",
+    "-revision",
+    "_backtrack",
+    "-backtrack",
+    "_fixed",
+    "-fixed",
+    "_updated",
+    "-updated",
+    "_draft",
+    "-draft",
+    "_copy",
+    "-copy",
+)
+
 
 def _get_canonical_name(stage: str) -> str:
     """Map stage to canonical output filename (without extension)."""
@@ -72,6 +94,26 @@ def get_canonical_output_path(project_root: str | Path, stage: str) -> Path:
     mod = stage[:2]
     canonical = _get_canonical_name(stage)
     return root / "knowledge" / mod / f"{stage}_{canonical}.md"
+
+
+def find_alternate_outputs(directory: str | Path, canonical_name: str) -> list[Path]:
+    """Find suffixed Markdown copies that should have been in-place edits."""
+    base_dir = Path(directory)
+    if not base_dir.exists():
+        return []
+    canonical = Path(canonical_name)
+    stem = canonical.stem
+    alternates: list[Path] = []
+    for candidate in base_dir.glob(f"{stem}*.md"):
+        if candidate.name == canonical.name:
+            continue
+        suffix = candidate.stem[len(stem):].lower()
+        if suffix and (
+            suffix.startswith(("_", "-", "."))
+            or any(marker in suffix for marker in ALTERNATE_OUTPUT_SUFFIXES)
+        ):
+            alternates.append(candidate)
+    return sorted(alternates)
 
 
 def validate_stage_output(
@@ -131,7 +173,9 @@ def check_single_file_principle(
         return False, (
             f"Single file principle violated: found unexpected files for {stage}:\n"
             f"  {', '.join(names)}\n"
-            f"Allowed files: {', '.join(sorted(allowed_names))}"
+            f"Allowed files: {', '.join(sorted(allowed_names))}\n"
+            "Backtrack/revision work must update the canonical original file in place; "
+            "do not create v2/new/revised/backtrack Markdown copies."
         )
     return True, "Single file principle: OK"
 

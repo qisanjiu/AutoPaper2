@@ -20,6 +20,7 @@ from spiral.verdict_parser import (
     extract_m3_repair_field_value,
     is_valid_rebuild_mode,
 )
+from utils.file_guard import find_alternate_outputs
 
 _STAGE_REVIEW_REQUIREMENTS: dict[str, dict[str, str]] = {
     "M2S01": {
@@ -45,6 +46,7 @@ _STAGE_REVIEW_REQUIREMENTS: dict[str, dict[str, str]] = {
     },
     "M3S02": {
         "m3_baseline_result_review": "knowledge/reviews/M3S02_baseline_result_review.md",
+        "m3_baseline_lock_audit": "knowledge/reviews/M3S02_baseline_lock_audit.md",
     },
     "M3S03": {
         "m3_main_result_review": "knowledge/reviews/M3S03_main_result_review.md",
@@ -54,6 +56,7 @@ _STAGE_REVIEW_REQUIREMENTS: dict[str, dict[str, str]] = {
     },
     "M4S02": {
         "m4_analysis_design_review": "knowledge/reviews/M4S02_analysis_design_review.md",
+        "m4_execution_readiness_review": "knowledge/reviews/M4S02_execution_readiness_review.md",
     },
     "M4S03": {
         "m4_analysis_execution_review": "knowledge/reviews/M4S03_analysis_execution_review.md",
@@ -746,6 +749,348 @@ def _check_m6s06_item_resolution(root: Path) -> tuple[bool, list[str]]:
 
 def _count_exp_ids(text: str) -> int:
     return len(set(re.findall(r"\bExp-[A-Za-z0-9_-]+\b", text, flags=re.IGNORECASE)))
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "yes", "y", "1", "pass", "passed", "ok", "eligible", "是", "已验证"}
+    return False
+
+
+def _parse_floatish(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    is_percent = text.endswith("%")
+    text = text.rstrip("%").strip()
+    try:
+        parsed = float(text)
+    except ValueError:
+        return None
+    return parsed / 100.0 if is_percent else parsed
+
+
+def _load_yaml_mapping(path: Path) -> dict[str, Any]:
+    import yaml
+
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return data if isinstance(data, dict) else {}
+
+
+def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Path]) -> tuple[bool, list[str]]:
+    """Validate the structured M3S02 baseline lock manifest.
+
+    The prose baseline report is useful, but M3S03 needs a deterministic
+    machine-readable contract so it cannot silently move ahead with an
+    unfinished or non-comparable baseline.
+    """
+    lock = root / "experiments" / "baselines" / "baseline_lock.yaml"
+    messages: list[str] = []
+    ok = True
+
+    if not lock.exists():
+        return False, ["[FAIL] M3S02: experiments/baselines/baseline_lock.yaml not found"]
+
+    try:
+        data = _load_yaml_mapping(lock)
+    except Exception as exc:
+        return False, [f"[FAIL] M3S02: baseline_lock.yaml unreadable: {exc}"]
+
+    if not data:
+        return False, ["[FAIL] M3S02: baseline_lock.yaml must contain a mapping"]
+
+    baselines = data.get("baselines")
+    if not isinstance(baselines, list) or not baselines:
+        return False, ["[FAIL] M3S02: baseline_lock.yaml missing nonempty baselines list"]
+
+    messages.append(f"[PASS] M3S02: baseline_lock.yaml lists {len(baselines)} baseline(s)")
+
+    immutable = data.get("baseline_code_immutable_after_lock", data.get("immutable_after_lock"))
+    if not _truthy(immutable):
+        messages.append("[FAIL] M3S02: baseline_lock.yaml must set baseline_code_immutable_after_lock: true")
+        ok = False
+    else:
+        messages.append("[PASS] M3S02: baseline code immutable after lock")
+
+    contract_rel_paths = {
+        str(path.relative_to(root)).replace("\\", "/")
+        for path in baseline_contracts
+        if path.exists()
+    }
+    primary_eligible = 0
+    seen_primary_ids: list[str] = []
+
+    for index, raw in enumerate(baselines, start=1):
+        if not isinstance(raw, dict):
+            messages.append(f"[FAIL] M3S02: baseline_lock baselines[{index}] must be a mapping")
+            ok = False
+            continue
+
+        baseline_id = str(raw.get("baseline_id") or raw.get("id") or raw.get("name") or f"baseline_{index}").strip()
+        label = f"M3S02 baseline_lock[{baseline_id}]"
+        role = str(raw.get("comparison_role") or raw.get("role") or "").strip().lower()
+        eligible = _truthy(raw.get("m3s03_eligible"))
+        verdict = str(raw.get("verification_verdict") or "").strip().lower()
+        waiver = str(raw.get("caveat_waiver_reason") or raw.get("waiver_reason") or "").strip()
+        scope_limit = str(raw.get("comparison_scope_limit") or raw.get("scope_limit") or "").strip()
+
+        if "primary" in role:
+            seen_primary_ids.append(baseline_id)
+            if eligible:
+                primary_eligible += 1
+
+        for field in ("dataset", "split"):
+            if not str(raw.get(field, "")).strip():
+                messages.append(f"[FAIL] {label}: missing {field}")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: includes {field}")
+
+        primary_metric = {}
+        metrics = raw.get("metrics")
+        if isinstance(metrics, dict):
+            primary_metric = metrics.get("primary") or {}
+        metric_key = raw.get("metric") or (primary_metric.get("key") if isinstance(primary_metric, dict) else "")
+        local_value = raw.get("local_value", raw.get("value", primary_metric.get("value") if isinstance(primary_metric, dict) else None))
+        if not str(metric_key).strip():
+            messages.append(f"[FAIL] {label}: missing primary metric key")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: includes primary metric key")
+        if local_value is None or str(local_value).strip() == "":
+            messages.append(f"[FAIL] {label}: missing local baseline metric value")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: includes local baseline metric value")
+
+        contract_ref = str(raw.get("metric_contract") or raw.get("metric_contract_path") or raw.get("contract_path") or "").strip()
+        if not contract_ref:
+            messages.append(f"[FAIL] {label}: missing metric_contract path")
+            ok = False
+        else:
+            contract_rel = contract_ref.removeprefix("project:").lstrip("./")
+            contract_path = root / contract_rel
+            if not contract_path.exists():
+                messages.append(f"[FAIL] {label}: metric_contract path does not exist: {contract_ref}")
+                ok = False
+            elif contract_rel not in contract_rel_paths:
+                messages.append(f"[WARN] {label}: metric_contract exists but is outside experiments/baselines/** scan: {contract_ref}")
+            else:
+                messages.append(f"[PASS] {label}: metric_contract path exists")
+
+        checkpoint = raw.get("checkpoint") if isinstance(raw.get("checkpoint"), dict) else {}
+        checkpoint_required = _truthy(raw.get("checkpoint_required")) or _truthy(checkpoint.get("required"))
+        checkpoint_status = str(raw.get("checkpoint_status") or checkpoint.get("status") or "").strip().lower()
+        checkpoint_has_path = bool(str(raw.get("checkpoint_local_path") or checkpoint.get("local_path") or "").strip())
+        checkpoint_verified = (
+            _truthy(raw.get("checkpoint_verified_loadable"))
+            or _truthy(checkpoint.get("verified_loadable"))
+            or checkpoint_status in {"verified_loadable", "verified", "loaded", "已验证加载"}
+        )
+        checkpoint_not_applicable = checkpoint_status in {"not_applicable", "not applicable", "none", "no_checkpoint", "不适用", "无"}
+        if (checkpoint_required or checkpoint_has_path) and not checkpoint_verified:
+            messages.append(f"[FAIL] {label}: checkpoint is required/present but not verified loadable")
+            ok = False
+        elif checkpoint_required or checkpoint_has_path:
+            messages.append(f"[PASS] {label}: checkpoint verified loadable")
+        elif checkpoint_not_applicable:
+            messages.append(f"[PASS] {label}: checkpoint marked not applicable")
+        else:
+            messages.append(f"[WARN] {label}: checkpoint applicability not declared")
+
+        allowed_verdicts = {"verified_match", "verified_close"}
+        if verdict in allowed_verdicts:
+            messages.append(f"[PASS] {label}: verification_verdict={verdict}")
+        elif verdict == "trusted_with_caveats":
+            if not waiver or not scope_limit:
+                messages.append(f"[FAIL] {label}: trusted_with_caveats requires caveat_waiver_reason and comparison_scope_limit")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: trusted_with_caveats has waiver and scope limit")
+        else:
+            messages.append(f"[FAIL] {label}: verification_verdict must be verified_match, verified_close, or justified trusted_with_caveats")
+            ok = False
+
+        deviation = _parse_floatish(raw.get("relative_deviation"))
+        if deviation is not None and abs(deviation) > 0.10 and not waiver:
+            messages.append(f"[FAIL] {label}: relative_deviation={deviation:.3g} exceeds 0.10 without waiver")
+            ok = False
+        elif deviation is not None:
+            messages.append(f"[PASS] {label}: relative_deviation recorded")
+        else:
+            messages.append(f"[WARN] {label}: relative_deviation not recorded")
+
+        if "primary" in role and not eligible:
+            messages.append(f"[FAIL] {label}: primary baseline must set m3s03_eligible: true")
+            ok = False
+
+    if not seen_primary_ids:
+        messages.append("[FAIL] M3S02: no primary baseline declared in baseline_lock.yaml")
+        ok = False
+    elif primary_eligible < 1:
+        messages.append("[FAIL] M3S02: no primary baseline is eligible for M3S03")
+        ok = False
+    else:
+        messages.append(f"[PASS] M3S02: {primary_eligible} primary baseline(s) eligible for M3S03")
+
+    m3s03_contract = data.get("m3s03_contract")
+    if not isinstance(m3s03_contract, dict):
+        messages.append("[FAIL] M3S02: baseline_lock.yaml missing m3s03_contract mapping")
+        ok = False
+    else:
+        for field in ("primary_baseline_id", "metric_contract", "dataset", "split", "metric"):
+            if not str(m3s03_contract.get(field, "")).strip():
+                messages.append(f"[FAIL] M3S02: m3s03_contract missing {field}")
+                ok = False
+            else:
+                messages.append(f"[PASS] M3S02: m3s03_contract includes {field}")
+
+    return ok, messages
+
+
+def _load_m4_task_queue(root: Path) -> tuple[bool, list[str], list[dict[str, Any]]]:
+    path = root / "experiments" / "configs" / "m4_task_queue.yaml"
+    if not path.exists():
+        return False, ["[FAIL] M4S02: experiments/configs/m4_task_queue.yaml not found"], []
+    try:
+        data = _load_yaml_mapping(path)
+    except Exception as exc:
+        return False, [f"[FAIL] M4S02: m4_task_queue.yaml unreadable: {exc}"], []
+    tasks = data.get("tasks") or data.get("queue")
+    if not isinstance(tasks, list) or not tasks:
+        return False, ["[FAIL] M4S02: m4_task_queue.yaml missing nonempty tasks list"], []
+    if not all(isinstance(task, dict) for task in tasks):
+        return False, ["[FAIL] M4S02: every m4_task_queue task must be a mapping"], []
+    return True, [f"[PASS] M4S02: m4_task_queue.yaml lists {len(tasks)} task(s)"], tasks
+
+
+def _task_ana_id(task: dict[str, Any]) -> str:
+    raw = str(task.get("task_id") or task.get("slice") or task.get("ana_id") or "").strip()
+    match = re.search(r"\bAna-\d+\b", raw, flags=re.IGNORECASE)
+    return match.group(0) if match else raw
+
+
+def _task_baseline_required(task: dict[str, Any]) -> bool:
+    value = task.get("baseline_required", task.get("baseline_inclusion", ""))
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"required", "true", "yes", "y", "1", "必须", "需要"}
+
+
+def _check_m4s02_task_queue(root: Path, design_text: str) -> tuple[bool, list[str]]:
+    ok, messages, tasks = _load_m4_task_queue(root)
+    if not ok:
+        return False, messages
+
+    design_ids = set(re.findall(r"\bAna-\d+\b", design_text, flags=re.IGNORECASE))
+    task_ids = {_task_ana_id(task) for task in tasks if _task_ana_id(task)}
+    if len(task_ids) < 3:
+        messages.append(f"[FAIL] M4S02: m4_task_queue has fewer than 3 Ana-* task ids ({len(task_ids)})")
+        ok = False
+    else:
+        messages.append(f"[PASS] M4S02: m4_task_queue has {len(task_ids)} Ana-* task ids")
+
+    missing = sorted(design_ids - task_ids)
+    if missing:
+        messages.append("[FAIL] M4S02: m4_task_queue missing design slice ids: " + ", ".join(missing))
+        ok = False
+    elif design_ids:
+        messages.append("[PASS] M4S02: m4_task_queue.yaml covers all design Ana-* ids")
+
+    for task in tasks:
+        task_id = _task_ana_id(task) or "<missing>"
+        label = f"M4S02 task_queue[{task_id}]"
+        required = {
+            "command": task.get("command"),
+            "analysis_type": task.get("analysis_type"),
+            "dependencies": task.get("dependencies", None),
+            "resource_requirements": task.get("resource_requirements"),
+            "expected_artifacts": task.get("expected_artifacts"),
+            "success_criteria": task.get("success_criteria"),
+        }
+        for field, value in required.items():
+            if field == "dependencies":
+                missing_value = value is None
+            else:
+                missing_value = (
+                    value is None
+                    or (isinstance(value, str) and not value.strip())
+                    or (isinstance(value, list) and not value)
+                )
+            if missing_value:
+                messages.append(f"[FAIL] {label}: missing {field}")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: includes {field}")
+        if not task.get("baseline_inclusion") and "baseline_required" not in task:
+            messages.append(f"[FAIL] {label}: missing baseline_inclusion/baseline_required")
+            ok = False
+        elif _task_baseline_required(task) and not str(task.get("fairness_key", "")).strip():
+            messages.append(f"[FAIL] {label}: baseline-required task missing fairness_key")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: baseline/fairness policy declared")
+
+    return ok, messages
+
+
+def _check_m4s03_task_queue_coverage(root: Path, analysis_lines: list[str]) -> tuple[bool, list[str]]:
+    queue_ok, queue_msgs, tasks = _load_m4_task_queue(root)
+    messages = [msg.replace("M4S02", "M4S03") for msg in queue_msgs]
+    ok = queue_ok
+    if not queue_ok:
+        return False, messages
+    try:
+        import csv
+
+        rows = list(csv.DictReader(analysis_lines, delimiter="\t"))
+    except Exception as exc:
+        return False, messages + [f"[FAIL] M4S03: analysis_results.tsv task coverage parse failed: {exc}"]
+
+    if not rows:
+        return False, messages + ["[FAIL] M4S03: analysis_results.tsv has no rows for task coverage"]
+
+    slice_key = next((key for key in rows[0].keys() if str(key).strip().lower() == "slice"), "")
+    method_key = next((key for key in rows[0].keys() if str(key).strip().lower() == "method"), "")
+    if not slice_key or not method_key:
+        return False, messages + ["[FAIL] M4S03: analysis_results.tsv missing slice/method columns for task coverage"]
+
+    result_ids = {str(row.get(slice_key, "")).strip() for row in rows if str(row.get(slice_key, "")).strip()}
+    task_ids = {_task_ana_id(task) for task in tasks if _task_ana_id(task)}
+    missing = sorted(task_ids - result_ids)
+    if missing:
+        messages.append("[FAIL] M4S03: analysis_results.tsv missing task_queue slices: " + ", ".join(missing))
+        ok = False
+    else:
+        messages.append("[PASS] M4S03: analysis_results.tsv covers all task_queue slices")
+
+    for task in tasks:
+        task_id = _task_ana_id(task)
+        if not task_id or not _task_baseline_required(task):
+            continue
+        methods = {
+            str(row.get(method_key, "")).strip().lower()
+            for row in rows
+            if str(row.get(slice_key, "")).strip() == task_id
+        }
+        if "baseline" not in methods:
+            messages.append(f"[FAIL] M4S03: baseline-required slice {task_id} missing baseline row")
+            ok = False
+        elif not ({"ours", "proposed", "full", "full_model"} & methods):
+            messages.append(f"[FAIL] M4S03: baseline-required slice {task_id} missing ours/proposed/full row")
+            ok = False
+        else:
+            messages.append(f"[PASS] M4S03: baseline-required slice {task_id} has baseline and method rows")
+
+    return ok, messages
 
 
 def _contains_table_with_headers(text: str, headers: tuple[str, ...]) -> bool:
@@ -2579,6 +2924,14 @@ def _check_stage_reviews(root: Path, stage: str) -> tuple[bool, list[str]]:
 
     for checker, rel_path in requirements.items():
         review_path = root / rel_path
+        alternates = find_alternate_outputs(review_path.parent, review_path.name)
+        if alternates:
+            messages.append(
+                f"[FAIL] {stage}: alternate stage review file(s) found for {review_path.name}: "
+                + ", ".join(path.name for path in alternates)
+                + "; update the canonical review in place instead of creating v2/new/revised copies."
+            )
+            ok = False
         if not review_path.exists():
             messages.append(f"[FAIL] {stage}: required stage review missing: {review_path.name}")
             ok = False
@@ -2660,6 +3013,14 @@ def _check_m1s02_rounds(root: Path) -> tuple[bool, list[str]]:
 
     for round_num in (1, 2, 3):
         review_path = root / _M1S02_ROUND_REVIEW_REQUIREMENTS[round_num]
+        alternates = find_alternate_outputs(review_path.parent, review_path.name)
+        if alternates:
+            messages.append(
+                f"[FAIL] M1S02: alternate round {round_num} review file(s) found: "
+                + ", ".join(path.name for path in alternates)
+                + "; update the canonical review in place instead of creating v2/new/revised copies."
+            )
+            ok = False
         if not review_path.exists():
             messages.append(f"[FAIL] M1S02: missing round {round_num} review file: {review_path.name}")
             ok = False
@@ -3151,6 +3512,10 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
             else:
                 messages.append(f"[PASS] M3S02: {verified} verified baseline contract(s) found")
 
+        lock_ok, lock_msgs = _check_m3s02_baseline_lock_manifest(root, baseline_contracts)
+        messages.extend(lock_msgs)
+        ok = ok and lock_ok
+
         review_ok, review_msgs = _check_stage_reviews(root, stage)
         messages.extend(review_msgs)
         ok = ok and review_ok
@@ -3453,6 +3818,9 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 ok = False
             else:
                 messages.append("[PASS] M4S02: literature/database basis present")
+            queue_ok, queue_msgs = _check_m4s02_task_queue(root, text)
+            messages.extend(queue_msgs)
+            ok = ok and queue_ok
             plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
             if plan_path.exists():
                 try:
@@ -3553,6 +3921,9 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                     ok = False
                 else:
                     messages.append("[PASS] M4S03: analysis_results.tsv includes extended M4 schema")
+                coverage_ok, coverage_msgs = _check_m4s03_task_queue_coverage(root, lines)
+                messages.extend(coverage_msgs)
+                ok = ok and coverage_ok
 
         sandbox_ok, sandbox_msgs = _check_experiment_sandbox_profile(root, require_m4_execution_doc=True)
         messages.extend(sandbox_msgs)

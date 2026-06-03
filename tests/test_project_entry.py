@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 from scripts.conductor_helper import get_input_docs
-from spiral.project import ProjectManager
+from spiral.project import ProjectManager, validate_project_name
 from spiral.state import PipelineState
 from utils.source_log_validator import validate
 
@@ -113,6 +113,45 @@ class TestProjectEntryManifest(unittest.TestCase):
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp_path)
+
+    def test_project_display_name_must_match_folder_base_rules(self) -> None:
+        valid_names = ["Entry-Test", "Entry.Test_01", "A1"]
+        for name in valid_names:
+            with self.subTest(name=name):
+                self.assertEqual(validate_project_name(name), name)
+
+        invalid_names = [
+            "Bad Name",
+            "Bad/Name",
+            "-BadName",
+            "BadName_",
+            "CON",
+            "Project中文",
+            "a" * 81,
+        ]
+        for name in invalid_names:
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError):
+                    validate_project_name(name)
+
+    def test_create_rejects_invalid_project_display_name(self) -> None:
+        projects_root = self.tmp_path / "invalid-root"
+        with self.assertRaises(ValueError):
+            ProjectManager.create(
+                topic="Invalid project name",
+                display_name="Invalid Name",
+                projects_root=projects_root,
+            )
+        self.assertFalse(projects_root.exists())
+
+    def test_create_uses_valid_project_name_as_timestamped_folder_base(self) -> None:
+        proj = ProjectManager.create(
+            topic="Strict Project Name",
+            display_name="Strict.Project_01",
+            projects_root=self.tmp_path,
+        )
+
+        self.assertRegex(proj.name, r"^Strict\.Project_01-\d{8}-\d{6}$")
 
     def test_create_writes_research_brief_with_anchors(self) -> None:
         proj = ProjectManager.create(

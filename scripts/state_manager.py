@@ -541,10 +541,14 @@ def cmd_create(
     ssh_min_vram_gb: Optional[float] = None,
     ssh_server_tags: Optional[list[str]] = None,
 ) -> str:
-    from spiral.project import ProjectManager
+    from spiral.project import ProjectManager, validate_project_name
 
     env_override = os.environ.get("SPIRAL_PROJECTS_ROOT")
     projects_root = Path(env_override) if env_override else PROJECTS_ROOT
+    try:
+        validate_project_name(display_name)
+    except ValueError as exc:
+        raise SystemExit(f"[ERROR] Invalid project display_name: {exc}") from exc
     projects_root.mkdir(parents=True, exist_ok=True)
 
     proj = ProjectManager.create(

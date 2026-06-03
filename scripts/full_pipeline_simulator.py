@@ -641,10 +641,58 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "| dataset | local | `wget -c https://example.test/demo.zip` | completed | `experiments/logs/download.log` | timeout=12h; poll_interval=30m | `wget -c https://example.test/demo.zip` | none | checksum passed |\n",
         )
     elif stage == "M3S02":
-        _write(out, "# M3S02 Baseline Lock\n\n### Baseline 1\nVerification path: verify-local-existing.\n\n## Smoke Test\nsmoke passed.\n")
+        _write(
+            out,
+            "# M3S02 Baseline Lock\n\n"
+            "### Baseline 1\n"
+            "Verification path: verify-local-existing.\n"
+            "Checkpoint verified loadable: not_applicable.\n"
+            "Paper value: 0.75; local value: 0.75; relative_deviation: 0.0.\n"
+            "verification_verdict: verified_match.\n\n"
+            "## Smoke Test\nsmoke passed.\n\n"
+            "## Baseline Lock Manifest\n"
+            "`experiments/baselines/baseline_lock.yaml` declares baseline_1 as primary and m3s03_eligible.\n",
+        )
         _write_yaml(
             root / "experiments" / "baselines" / "baseline_1" / "metric_contract.yaml",
             {"verification_verdict": "verified_match", "metrics": {"primary": {"key": "accuracy", "value": 0.75}}},
+        )
+        _write_yaml(
+            root / "experiments" / "baselines" / "baseline_lock.yaml",
+            {
+                "schema_version": 1,
+                "baseline_code_immutable_after_lock": True,
+                "baselines": [
+                    {
+                        "baseline_id": "baseline_1",
+                        "name": "Simulated baseline",
+                        "comparison_role": "primary",
+                        "source": "verify-local-existing",
+                        "implementation_path": "experiments/baselines/baseline_1/",
+                        "metric_contract": "experiments/baselines/baseline_1/metric_contract.yaml",
+                        "dataset": "demo",
+                        "split": "test",
+                        "metric": "accuracy",
+                        "paper_value": 0.75,
+                        "local_value": 0.75,
+                        "relative_deviation": 0.0,
+                        "verification_verdict": "verified_match",
+                        "m3s03_eligible": True,
+                        "checkpoint": {
+                            "required": False,
+                            "status": "not_applicable",
+                            "verified_loadable": False,
+                        },
+                    }
+                ],
+                "m3s03_contract": {
+                    "primary_baseline_id": "baseline_1",
+                    "metric_contract": "experiments/baselines/baseline_1/metric_contract.yaml",
+                    "dataset": "demo",
+                    "split": "test",
+                    "metric": "accuracy",
+                },
+            },
         )
     elif stage == "M3S03":
         _write(
@@ -794,6 +842,63 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "efficiency_required: no; paper_protocol_adaptation=negative-result audit adopted; "
             "comparison_target=boundary cases; expected_pattern=failures documented; evidence_criteria=case taxonomy; claim_links=C4.\n\n"
             "## Comparability Contract\nbaseline same split.\n## 执行信封审计\nrealistic.\n",
+        )
+        _write_yaml(
+            root / "experiments" / "configs" / "m4_task_queue.yaml",
+            {
+                "schema_version": 1,
+                "stage": "M4S03",
+                "tasks": [
+                    {
+                        "task_id": "Ana-1",
+                        "analysis_type": "ablation",
+                        "command": "python experiments/src/run_analysis.py --slice Ana-1",
+                        "dependencies": [],
+                        "parallelizable": True,
+                        "resource_requirements": {"min_gpu_count": 0, "min_cpu_cores": 2, "expected_minutes": 30},
+                        "baseline_inclusion": "required",
+                        "fairness_key": "Ana-1_same_split_seed_metric_resource_class",
+                        "expected_artifacts": ["experiments/artifacts/analysis_experiment/Ana-1/manifest.yaml"],
+                        "success_criteria": ["analysis_results.tsv contains Ana-1 baseline and ours rows"],
+                    },
+                    {
+                        "task_id": "Ana-2",
+                        "analysis_type": "mechanism",
+                        "command": "python experiments/src/run_analysis.py --slice Ana-2",
+                        "dependencies": [],
+                        "parallelizable": True,
+                        "resource_requirements": {"min_gpu_count": 0, "min_cpu_cores": 2, "expected_minutes": 30},
+                        "baseline_inclusion": "required",
+                        "fairness_key": "Ana-2_same_split_seed_metric_resource_class",
+                        "expected_artifacts": ["experiments/artifacts/analysis_experiment/Ana-2/manifest.yaml"],
+                        "success_criteria": ["analysis_results.tsv contains Ana-2 baseline and ours rows"],
+                    },
+                    {
+                        "task_id": "Ana-3",
+                        "analysis_type": "robustness",
+                        "command": "python experiments/src/run_analysis.py --slice Ana-3",
+                        "dependencies": [],
+                        "parallelizable": True,
+                        "resource_requirements": {"min_gpu_count": 0, "min_cpu_cores": 2, "expected_minutes": 30},
+                        "baseline_inclusion": "required",
+                        "fairness_key": "Ana-3_same_split_seed_metric_resource_class",
+                        "expected_artifacts": ["experiments/artifacts/analysis_experiment/Ana-3/manifest.yaml"],
+                        "success_criteria": ["analysis_results.tsv contains Ana-3 baseline and ours rows"],
+                    },
+                    {
+                        "task_id": "Ana-4",
+                        "analysis_type": "failure",
+                        "command": "python experiments/src/run_analysis.py --slice Ana-4",
+                        "dependencies": [],
+                        "parallelizable": True,
+                        "resource_requirements": {"min_gpu_count": 0, "min_cpu_cores": 2, "expected_minutes": 30},
+                        "baseline_inclusion": "optional",
+                        "fairness_key": "Ana-4_boundary_documentation",
+                        "expected_artifacts": ["experiments/artifacts/analysis_experiment/Ana-4/manifest.yaml"],
+                        "success_criteria": ["analysis_results.tsv contains Ana-4 rows"],
+                    },
+                ],
+            },
         )
     elif stage == "M4S03":
         _write(out, "# M4S03\n\n## 执行摘要\nok\n## Slice 执行记录\nok; resource_id=local resource_kind=local server_id=none resource_monitor=experiments/runs/analysis_1/resource_monitor.csv.\n## 负面/失败结果记录\nfailed case.\n## 原始数据与日志\nlogs. sandbox_profile: experiments/configs/sandbox_profile.yaml.\n\n## Sandbox / Container Execution Record\nAna-1 sandbox mode venv; resource_id local; command `python analysis.py`; working dir experiments; allowed writes experiments/runs/; network policy restricted; resource limits timeout=24h cpu=4 gpu=0; log path experiments/runs/analysis_1/logs/run.log.\n\n## 初步审查摘要\nstage_in_fix continue; abnormal class: data metric method model environment.\n")

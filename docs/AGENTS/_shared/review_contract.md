@@ -17,6 +17,11 @@ Every `REVISE`, `BACKTRACK`, `FIX`, or `REWORK` review must include:
 - `rerun_scope`
 - `handoff_updates`
 
+## Review Output Location
+- Write the review only to packet `output_path`.
+- If re-reviewing after a backtrack or human revision, overwrite/update the same canonical review file in place.
+- Do not create alternate review files such as `_v2`, `_new`, `_revised`, `_revision`, `_backtrack`, `_fixed`, `_updated`, `_draft`, or `_copy`.
+
 ## Review Output Skeleton
 ```markdown
 # Review: <task>

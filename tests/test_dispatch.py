@@ -181,6 +181,18 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertIn("docs/AGENTS/_specs/method.md", packet["subagent_launch_prompt"])
         self.assertLessEqual(len(packet["subagent_launch_prompt"]), packet["context_policy"]["max_initial_prompt_chars"])
 
+    def test_stage_execution_packet_requires_canonical_in_place_output(self) -> None:
+        packet = build_stage_execution_packet(self.root, "M2S01")
+
+        policy = packet["output_write_policy"]
+        self.assertEqual(policy["mode"], "canonical_in_place")
+        self.assertEqual(policy["target_path"], packet["output_path"])
+        self.assertIs(policy["overwrite_existing"], True)
+        self.assertIs(policy["forbid_alternate_outputs"], True)
+        self.assertIn("_revised", policy["forbidden_suffixes"])
+        self.assertIn("canonical_in_place", packet["subagent_prompt"])
+        self.assertIn("do not create v2/new/revised/backtrack", packet["subagent_launch_prompt"])
+
     def test_written_markdown_packet_exposes_only_compact_launch_prompt(self) -> None:
         packet = build_stage_execution_packet(self.root, "M2S01")
         paths = write_packets(self.root, [packet], fmt="markdown")
@@ -192,6 +204,7 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertIn("handoff_mode: packet_path_only", text)
         self.assertIn("role_spec:", text)
         self.assertIn("docs/AGENTS/_specs/method.md", text)
+        self.assertIn("output_write_policy:", text)
         self.assertNotIn("## Subagent Prompt", text)
 
     def test_ssh_ops_packet_targets_ssh_agent(self) -> None:

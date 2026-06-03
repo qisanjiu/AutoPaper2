@@ -2,7 +2,7 @@
 
 > Stage: M4S02
 > Agent: Analysis Agent
-> Output: `knowledge/M4/M4S02_analysis_experiment_design.md`
+> Output: `knowledge/M4/M4S02_analysis_experiment_design.md` + `experiments/configs/m4_task_queue.yaml`
 
 ---
 
@@ -98,3 +98,37 @@ M4S03 必须按此 schema 写入 `experiments/analysis_results.tsv`：
 `slice`, `analysis_type`, `method`, `dataset`, `split`, `seed`, `config_id`, `run_id`, `metric`, `value`, `baseline_inclusion`, `artifact_path`, `runtime_sec`, `params_m`, `peak_mem_mb`, `resource_id`, `resource_kind`, `server_id`, `gpu_ids`, `resource_monitor`, `notes`
 
 效率 slice 若适用，还应补充 `flops_g`、`inference_latency_ms`、`throughput`、`train_time_sec` 中的相关列；不适用字段可留空但列名应保留。
+
+---
+
+## 8. M4 Task Queue（必须）
+
+必须同步写入 `experiments/configs/m4_task_queue.yaml`。M4S03 只能执行该队列中的任务；设计文档中的每个 `Ana-*` slice 都必须在队列中有对应任务。
+
+```yaml
+schema_version: 1
+stage: M4S03
+tasks:
+  - task_id: Ana-1
+    analysis_type: ablation
+    command: "python experiments/src/run_analysis.py --slice Ana-1 --config experiments/configs/ana1.yaml"
+    dependencies: []
+    parallelizable: true
+    resource_requirements:
+      min_gpu_count: 1
+      min_cpu_cores: 4
+      memory_gb: 16
+      expected_minutes: 120
+      remote_ok: true
+    baseline_inclusion: required
+    fairness_key: Ana-1_same_split_seed_metric_resource_class
+    expected_artifacts:
+      - experiments/artifacts/analysis_experiment/Ana-1/manifest.yaml
+      - experiments/runs/analysis_Ana-1/resource_monitor.csv
+    success_criteria:
+      - "analysis_results.tsv contains Ana-1 baseline and ours/proposed rows"
+      - "artifact_path exists for every Ana-1 row"
+      - "resource_monitor is recorded"
+```
+
+若某个 slice 暂时不可执行，不得把它伪装成 completed task。应在 M4S02 正文中说明 blocked reason，并由 reviewer 决定是否回溯或重设分析设计。

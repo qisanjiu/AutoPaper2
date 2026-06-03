@@ -85,6 +85,13 @@ _WIN_RESERVED = {
     "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 }
 
+PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,78}[A-Za-z0-9])?$")
+PROJECT_NAME_RULES = (
+    "Project display_name must be 1-80 ASCII characters, use only letters, "
+    "digits, '.', '_' or '-', start and end with a letter/digit, contain no "
+    "spaces or path separators, and not be a Windows reserved name."
+)
+
 
 def sanitize_folder_name(name: str) -> str:
     name = name.strip()
@@ -96,6 +103,21 @@ def sanitize_folder_name(name: str) -> str:
     if name.upper() in _WIN_RESERVED:
         name = name + "_"
     return name or "untitled"
+
+
+def validate_project_name(name: str) -> str:
+    """Validate the strict project folder base used before the timestamp suffix."""
+    if not isinstance(name, str):
+        raise ValueError(PROJECT_NAME_RULES)
+    candidate = name.strip()
+    if not candidate or candidate != name:
+        raise ValueError(PROJECT_NAME_RULES)
+    if not PROJECT_NAME_PATTERN.fullmatch(candidate):
+        raise ValueError(PROJECT_NAME_RULES)
+    reserved_base = candidate.split(".", 1)[0].upper()
+    if reserved_base in _WIN_RESERVED:
+        raise ValueError(PROJECT_NAME_RULES)
+    return candidate
 
 
 def _load_venue_registry() -> dict[str, Any]:
@@ -161,8 +183,6 @@ class ProjectManager:
         if projects_root is None:
             projects_root = framework_root / "projects"
 
-        projects_root.mkdir(parents=True, exist_ok=True)
-
         registry = _load_venue_registry()
         default_venue = registry.get("default_venue", "arxiv")
         venue_id = venue if venue else default_venue
@@ -171,8 +191,9 @@ class ProjectManager:
             available = list(registry.get("venues", {}).keys())
             raise ValueError(f"Unknown venue '{venue_id}'. Available: {available}")
 
-        folder_base = display_name if display_name else topic
-        folder_name = sanitize_folder_name(folder_base)
+        folder_base = display_name if display_name is not None else sanitize_folder_name(topic)
+        folder_name = validate_project_name(folder_base)
+        projects_root.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         proj_dir = projects_root / f"{folder_name}-{ts}"
         proj_dir.mkdir(parents=True, exist_ok=False)

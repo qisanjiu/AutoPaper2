@@ -74,6 +74,18 @@ class TestM4FileGuard(unittest.TestCase):
             assert ok, f"Expected OK, got: {msg}"
             print("  [PASS] M4S01 file_guard validation")
 
+    def test_m4s02_rejects_alternate_stage_output_copy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "test_project"
+            (proj / "knowledge" / "M4").mkdir(parents=True)
+            (proj / "knowledge" / "M4" / "M4S02_analysis_experiment_design.md").write_text("# canonical")
+            (proj / "knowledge" / "M4" / "M4S02_analysis_experiment_design_revised.md").write_text("# copy")
+
+            ok, msg = check_single_file_principle(proj, "M4S02")
+
+            assert not ok, "Expected alternate stage output copy to be rejected"
+            assert "canonical original file in place" in msg
+
 
 class TestM4Conductor(unittest.TestCase):
     """Test Conductor M4 stage checker configuration."""
@@ -84,7 +96,7 @@ class TestM4Conductor(unittest.TestCase):
         assert "M4S02" in STAGE_CHECKERS, "M4S02 missing from STAGE_CHECKERS"
         assert "M4S03" in STAGE_CHECKERS, "M4S03 missing from STAGE_CHECKERS"
         assert STAGE_CHECKERS["M4S01"] == ["m4_findings_audit"]
-        assert STAGE_CHECKERS["M4S02"] == ["m4_analysis_design_review"]
+        assert STAGE_CHECKERS["M4S02"] == ["m4_analysis_design_review", "m4_execution_readiness_review"]
         assert STAGE_CHECKERS["M4S03"] == ["m4_analysis_execution_review"]
         # Ensure old M3 code_review is not bound to M4
         assert "code_review" not in STAGE_CHECKERS.get("M4S02", [])
@@ -97,10 +109,12 @@ class TestM4Conductor(unittest.TestCase):
             cond = Conductor(proj)
             p1 = cond.get_checker_md_path("m4_findings_audit")
             p2 = cond.get_checker_md_path("m4_analysis_design_review")
-            p3 = cond.get_checker_md_path("m4_analysis_execution_review")
+            p3 = cond.get_checker_md_path("m4_execution_readiness_review")
+            p4 = cond.get_checker_md_path("m4_analysis_execution_review")
             assert "m4_findings_audit" in str(p1)
             assert "m4_analysis_design_review" in str(p2)
-            assert "m4_analysis_execution_review" in str(p3)
+            assert "m4_execution_readiness_review" in str(p3)
+            assert "m4_analysis_execution_review" in str(p4)
             print("  [PASS] M4 checker md paths resolve correctly")
 
     def test_m4_module_stages(self):
@@ -110,8 +124,8 @@ class TestM4Conductor(unittest.TestCase):
 
 
 class TestM4StageGate(unittest.TestCase):
-    def _write_m4s02_project(self, root: Path, *, complete: bool = True) -> None:
-        for rel in ("knowledge/M4", "knowledge/reviews"):
+    def _write_m4s02_project(self, root: Path, *, complete: bool = True, include_task_queue: bool = True) -> None:
+        for rel in ("knowledge/M4", "knowledge/reviews", "experiments/configs"):
             (root / rel).mkdir(parents=True, exist_ok=True)
         if complete:
             text = (
@@ -190,6 +204,43 @@ class TestM4StageGate(unittest.TestCase):
             "# M4S02 Review\n\nVerdict: PASS\n",
             encoding="utf-8",
         )
+        (root / "knowledge" / "reviews" / "M4S02_execution_readiness_review.md").write_text(
+            "# M4S02 Execution Readiness Review\n\nVerdict: PASS\n",
+            encoding="utf-8",
+        )
+        if complete and include_task_queue:
+            task_block = ""
+            for ana_id, analysis_type, baseline_required in (
+                ("Ana-1", "ablation", True),
+                ("Ana-2", "mechanism", True),
+                ("Ana-3", "robustness", True),
+                ("Ana-4", "failure", False),
+            ):
+                task_block += (
+                    f"  - task_id: {ana_id}\n"
+                    f"    analysis_type: {analysis_type}\n"
+                    f"    command: python experiments/src/run_analysis.py --slice {ana_id}\n"
+                    "    dependencies: []\n"
+                    "    parallelizable: true\n"
+                    "    resource_requirements:\n"
+                    "      min_gpu_count: 0\n"
+                    "      min_cpu_cores: 2\n"
+                    "      memory_gb: 8\n"
+                    "      expected_minutes: 30\n"
+                    f"    baseline_inclusion: {'required' if baseline_required else 'optional'}\n"
+                    f"    fairness_key: {ana_id}_same_split_seed_metric_resource_class\n"
+                    "    expected_artifacts:\n"
+                    f"      - experiments/artifacts/analysis_experiment/{ana_id}/manifest.yaml\n"
+                    "    success_criteria:\n"
+                    f"      - analysis_results.tsv contains {ana_id} rows\n"
+                )
+            (root / "experiments" / "configs" / "m4_task_queue.yaml").write_text(
+                "schema_version: 1\n"
+                "stage: M4S03\n"
+                "tasks:\n"
+                f"{task_block}",
+                encoding="utf-8",
+            )
 
     def _write_m4s03_project(self, root: Path, *, include_sandbox_record: bool = True) -> None:
         for rel in (
@@ -283,9 +334,44 @@ class TestM4StageGate(unittest.TestCase):
             "## 初步审查摘要\nstage_in_fix continue; abnormal cause: environment setup model data metric method unknown.\n",
             encoding="utf-8",
         )
+        task_block = ""
+        for ana_id, analysis_type, baseline_required in (
+            ("Ana-1", "ablation", True),
+            ("Ana-2", "mechanism", True),
+            ("Ana-3", "robustness", True),
+            ("Ana-4", "failure", False),
+        ):
+            task_block += (
+                f"  - task_id: {ana_id}\n"
+                f"    analysis_type: {analysis_type}\n"
+                f"    command: python experiments/src/run_analysis.py --slice {ana_id}\n"
+                "    dependencies: []\n"
+                "    resource_requirements:\n"
+                "      min_gpu_count: 0\n"
+                "      min_cpu_cores: 2\n"
+                f"    baseline_inclusion: {'required' if baseline_required else 'optional'}\n"
+                f"    fairness_key: {ana_id}_same_split_seed_metric_resource_class\n"
+                "    expected_artifacts:\n"
+                f"      - experiments/artifacts/analysis_experiment/{ana_id}/manifest.yaml\n"
+                "    success_criteria:\n"
+                f"      - analysis_results.tsv contains {ana_id} rows\n"
+            )
+        (root / "experiments" / "configs" / "m4_task_queue.yaml").write_text(
+            "schema_version: 1\n"
+            "stage: M4S03\n"
+            "tasks:\n"
+            f"{task_block}",
+            encoding="utf-8",
+        )
         (root / "experiments" / "analysis_results.tsv").write_text(
             "slice\tanalysis_type\tmethod\tdataset\tsplit\tseed\tconfig_id\trun_id\tmetric\tvalue\tbaseline_inclusion\tartifact_path\truntime_sec\tparams_m\tpeak_mem_mb\tresource_id\tresource_kind\tserver_id\tgpu_ids\tresource_monitor\tnotes\n"
-            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-a\trun-a\taccuracy_drop\t0.05\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t120\t10.5\t2048\tlocal\tlocal\t\t[]\texperiments/runs/analysis_1/resource_monitor.csv\tok\n",
+            "Ana-1\tablation\tbaseline\tds\ttest\t42\tcfg-b\trun-b\taccuracy_drop\t0.02\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t120\t10.5\t2048\tlocal\tlocal\t\t[]\texperiments/runs/analysis_1/resource_monitor.csv\tbaseline\n"
+            "Ana-1\tablation\tours\tds\ttest\t42\tcfg-a\trun-a\taccuracy_drop\t0.05\trequired\texperiments/artifacts/analysis_experiment/Ana-1\t120\t10.5\t2048\tlocal\tlocal\t\t[]\texperiments/runs/analysis_1/resource_monitor.csv\tok\n"
+            "Ana-2\tmechanism\tbaseline\tds\ttest\t42\tcfg-b\trun-b\talignment_score\t0.40\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t120\t10.5\t2048\tlocal\tlocal\t\t[]\texperiments/runs/analysis_1/resource_monitor.csv\tbaseline\n"
+            "Ana-2\tmechanism\tours\tds\ttest\t42\tcfg-a\trun-a\talignment_score\t0.60\trequired\texperiments/artifacts/analysis_experiment/Ana-2\t120\t10.5\t2048\tlocal\tlocal\t\t[]\texperiments/runs/analysis_1/resource_monitor.csv\tok\n"
+            "Ana-3\trobustness\tbaseline\tds\tnoise\t42\tcfg-b\trun-b\taccuracy_noise\t0.70\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t120\t10.5\t2048\tlocal\tlocal\t\t[]\texperiments/runs/analysis_1/resource_monitor.csv\tbaseline\n"
+            "Ana-3\trobustness\tours\tds\tnoise\t42\tcfg-a\trun-a\taccuracy_noise\t0.78\trequired\texperiments/artifacts/analysis_experiment/Ana-3\t120\t10.5\t2048\tlocal\tlocal\t\t[]\texperiments/runs/analysis_1/resource_monitor.csv\tok\n"
+            "Ana-4\tfailure\tours\tds\tboundary\t42\tcfg-a\trun-a\tfailure_rate\t0.10\toptional\texperiments/artifacts/analysis_experiment/Ana-4\t120\t10.5\t2048\tlocal\tlocal\t\t[]\texperiments/runs/analysis_1/resource_monitor.csv\tok\n",
             encoding="utf-8",
         )
         (root / "knowledge" / "reviews" / "M4S03_analysis_execution_review.md").write_text(
@@ -303,6 +389,17 @@ class TestM4StageGate(unittest.TestCase):
             self.assertTrue(ok, "\n".join(messages))
             self.assertTrue(any("concrete Ana-* slice IDs found" in m for m in messages))
             self.assertTrue(any("includes expected pattern" in m for m in messages))
+            self.assertTrue(any("m4_task_queue.yaml covers all design Ana-* ids" in m for m in messages), messages)
+
+    def test_m4s02_stage_gate_requires_task_queue(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "test_project"
+            self._write_m4s02_project(proj, complete=True, include_task_queue=False)
+
+            ok, messages = check_stage(proj, "M4S02")
+
+            self.assertFalse(ok)
+            self.assertTrue(any("m4_task_queue.yaml not found" in m for m in messages), messages)
 
     def test_m4s02_stage_gate_blocks_shallow_design(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -337,6 +434,7 @@ class TestM4StageGate(unittest.TestCase):
 
             self.assertTrue(ok, "\n".join(messages))
             self.assertTrue(any("sandbox/container execution record present" in m for m in messages))
+            self.assertTrue(any("analysis_results.tsv covers all task_queue slices" in m for m in messages), messages)
 
     def test_m4s03_stage_gate_requires_sandbox_execution_record(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -347,6 +445,23 @@ class TestM4StageGate(unittest.TestCase):
 
             self.assertFalse(ok)
             self.assertTrue(any("sandbox/container execution record missing" in m for m in messages))
+
+    def test_m4s03_stage_gate_blocks_missing_task_queue_slice(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "test_project"
+            self._write_m4s03_project(proj, include_sandbox_record=True)
+            results = proj / "experiments" / "analysis_results.tsv"
+            filtered = "\n".join(
+                line
+                for line in results.read_text(encoding="utf-8").splitlines()
+                if not line.startswith("Ana-3\t")
+            ) + "\n"
+            results.write_text(filtered, encoding="utf-8")
+
+            ok, messages = check_stage(proj, "M4S03")
+
+            self.assertFalse(ok)
+            self.assertTrue(any("missing task_queue slices: Ana-3" in m for m in messages), messages)
 
     def _write_m4s04_project(
         self,
