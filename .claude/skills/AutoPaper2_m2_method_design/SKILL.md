@@ -30,6 +30,11 @@ Method Agent for all M2 stages; stage reviewers after each stage; Gate: logic, m
 4. Verify output exists; for reviews parse verdict.
 5. PASS -> `state_manager.py advance`; non-PASS -> structured backtrack and regenerate dispatch.
 
+## M2 Metric Protocol Policy
+- M2S05 must lock metric correctness before M3 by writing `knowledge/M2/M2S05_metric_protocol.yaml`.
+- Each metric protocol must bind metric to dataset, scenario/task, split, definition, calculation, direction, value range, normal reference range, protocol source, and a sanity-check case.
+- M2S06 must reference `metric_protocol_id` for every executable experiment. If the correct metric for a dataset/scenario is unclear, revise M2S05 instead of deferring the issue to M3.
+
 ## Forbidden Writes
 `knowledge/M*/`, `drafts/`, `knowledge/reviews/*_review.md`, `artifacts/paper.*` unless a delegated subagent owns the path.
 

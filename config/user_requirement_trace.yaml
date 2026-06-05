@@ -42,6 +42,8 @@ requirements:
       Use M1 problems to search library/internet sources for transferable or
       newly designed solutions, integrate inspirations, design methods, and
       define experiment setup with datasets, metrics, purposes, and full reports.
+      M2S05 must lock metric protocols for each dataset/scenario/split before
+      M3, including value range, normal reference range, source, and sanity check.
     enforced_by:
       stage_gates: [M2S01, M2S02, M2S03, M2S04, M2S05, M2S06]
       validators: [utils/source_log_validator.py]
@@ -75,7 +77,9 @@ requirements:
       when needed. M3 must actively acquire datasets, baseline code/weights,
       and checkpoints; M3S03 may advance only with completed trained-weight
       evidence for proposed results; M3 baselines cannot be ablations or
-      simplified implementations.
+      simplified implementations. M3S02 baseline contracts must align with
+      M2S05 metric_protocol_id and report anomalous metric values instead of
+      silently advancing.
     enforced_by:
       stage_gates: [M3S01, M3S02, M3S03, M3S04]
       configs: [config/execution_env.yaml]

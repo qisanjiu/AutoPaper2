@@ -366,6 +366,29 @@ class TestDispatchPackets(unittest.TestCase):
             "可复现 reproducibility requirements include git commit and environment lock.\n",
             encoding="utf-8",
         )
+        (self.root / "knowledge" / "M2" / "M2S05_metric_protocol.yaml").write_text(
+            "schema_version: 1\n"
+            "metric_protocols:\n"
+            "  - metric_protocol_id: mp_demo_accuracy\n"
+            "    dataset: DemoSet\n"
+            "    scenario: classification\n"
+            "    split: test\n"
+            "    metric_key: accuracy\n"
+            "    definition: fraction of correct labels\n"
+            "    calculation: correct / total over the test split\n"
+            "    direction: higher_is_better\n"
+            "    value_range: [0.0, 1.0]\n"
+            "    normal_reference_range: [0.5, 0.95]\n"
+            "    protocol_source:\n"
+            "      source_id: PaperX\n"
+            "      table_or_section: Table 1\n"
+            "      rationale: standard classification metric for DemoSet\n"
+            "    metric_sanity_check:\n"
+            "      test_case: two correct out of four examples\n"
+            "      expected_value: 0.5\n"
+            "      tolerance: 1.0e-6\n",
+            encoding="utf-8",
+        )
 
     def _write_valid_m2s06(self) -> None:
         (self.root / "knowledge" / "M2" / "M2S06_full_experiment_plan.md").write_text(
@@ -391,7 +414,7 @@ class TestDispatchPackets(unittest.TestCase):
             "- 参考相关工作实验设置: PaperX reference protocol 论文\n"
             "- 数据集与划分: DemoSet dataset split\n"
             "- Baselines / 对照组: baseline\n"
-            "- 评价指标: accuracy metric\n"
+            "- 评价指标: metric_protocol_id=mp_demo_accuracy accuracy metric\n"
             "- 运行协议: seed=42 epoch hardware 超参\n"
             "- 预期结果形态: table plot\n"
             "- 成功标准: ...\n"
@@ -422,6 +445,16 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertTrue(any("3 experiment IDs found" in message for message in messages))
         self.assertTrue(any("m2_experiment_design_review PASS" in message for message in messages))
 
+    def test_m2s05_stage_gate_requires_metric_protocol_registry(self) -> None:
+        self._write_valid_m2s05()
+        (self.root / "knowledge" / "M2" / "M2S05_metric_protocol.yaml").unlink()
+        self._write_pass_review("knowledge/reviews/M2S05_experiment_design_review.md")
+
+        ok, messages = check_stage(self.root, "M2S05")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("metric protocol registry not found" in message for message in messages), messages)
+
     def test_m2s06_stage_gate_blocks_incomplete_full_plan(self) -> None:
         (self.root / "knowledge" / "M2" / "M2S06_full_experiment_plan.md").write_text(
             "# M2S06\n\nExp-1 only.\n",
@@ -436,6 +469,7 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertTrue(any("required stage review missing" in message for message in messages))
 
     def test_m2s06_stage_gate_accepts_full_plan_with_pass_review(self) -> None:
+        self._write_valid_m2s05()
         self._write_valid_m2s06()
         self._write_pass_review("knowledge/reviews/M2S06_experiment_plan_review.md")
 

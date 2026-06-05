@@ -284,23 +284,75 @@ class TestM3StageGate(unittest.TestCase):
         verification_verdict: str = "verified_match",
         caveat_waiver_reason: str = "",
         comparison_scope_limit: str = "",
-        relative_deviation: float = 0.0,
+        relative_deviation: float | None = None,
+        paper_value: float = 0.75,
+        local_value: float = 0.75,
+        metric_protocol_id: str = "mp_demo_accuracy",
+        scenario: str = "classification",
+        direction: str = "higher_is_better",
+        include_metric_protocol: bool = True,
+        normal_reference_range: tuple[float, float] = (0.5, 0.95),
+        metric_validation_status: str = "pass",
+        include_metric_validation_evidence: bool = True,
         checkpoint_required: bool = False,
         checkpoint_verified: bool = False,
     ) -> None:
         for rel in (
+            "knowledge/M2",
             "knowledge/M3",
             "knowledge/reviews",
             "experiments/baselines/baseline_1",
+            "experiments/baselines/baseline_1/logs",
         ):
             (self.root / rel).mkdir(parents=True, exist_ok=True)
+
+        if include_metric_protocol:
+            (self.root / "knowledge" / "M2" / "M2S05_metric_protocol.yaml").write_text(
+                "schema_version: 1\n"
+                "metric_protocols:\n"
+                f"  - metric_protocol_id: {metric_protocol_id}\n"
+                "    dataset: demo\n"
+                f"    scenario: {scenario}\n"
+                "    split: test\n"
+                "    metric_key: accuracy\n"
+                "    definition: fraction of correct labels\n"
+                "    calculation: correct / total over the test split\n"
+                f"    direction: {direction}\n"
+                "    value_range: [0.0, 1.0]\n"
+                f"    normal_reference_range: [{normal_reference_range[0]}, {normal_reference_range[1]}]\n"
+                "    protocol_source:\n"
+                "      source_id: PaperX\n"
+                "      table_or_section: Table 1\n"
+                "      rationale: standard classification metric for demo\n"
+                "    metric_sanity_check:\n"
+                "      test_case: two correct out of four examples\n"
+                "      expected_value: 0.5\n"
+                "      tolerance: 1.0e-6\n",
+                encoding="utf-8",
+            )
+
+        if include_metric_validation_evidence:
+            (self.root / "experiments" / "baselines" / "baseline_1" / "logs" / "metric_sanity.log").write_text(
+                "metric sanity passed: 2/4 accuracy = 0.5\n",
+                encoding="utf-8",
+            )
+        (self.root / "experiments" / "baselines" / "baseline_1" / "logs" / "eval.log").write_text(
+            f"local accuracy = {local_value}\n",
+            encoding="utf-8",
+        )
+        deviation_value = (
+            relative_deviation
+            if relative_deviation is not None
+            else (local_value - paper_value) / abs(paper_value if abs(paper_value) > 1e-12 else 1.0)
+        )
 
         (self.root / "knowledge" / "M3" / "M3S02_baseline_lock.md").write_text(
             "# M3S02 Baseline Lock\n\n"
             "### Baseline 1\n"
             f"Verification path: {source}.\n"
             f"verification_verdict: {verification_verdict}.\n"
-            "Paper value: 0.75; local value: 0.75.\n\n"
+            f"metric_protocol_id: {metric_protocol_id}; scenario: {scenario}.\n"
+            f"Paper value: {paper_value}; local value: {local_value}.\n\n"
             "## Smoke Test\n"
             "Smoke Test passed with correct metric computation and checkpoint loading status.\n\n",
             encoding="utf-8",
@@ -312,10 +364,34 @@ class TestM3StageGate(unittest.TestCase):
         (self.root / "experiments" / "baselines" / "baseline_1" / "metric_contract.yaml").write_text(
             "baseline_id: baseline_1\n"
             f"verification_verdict: {verification_verdict}\n"
+            f"metric_protocol_id: {metric_protocol_id}\n"
+            "dataset: demo\n"
+            f"scenario: {scenario}\n"
+            "split: test\n"
             "metrics:\n"
             "  primary:\n"
             "    key: accuracy\n"
-            "    value: 0.75\n",
+            f"    value: {local_value}\n"
+            f"    direction: {direction}\n"
+            "reference_result:\n"
+            f"  value: {paper_value}\n"
+            "  source: paper\n"
+            "  dataset: demo\n"
+            f"  scenario: {scenario}\n"
+            "  split: test\n"
+            "  metric: accuracy\n"
+            "  table_or_section: Table 1\n"
+            "local_validation:\n"
+            "  command: python eval.py --metric accuracy\n"
+            "  raw_log_path: experiments/baselines/baseline_1/logs/eval.log\n"
+            f"  local_value: {local_value}\n"
+            "deviation:\n"
+            f"  relative_delta: {deviation_value}\n"
+            "  tolerance: 0.10\n"
+            f"  passed: {'true' if abs(deviation_value) <= 0.10 else 'false'}\n"
+            "metric_validation:\n"
+            f"  status: {metric_validation_status}\n"
+            "  evidence_path: experiments/baselines/baseline_1/logs/metric_sanity.log\n",
             encoding="utf-8",
         )
         if include_lock:
@@ -333,12 +409,34 @@ class TestM3StageGate(unittest.TestCase):
                 f"    fidelity_evidence: \"{fidelity_evidence}\"\n"
                 "    implementation_path: experiments/baselines/baseline_1/\n"
                 "    metric_contract: experiments/baselines/baseline_1/metric_contract.yaml\n"
+                f"    metric_protocol_id: {metric_protocol_id}\n"
                 "    dataset: demo\n"
+                f"    scenario: {scenario}\n"
                 "    split: test\n"
                 "    metric: accuracy\n"
-                "    paper_value: 0.75\n"
-                "    local_value: 0.75\n"
-                f"    relative_deviation: {relative_deviation}\n"
+                f"    direction: {direction}\n"
+                f"    paper_value: {paper_value}\n"
+                f"    local_value: {local_value}\n"
+                f"    relative_deviation: {deviation_value}\n"
+                "    reference_result:\n"
+                f"      value: {paper_value}\n"
+                "      source: paper\n"
+                "      dataset: demo\n"
+                f"      scenario: {scenario}\n"
+                "      split: test\n"
+                "      metric: accuracy\n"
+                "      table_or_section: Table 1\n"
+                "    local_validation:\n"
+                "      command: python eval.py --metric accuracy\n"
+                "      raw_log_path: experiments/baselines/baseline_1/logs/eval.log\n"
+                f"      local_value: {local_value}\n"
+                "    deviation:\n"
+                f"      relative_delta: {deviation_value}\n"
+                "      tolerance: 0.10\n"
+                f"      passed: {'true' if abs(deviation_value) <= 0.10 else 'false'}\n"
+                "    metric_validation:\n"
+                f"      status: {metric_validation_status}\n"
+                "      evidence_path: experiments/baselines/baseline_1/logs/metric_sanity.log\n"
                 f"    verification_verdict: {verification_verdict}\n"
                 f"    m3s03_eligible: {'true' if m3s03_eligible else 'false'}\n"
                 f"    caveat_waiver_reason: \"{caveat_waiver_reason}\"\n"
@@ -351,8 +449,10 @@ class TestM3StageGate(unittest.TestCase):
                 "  primary_baseline_id: baseline_1\n"
                 "  metric_contract: experiments/baselines/baseline_1/metric_contract.yaml\n"
                 "  dataset: demo\n"
+                f"  scenario: {scenario}\n"
                 "  split: test\n"
-                "  metric: accuracy\n",
+                "  metric: accuracy\n"
+                f"  metric_protocol_id: {metric_protocol_id}\n",
                 encoding="utf-8",
             )
         (self.root / "knowledge" / "reviews" / "M3S02_baseline_result_review.md").write_text(
@@ -831,6 +931,46 @@ class TestM3StageGate(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertTrue(any("trusted_with_caveats requires caveat_waiver_reason" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_requires_m2_metric_protocol(self) -> None:
+        self._write_m3s02_files(include_metric_protocol=False)
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("metric protocol registry not found" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_rejects_metric_protocol_mismatch(self) -> None:
+        self._write_m3s02_files()
+        for rel in (
+            "experiments/baselines/baseline_1/metric_contract.yaml",
+            "experiments/baselines/baseline_lock.yaml",
+        ):
+            path = self.root / rel
+            text = path.read_text(encoding="utf-8")
+            text = text.replace("scenario: classification", "scenario: regression")
+            path.write_text(text, encoding="utf-8")
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("scenario=regression does not match M2 metric protocol classification" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_rejects_metric_validation_failure(self) -> None:
+        self._write_m3s02_files(metric_validation_status="fail")
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("metric_validation status must be pass" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_rejects_weird_metric_value_without_triage(self) -> None:
+        self._write_m3s02_files(paper_value=0.99, local_value=0.99)
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("outside normal_reference_range" in message for message in messages), messages)
 
     def test_m3s02_stage_gate_rejects_ablation_as_baseline(self) -> None:
         self._write_m3s02_files(ablation_of_ours=True, comparator_type="ablation")

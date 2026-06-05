@@ -35,6 +35,7 @@ Experiment Agent: M3S01-M3S03; Analysis Agent: M3S04; Gate: method, evidence.
 - Baseline weights, dataset downloads, and official code acquisition are Agent work by default. Ask only for credentials, licenses, paid/quota approvals, unavailable storage/network access, unsafe/destructive actions, or spiral limit.
 - M3S03 cannot PASS until proposed/ours results are produced by completed trained weights with loadable checkpoint evidence. E0/random/untrained weights are diagnostic only.
 - M3 baselines cannot be ablations or simplified implementations; ablations are deferred to M4.
+- M3S02 must use M2S05 metric protocols, not redefine metrics. Baseline contracts must cite `metric_protocol_id`, match dataset/scenario/split/metric/direction, run metric sanity checks, and report/backtrack abnormal metric values instead of silently advancing.
 
 ## Forbidden Writes
 `knowledge/M*/`, `drafts/`, `knowledge/reviews/*_review.md`, `artifacts/paper.*` unless a delegated subagent owns the path.

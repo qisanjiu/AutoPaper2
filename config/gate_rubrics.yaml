@@ -47,9 +47,10 @@ gates:
           - knowledge/M2/M2S03_method_architecture.md
           - knowledge/M2/M2S04_algorithm_theory.md
       - id: G2-R3
-        criterion: "Experiment setup follows related-field protocols and gives datasets, metrics, baselines, per-experiment purpose, and full report blueprint."
+        criterion: "Experiment setup follows related-field protocols and gives datasets, metric protocol registry with dataset/scenario/split correctness, baselines, per-experiment purpose, and full report blueprint."
         evidence_examples:
           - knowledge/M2/M2S05_experiment_setup.md
+          - knowledge/M2/M2S05_metric_protocol.yaml
           - knowledge/M2/M2S06_full_experiment_plan.md
           - knowledge/handoff_M2_M3.md
 

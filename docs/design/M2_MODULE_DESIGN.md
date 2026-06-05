@@ -175,7 +175,7 @@ Handoff M2→M3                      [Conductor]     → knowledge/handoff_M2_M3
 > - 参考 M1S02 的代码可用性标注：对未开源或代码不可运行的 baseline 降权
 > - Subagent 检查可行性
 
-**输出**: `knowledge/M2/M2S05_experiment_setup.md`
+**输出**: `knowledge/M2/M2S05_experiment_setup.md` + `knowledge/M2/M2S05_metric_protocol.yaml`
 
 **质量标准**:
 - [ ] 数据集领域标准、公开可用、许可证合规
@@ -285,6 +285,7 @@ knowledge/reviews/
 - 完成了跨领域搜索和迁移分析（M2S01-M2S02）
 - 设计了方法架构、算法流程和理论分析（M2S03-M2S04）
 - 选择了数据集、baseline 和实验协议（M2S05）
+- 锁定了 dataset/scenario/split/metric 对应的 `metric_protocol_id`、取值范围、正常参考范围和 sanity check（M2S05_metric_protocol.yaml）
 - 制定了完整实验计划（M2S06）
 
 ## 关键决策记录
@@ -398,8 +399,8 @@ Phase 8: Handoff & 完成
 - m2_search_quality: M2S01 完成后审查搜索质量
 - m2_migration: M2S02 完成后审查迁移分析
 - m2_design_review: M2S03 和 M2S04 完成后审查设计质量
-- m2_experiment_design_review: M2S05 完成后审查数据集、baseline、公平性、指标、逐实验目标和可复现性
-- m2_experiment_plan_review: M2S06 完成后审查执行顺序、分支/回溯逻辑、逐实验报告蓝图和证据保存协议
+- m2_experiment_design_review: M2S05 完成后审查数据集、baseline、公平性、指标协议 registry、逐实验目标和可复现性
+- m2_experiment_plan_review: M2S06 完成后审查执行顺序、分支/回溯逻辑、逐实验报告蓝图、metric_protocol_id 引用和证据保存协议
 
 **Gate G2 Critics** (并行执行):
 - Logic Critic: 读取 `docs/AGENTS/critic/logic/AGENT.md`
@@ -448,8 +449,8 @@ spiral_count:
 | M2S01 完成后 | 产出文件非空、有形式化描述、有设计决策记录 | 重试一次，仍失败则 BACKTRACK → M1S04 |
 | M2S02 完成后 | 数据集可获取、许可证合规、适配性分析完整 | BACKTRACK → M2S01 |
 | M2S04 完成后 | baseline 与消融无冲突、代码可用性评估完整 | 要求补充 |
-| M2S05 完成后 | 数据集获取/校验、baseline、公平性、指标、相关工作协议、逐实验目的/假设、固定随机种子=42、可复现清单、m2_experiment_design_review PASS | BACKTRACK → M2S05 |
-| M2S06 完成后 | 执行顺序、分支/回溯逻辑、成功/失败标准、风险/资源预算、逐实验完整报告蓝图、证据保存协议、m2_experiment_plan_review PASS | BACKTRACK → M2S06 |
+| M2S05 完成后 | 数据集获取/校验、baseline、公平性、`M2S05_metric_protocol.yaml`、相关工作协议、逐实验目的/假设、固定随机种子=42、可复现清单、m2_experiment_design_review PASS | BACKTRACK → M2S05 |
+| M2S06 完成后 | 执行顺序、分支/回溯逻辑、成功/失败标准、风险/资源预算、逐实验完整报告蓝图、每个实验引用 metric_protocol_id、证据保存协议、m2_experiment_plan_review PASS | BACKTRACK → M2S06 |
 | Gate G2 | Logic ≥7.0 AND Method ≥7.0 AND Novelty ≥7.0 | BACKTRACK 或 REVISE |
 | Handoff 前 | 所有 M2 产出文件存在 | 阻止完成 |
 

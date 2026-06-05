@@ -132,7 +132,7 @@ Checkpoint 搜索优先级：
 5. 其他项目缓存复用
 6. 以上均失败 → 生成报告阻塞等待用户协助
 
-Metric Contract 必须包含 checkpoint 字段：source_url、local_path、checksum、verified_loadable。
+Metric Contract 必须包含 checkpoint 字段：source_url、local_path、checksum、verified_loadable。还必须引用 M2S05 的 `metric_protocol_id`，并证明 dataset、scenario、split、metric、direction、value_range、normal_reference_range 与 `knowledge/M2/M2S05_metric_protocol.yaml` 一致。指标实现必须有 sanity-check 日志；异常结果或超出正常参考范围不得静默推进。
 
 **Step 2: Metric Contract 锁定**
 
@@ -140,7 +140,9 @@ Metric Contract 必须包含 checkpoint 字段：source_url、local_path、check
 ```yaml
 baseline_id: "baseline_x"
 source: "论文X / 官方代码 / 自行实现"
+metric_protocol_id: "mp_..."
 dataset: "..."
+scenario: "..."
 split: "..."
 metrics:
   primary:
@@ -150,6 +152,9 @@ metrics:
   secondary:
     - key: "f1"
       value: 0.821
+metric_validation:
+  status: pass
+  evidence_path: "experiments/baselines/baseline_x/logs/metric_sanity.log"
 environment:
   python: "3.10.12"
   torch: "2.1.0"

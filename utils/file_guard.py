@@ -12,6 +12,9 @@ VALID_STAGE_PATTERN = re.compile(r"^M[1-6]S\d{2}$")
 VALID_GATE_PATTERN = re.compile(r"^G[1-6]$")
 
 ALLOWED_EXTRA_STAGE_OUTPUTS = {
+    # M2S05 writes a machine-readable metric protocol registry used by
+    # M2S06/M3S02 to prevent metric drift and late experiment backtracking.
+    "M2S05": {"M2S05_metric_protocol.yaml"},
     # M6S03/M6S04 deliberately produce one primary stage report plus one
     # structured companion file used by downstream review/rebuttal planning.
     "M6S03": {"M6S03_review_matrix.md"},

@@ -26,9 +26,12 @@
 | Checkpoint 来源 | 官方 Release / README 链接 / HuggingFace / 自动下载 / 无 |
 | Checkpoint 本地路径 | `experiments/baselines/{id}/checkpoints/...` |
 | Checkpoint 验证状态 | 已验证加载 / 未验证 / 不适用 |
+| metric_protocol_id | 来自 `knowledge/M2/M2S05_metric_protocol.yaml` |
+| 场景 / Scenario | 必须与 M2 指标协议一致 |
 | 官方指标（论文报告） | ... |
 | 我们的运行结果 | ... |
 | 偏差说明 | ... |
+| 指标实现验证 | `metric_validation` 通过，证据路径存在 |
 | 验证分级 | verified_match / verified_close / trusted_with_caveats / diverged |
 
 **Checkpoint 获取记录**:
@@ -58,7 +61,9 @@ comparator_type: external_prior_work
 ablation_of_ours: false
 implementation_fidelity: official_code / full_reproduction / paper_faithful_reproduction
 fidelity_evidence: "experiments/baselines/{id}/fidelity_report.md"
+metric_protocol_id: "mp_..."
 dataset: "..."
+scenario: "..."
 split: "..."
 metrics:
   primary:
@@ -68,6 +73,27 @@ metrics:
   secondary:
     - key: "..."
       value: ...
+reference_result:
+  source: paper / official_repo / official_checkpoint / leaderboard
+  value: ...
+  dataset: "..."
+  scenario: "..."
+  split: "..."
+  metric: "..."
+  table_or_section: "..."
+local_validation:
+  command: "..."
+  config_path: "..."
+  raw_log_path: "experiments/baselines/{id}/logs/eval.log"
+  local_value: ...
+deviation:
+  relative_delta: ...
+  tolerance: ...
+  passed: true/false
+metric_validation:
+  status: pass
+  evidence_path: "experiments/baselines/{id}/logs/metric_sanity.log"
+  checked_against_protocol: "knowledge/M2/M2S05_metric_protocol.yaml#mp_..."
 environment:
   python: "..."
   torch: "..."
@@ -163,12 +189,35 @@ baselines:
     fidelity_evidence: experiments/baselines/baseline_1/fidelity_report.md
     implementation_path: experiments/baselines/baseline_1/
     metric_contract: experiments/baselines/baseline_1/metric_contract.yaml
+    metric_protocol_id: mp_...
     dataset: "..."
+    scenario: "..."
     split: "..."
     metric: "accuracy"
+    direction: higher_is_better
     paper_value: 0.0
     local_value: 0.0
     relative_deviation: 0.0
+    reference_result:
+      source: paper / official_repo / official_checkpoint / leaderboard
+      value: 0.0
+      dataset: "..."
+      scenario: "..."
+      split: "..."
+      metric: "accuracy"
+      table_or_section: "..."
+    local_validation:
+      command: "..."
+      raw_log_path: experiments/baselines/baseline_1/logs/eval.log
+      local_value: 0.0
+    deviation:
+      relative_delta: 0.0
+      tolerance: 0.10
+      passed: true
+    metric_validation:
+      status: pass
+      evidence_path: experiments/baselines/baseline_1/logs/metric_sanity.log
+      checked_against_protocol: knowledge/M2/M2S05_metric_protocol.yaml#mp_...
     verification_verdict: verified_match / verified_close / trusted_with_caveats
     m3s03_eligible: true
     caveat_waiver_reason: ""
@@ -187,11 +236,15 @@ m3s03_contract:
   primary_baseline_id: baseline_1
   metric_contract: experiments/baselines/baseline_1/metric_contract.yaml
   dataset: "..."
+  scenario: "..."
   split: "..."
   metric: "accuracy"
+  metric_protocol_id: mp_...
   run_contract_note: "M3S03 must compare against this locked baseline without changing baseline code, split, metric, or checkpoint."
 ```
 
 `trusted_with_caveats` 只有在 `caveat_waiver_reason` 和 `comparison_scope_limit` 都明确时才可进入 M3S03。若 baseline 依赖 checkpoint，`checkpoint.verified_loadable` 必须为 `true`。
 
 如果 `source: reimplementation` 或自行实现，`implementation_fidelity` 必须是 `full_reproduction`、`paper_faithful_reproduction` 或 `official_equivalent`，并且 `fidelity_evidence` 必须指向已存在的复现一致性报告。不得使用 simplified / toy / minimal / proxy baseline。
+
+M3S02 不得重新定义指标。所有 primary baseline 必须引用 M2S05 的 `metric_protocol_id`，并与其 dataset、scenario、split、metric、direction、value_range、normal_reference_range 一致。若本地结果超出正常参考范围，必须写入 `anomaly_triage`，提供真实日志/证据路径，并根据根因 REVISE 或 BACKTRACK；不得把异常结果标成 `verified_match` 或 `verified_close` 后继续推进。

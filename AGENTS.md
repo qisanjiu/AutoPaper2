@@ -157,6 +157,7 @@ When a backtrack is triggered (by stage review, gate critic, or human review):
 | `{project}/knowledge/M2/M2S03_method_architecture.md` | Method architecture design |
 | `{project}/knowledge/M2/M2S04_algorithm_theory.md` | Algorithm & theory design |
 | `{project}/knowledge/M2/M2S05_experiment_setup.md` | Experiment setup design |
+| `{project}/knowledge/M2/M2S05_metric_protocol.yaml` | Canonical metric protocol registry for dataset/scenario/split/metric correctness |
 | `{project}/knowledge/M2/M2S06_full_experiment_plan.md` | Full experiment plan |
 | `{project}/knowledge/handoff_M2_M3.md` | M2→M3 handoff document |
 | `{framework}/skills/AutoPaper2_m2_method_design/SKILL.md` | M2 execution skill |

@@ -833,6 +833,472 @@ def _looks_simplified_implementation(raw: dict[str, Any]) -> bool:
     return any(marker in text for marker in ("simple", "simplified", "minimal", "toy", "简化", "简单", "玩具"))
 
 
+def _first_nested_value(raw: dict[str, Any], paths: tuple[tuple[str, ...], ...]) -> Any:
+    for path in paths:
+        current: Any = raw
+        found = True
+        for key in path:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                found = False
+                break
+        if found and current is not None and str(current).strip() != "":
+            return current
+    return None
+
+
+def _baseline_reference_value(raw: dict[str, Any]) -> Any:
+    return _first_nested_value(
+        raw,
+        (
+            ("reference_result", "value"),
+            ("reference_result", "paper_value"),
+            ("reference_result", "reported_value"),
+            ("reference_result", "metric_value"),
+            ("paper_value",),
+            ("reference_value",),
+            ("official_value",),
+            ("historical_value",),
+        ),
+    )
+
+
+def _baseline_local_value(raw: dict[str, Any], primary_metric: dict[str, Any] | None = None) -> Any:
+    if primary_metric is None:
+        metrics = raw.get("metrics")
+        primary_metric = metrics.get("primary") if isinstance(metrics, dict) else {}
+    return _first_nested_value(
+        {"raw": raw, "primary": primary_metric if isinstance(primary_metric, dict) else {}},
+        (
+            ("raw", "local_validation", "local_value"),
+            ("raw", "local_validation", "local_mean"),
+            ("raw", "local_validation", "mean"),
+            ("raw", "local_value"),
+            ("raw", "value"),
+            ("primary", "value"),
+        ),
+    )
+
+
+def _baseline_declared_deviation(raw: dict[str, Any]) -> Any:
+    return _first_nested_value(
+        raw,
+        (
+            ("deviation", "relative_delta"),
+            ("deviation", "relative_deviation"),
+            ("relative_deviation",),
+            ("relative_delta",),
+        ),
+    )
+
+
+def _baseline_deviation_tolerance(raw: dict[str, Any]) -> float:
+    value = _first_nested_value(
+        raw,
+        (
+            ("deviation", "tolerance"),
+            ("deviation", "tolerance_value"),
+            ("reference_result", "tolerance"),
+            ("relative_deviation_tolerance",),
+            ("deviation_tolerance",),
+        ),
+    )
+    parsed = _parse_floatish(value)
+    return abs(parsed) if parsed is not None else 0.10
+
+
+def _baseline_anomaly_triage(raw: dict[str, Any]) -> dict[str, Any]:
+    triage = (
+        raw.get("anomaly_triage")
+        or raw.get("deviation_triage")
+        or raw.get("deviation_analysis")
+        or raw.get("anomaly_report")
+    )
+    return triage if isinstance(triage, dict) else {}
+
+
+def _project_any_path_exists(root: Path, value: Any) -> bool:
+    if isinstance(value, list):
+        return any(_project_any_path_exists(root, item) for item in value)
+    return _project_path_exists(root, value)
+
+
+def _metric_range_bounds(value: Any) -> tuple[float, float] | None:
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        low = _parse_floatish(value[0])
+        high = _parse_floatish(value[1])
+        if low is not None and high is not None:
+            return (min(low, high), max(low, high))
+    if isinstance(value, dict):
+        low = _parse_floatish(value.get("min", value.get("low")))
+        high = _parse_floatish(value.get("max", value.get("high")))
+        if low is not None and high is not None:
+            return (min(low, high), max(low, high))
+    text = str(value or "").strip()
+    if text:
+        numbers = re.findall(r"-?\d+(?:\.\d+)?%?", text)
+        if len(numbers) >= 2:
+            low = _parse_floatish(numbers[0])
+            high = _parse_floatish(numbers[1])
+            if low is not None and high is not None:
+                return (min(low, high), max(low, high))
+    return None
+
+
+def _metric_key_from(raw: dict[str, Any]) -> str:
+    metrics = raw.get("metrics")
+    primary = metrics.get("primary") if isinstance(metrics, dict) else {}
+    return str(
+        raw.get("metric")
+        or raw.get("metric_key")
+        or raw.get("primary_metric")
+        or (primary.get("key") if isinstance(primary, dict) else "")
+        or ""
+    ).strip()
+
+
+def _metric_protocol_id_from(raw: dict[str, Any]) -> str:
+    protocol = raw.get("metric_protocol") if isinstance(raw.get("metric_protocol"), dict) else {}
+    return str(
+        raw.get("metric_protocol_id")
+        or raw.get("protocol_id")
+        or protocol.get("metric_protocol_id")
+        or protocol.get("protocol_id")
+        or protocol.get("id")
+        or ""
+    ).strip()
+
+
+def _m2_metric_protocol_path(root: Path) -> Path:
+    return root / "knowledge" / "M2" / "M2S05_metric_protocol.yaml"
+
+
+def _load_m2_metric_protocol_registry(root: Path) -> tuple[bool, list[str], dict[str, dict[str, Any]]]:
+    path = _m2_metric_protocol_path(root)
+    messages: list[str] = []
+    protocols_by_id: dict[str, dict[str, Any]] = {}
+    ok = True
+    if not path.exists():
+        return False, [f"[FAIL] M2 metric protocol registry not found: {path.relative_to(root)}"], {}
+    try:
+        data = _load_yaml_mapping(path)
+    except Exception as exc:
+        return False, [f"[FAIL] M2 metric protocol registry unreadable: {exc}"], {}
+    protocols = data.get("metric_protocols") or data.get("protocols")
+    if not isinstance(protocols, list) or not protocols:
+        return False, ["[FAIL] M2 metric protocol registry missing nonempty metric_protocols list"], {}
+
+    messages.append(f"[PASS] M2 metric protocol registry lists {len(protocols)} protocol(s)")
+    allowed_directions = {"higher_is_better", "lower_is_better"}
+    for index, raw in enumerate(protocols, start=1):
+        if not isinstance(raw, dict):
+            messages.append(f"[FAIL] M2 metric protocol[{index}] must be a mapping")
+            ok = False
+            continue
+        protocol_id = str(raw.get("metric_protocol_id") or raw.get("protocol_id") or raw.get("id") or "").strip()
+        label = f"M2 metric protocol[{protocol_id or index}]"
+        if not protocol_id:
+            messages.append(f"[FAIL] {label}: missing metric_protocol_id")
+            ok = False
+            continue
+        if protocol_id in protocols_by_id:
+            messages.append(f"[FAIL] {label}: duplicate metric_protocol_id")
+            ok = False
+        protocols_by_id[protocol_id] = raw
+
+        required_fields = {
+            "dataset": raw.get("dataset"),
+            "scenario": raw.get("scenario") or raw.get("task") or raw.get("task_type"),
+            "split": raw.get("split"),
+            "metric_key": raw.get("metric_key") or raw.get("metric"),
+            "definition": raw.get("definition") or raw.get("metric_definition"),
+            "calculation": raw.get("calculation") or raw.get("computation") or raw.get("formula"),
+            "protocol_source": raw.get("protocol_source") or raw.get("source") or raw.get("reference"),
+        }
+        for field, value in required_fields.items():
+            if not _nonempty(value):
+                messages.append(f"[FAIL] {label}: missing {field}")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: includes {field}")
+
+        direction = str(raw.get("direction") or "").strip().lower()
+        if direction not in allowed_directions:
+            messages.append(f"[FAIL] {label}: direction must be higher_is_better or lower_is_better")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: direction={direction}")
+
+        value_range = _metric_range_bounds(raw.get("value_range"))
+        normal_range = _metric_range_bounds(raw.get("normal_reference_range") or raw.get("normal_range"))
+        if value_range is None:
+            messages.append(f"[FAIL] {label}: missing valid value_range")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: value_range valid")
+        if normal_range is None:
+            messages.append(f"[FAIL] {label}: missing valid normal_reference_range")
+            ok = False
+        elif value_range and (normal_range[0] < value_range[0] or normal_range[1] > value_range[1]):
+            messages.append(f"[FAIL] {label}: normal_reference_range must be inside value_range")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: normal_reference_range valid")
+
+        sanity = raw.get("metric_sanity_check") or raw.get("implementation_check") or raw.get("sanity_check")
+        if not isinstance(sanity, dict):
+            messages.append(f"[FAIL] {label}: missing metric_sanity_check mapping")
+            ok = False
+        else:
+            for field in ("test_case", "expected_value", "tolerance"):
+                if not _nonempty(sanity.get(field)):
+                    messages.append(f"[FAIL] {label}: metric_sanity_check missing {field}")
+                    ok = False
+            if all(_nonempty(sanity.get(field)) for field in ("test_case", "expected_value", "tolerance")):
+                messages.append(f"[PASS] {label}: metric_sanity_check complete")
+
+    return ok, messages, protocols_by_id
+
+
+def _check_m3s02_metric_protocol_alignment(
+    root: Path,
+    label: str,
+    raw: dict[str, Any],
+    protocols_by_id: dict[str, dict[str, Any]],
+    *,
+    eligible: bool = False,
+    primary: bool = False,
+) -> tuple[bool, list[str]]:
+    messages: list[str] = []
+    ok = True
+    protocol_id = _metric_protocol_id_from(raw)
+    if not protocol_id:
+        messages.append(f"[FAIL] {label}: missing metric_protocol_id from M2S05_metric_protocol.yaml")
+        return False, messages
+    protocol = protocols_by_id.get(protocol_id)
+    if not protocol:
+        messages.append(f"[FAIL] {label}: unknown metric_protocol_id {protocol_id}")
+        return False, messages
+    messages.append(f"[PASS] {label}: metric_protocol_id={protocol_id} found in M2")
+
+    comparisons = {
+        "dataset": str(raw.get("dataset") or "").strip(),
+        "split": str(raw.get("split") or "").strip(),
+        "metric": _metric_key_from(raw),
+    }
+    expected = {
+        "dataset": str(protocol.get("dataset") or "").strip(),
+        "split": str(protocol.get("split") or "").strip(),
+        "metric": str(protocol.get("metric_key") or protocol.get("metric") or "").strip(),
+    }
+    scenario = str(raw.get("scenario") or raw.get("task") or raw.get("task_type") or "").strip()
+    expected_scenario = str(protocol.get("scenario") or protocol.get("task") or protocol.get("task_type") or "").strip()
+    if primary or eligible:
+        comparisons["scenario"] = scenario
+        expected["scenario"] = expected_scenario
+
+    for field, actual in comparisons.items():
+        expected_value = expected[field]
+        if not actual:
+            messages.append(f"[FAIL] {label}: missing {field} for metric protocol alignment")
+            ok = False
+        elif expected_value and actual.lower() != expected_value.lower():
+            messages.append(f"[FAIL] {label}: {field}={actual} does not match M2 metric protocol {expected_value}")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: {field} matches M2 metric protocol")
+
+    metrics = raw.get("metrics")
+    primary_metric = metrics.get("primary") if isinstance(metrics, dict) else {}
+    direction = str(
+        raw.get("direction")
+        or raw.get("metric_direction")
+        or (primary_metric.get("direction") if isinstance(primary_metric, dict) else "")
+        or ""
+    ).strip().lower()
+    expected_direction = str(protocol.get("direction") or "").strip().lower()
+    if expected_direction and direction and direction != expected_direction:
+        messages.append(f"[FAIL] {label}: metric direction {direction} does not match M2 protocol {expected_direction}")
+        ok = False
+    elif expected_direction and not direction and (primary or eligible):
+        messages.append(f"[FAIL] {label}: missing metric direction from M2 protocol")
+        ok = False
+    else:
+        messages.append(f"[PASS] {label}: metric direction aligned")
+
+    local_value = _parse_floatish(_baseline_local_value(raw, primary_metric if isinstance(primary_metric, dict) else {}))
+    value_range = _metric_range_bounds(protocol.get("value_range"))
+    normal_range = _metric_range_bounds(protocol.get("normal_reference_range") or protocol.get("normal_range"))
+    if local_value is not None and value_range and not (value_range[0] <= local_value <= value_range[1]):
+        messages.append(f"[FAIL] {label}: local metric value {local_value:.3g} outside protocol value_range {value_range}")
+        ok = False
+    elif local_value is not None and value_range:
+        messages.append(f"[PASS] {label}: local metric value inside protocol value_range")
+    if local_value is not None and normal_range and not (normal_range[0] <= local_value <= normal_range[1]):
+        messages.append(f"[FAIL] {label}: local metric value {local_value:.3g} outside normal_reference_range {normal_range}")
+        triage_ok, triage_messages = _check_m3s02_anomaly_triage(root, label, raw)
+        messages.extend(triage_messages)
+        ok = ok and triage_ok
+    elif local_value is not None and normal_range:
+        messages.append(f"[PASS] {label}: local metric value inside normal_reference_range")
+
+    validation = raw.get("metric_validation") or raw.get("metric_implementation_check")
+    if not isinstance(validation, dict):
+        messages.append(f"[FAIL] {label}: missing metric_validation mapping")
+        ok = False
+    else:
+        status = str(validation.get("status") or validation.get("verdict") or "").strip().lower()
+        if status not in {"pass", "passed", "verified", "ok"}:
+            messages.append(f"[FAIL] {label}: metric_validation status must be pass/verified")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: metric_validation status={status}")
+        evidence = validation.get("evidence_path") or validation.get("evidence_paths") or validation.get("log_path")
+        if not _project_any_path_exists(root, evidence):
+            messages.append(f"[FAIL] {label}: metric_validation missing existing evidence path")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: metric_validation evidence path exists")
+
+    return ok, messages
+
+
+def _check_m3s02_anomaly_triage(root: Path, label: str, raw: dict[str, Any]) -> tuple[bool, list[str]]:
+    messages: list[str] = []
+    ok = True
+    triage = _baseline_anomaly_triage(raw)
+    if not triage:
+        return False, [f"[FAIL] {label}: large paper/local deviation requires anomaly_triage/deviation_analysis"]
+
+    status = str(triage.get("status") or triage.get("verdict") or "").strip().lower()
+    accepted_statuses = {
+        "resolved",
+        "fixed",
+        "explained",
+        "accepted_with_waiver",
+        "waived",
+        "not_reproducible_but_bounded",
+        "bounded_caveat",
+    }
+    if status not in accepted_statuses:
+        messages.append(f"[FAIL] {label}: anomaly_triage status must be resolved/explained/accepted_with_waiver, got {status or 'unset'}")
+        ok = False
+    else:
+        messages.append(f"[PASS] {label}: anomaly_triage status={status}")
+
+    cause = str(
+        triage.get("root_cause")
+        or triage.get("cause")
+        or triage.get("explanation")
+        or triage.get("reason")
+        or ""
+    ).strip()
+    if not cause:
+        messages.append(f"[FAIL] {label}: anomaly_triage missing root_cause/explanation")
+        ok = False
+    else:
+        messages.append(f"[PASS] {label}: anomaly_triage explains root cause")
+
+    evidence = (
+        triage.get("evidence_paths")
+        or triage.get("evidence_path")
+        or triage.get("log_path")
+        or triage.get("raw_log_path")
+    )
+    if not _project_any_path_exists(root, evidence):
+        messages.append(f"[FAIL] {label}: anomaly_triage missing existing evidence path")
+        ok = False
+    else:
+        messages.append(f"[PASS] {label}: anomaly_triage evidence path exists")
+    return ok, messages
+
+
+def _check_m3s02_reference_deviation(
+    root: Path,
+    label: str,
+    raw: dict[str, Any],
+    *,
+    verdict: str,
+    waiver: str = "",
+    scope_limit: str = "",
+    eligible: bool = False,
+    primary: bool = False,
+) -> tuple[bool, list[str]]:
+    messages: list[str] = []
+    ok = True
+    reference_raw = _baseline_reference_value(raw)
+    local_raw = _baseline_local_value(raw)
+    reference_value = _parse_floatish(reference_raw)
+    local_value = _parse_floatish(local_raw)
+    needs_hard_reference = primary or eligible or verdict in {"verified_match", "verified_close"}
+
+    if reference_raw is None:
+        if needs_hard_reference and verdict != "trusted_with_caveats":
+            messages.append(f"[FAIL] {label}: missing paper/reference result for baseline verification")
+            ok = False
+        elif verdict == "trusted_with_caveats" and waiver and scope_limit:
+            messages.append(f"[PASS] {label}: missing reference result is bounded by trusted_with_caveats")
+        else:
+            messages.append(f"[WARN] {label}: paper/reference result not recorded")
+        return ok, messages
+
+    if reference_value is None:
+        messages.append(f"[FAIL] {label}: paper/reference result is not numeric: {reference_raw}")
+        return False, messages
+    if local_value is None:
+        messages.append(f"[FAIL] {label}: local baseline result is not numeric or missing")
+        return False, messages
+
+    messages.append(f"[PASS] {label}: paper/reference and local numeric results recorded")
+
+    denominator = abs(reference_value) if abs(reference_value) > 1e-12 else 1.0
+    computed_deviation = (local_value - reference_value) / denominator
+    declared_raw = _baseline_declared_deviation(raw)
+    declared_deviation = _parse_floatish(declared_raw)
+    tolerance = _baseline_deviation_tolerance(raw)
+
+    if declared_deviation is None:
+        if needs_hard_reference:
+            messages.append(
+                f"[FAIL] {label}: relative_deviation must be recorded "
+                f"(computed {computed_deviation:.3g}, tolerance {tolerance:.3g})"
+            )
+            ok = False
+        else:
+            messages.append(f"[WARN] {label}: relative_deviation not recorded")
+        effective_deviation = computed_deviation
+    else:
+        effective_deviation = declared_deviation
+        if abs(declared_deviation - computed_deviation) > max(0.02, tolerance * 0.25):
+            messages.append(
+                f"[FAIL] {label}: declared relative_deviation={declared_deviation:.3g} "
+                f"does not match computed {computed_deviation:.3g}"
+            )
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: relative_deviation recorded and consistent")
+
+    if abs(effective_deviation) > tolerance:
+        messages.append(
+            f"[FAIL] {label}: paper/local deviation {effective_deviation:.3g} exceeds tolerance {tolerance:.3g}"
+        )
+        ok = False
+        triage_ok, triage_messages = _check_m3s02_anomaly_triage(root, label, raw)
+        messages.extend(triage_messages)
+        ok = ok and triage_ok
+        if verdict in {"verified_match", "verified_close"}:
+            messages.append(f"[FAIL] {label}: large deviation cannot be marked {verdict}")
+            ok = False
+        if eligible and (not waiver or not scope_limit):
+            messages.append(f"[FAIL] {label}: eligible large-deviation baseline requires waiver and comparison_scope_limit")
+            ok = False
+    else:
+        messages.append(f"[PASS] {label}: paper/local deviation within tolerance")
+
+    return ok, messages
+
+
 def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Path]) -> tuple[bool, list[str]]:
     """Validate the structured M3S02 baseline lock manifest.
 
@@ -867,6 +1333,15 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
         ok = False
     else:
         messages.append("[PASS] M3S02: baseline code immutable after lock")
+
+    registry_ok, registry_msgs, protocols_by_id = _load_m2_metric_protocol_registry(root)
+    messages.extend(
+        f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S02 upstream: {msg.split('] ', 1)[1]}"
+        if msg.startswith("[") and "] " in msg
+        else msg
+        for msg in registry_msgs
+    )
+    ok = ok and registry_ok
 
     contract_rel_paths = {
         str(path.relative_to(root)).replace("\\", "/")
@@ -999,6 +1474,30 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
         else:
             messages.append(f"[WARN] {label}: checkpoint applicability not declared")
 
+        metric_ok, metric_msgs = _check_m3s02_metric_protocol_alignment(
+            root,
+            label,
+            raw,
+            protocols_by_id,
+            eligible=eligible,
+            primary="primary" in role,
+        )
+        messages.extend(metric_msgs)
+        ok = ok and metric_ok
+
+        deviation_ok, deviation_msgs = _check_m3s02_reference_deviation(
+            root,
+            label,
+            raw,
+            verdict=verdict,
+            waiver=waiver,
+            scope_limit=scope_limit,
+            eligible=eligible,
+            primary="primary" in role,
+        )
+        messages.extend(deviation_msgs)
+        ok = ok and deviation_ok
+
         allowed_verdicts = {"verified_match", "verified_close"}
         if verdict in allowed_verdicts:
             messages.append(f"[PASS] {label}: verification_verdict={verdict}")
@@ -1011,15 +1510,6 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
         else:
             messages.append(f"[FAIL] {label}: verification_verdict must be verified_match, verified_close, or justified trusted_with_caveats")
             ok = False
-
-        deviation = _parse_floatish(raw.get("relative_deviation"))
-        if deviation is not None and abs(deviation) > 0.10 and not waiver:
-            messages.append(f"[FAIL] {label}: relative_deviation={deviation:.3g} exceeds 0.10 without waiver")
-            ok = False
-        elif deviation is not None:
-            messages.append(f"[PASS] {label}: relative_deviation recorded")
-        else:
-            messages.append(f"[WARN] {label}: relative_deviation not recorded")
 
         if "primary" in role and not eligible:
             messages.append(f"[FAIL] {label}: primary baseline must set m3s03_eligible: true")
@@ -1371,7 +1861,7 @@ def _check_m1s05_novelty_feasibility(root: Path) -> tuple[bool, list[str]]:
     return ok, messages
 
 
-def _check_m2s05_experiment_design(text: str) -> tuple[bool, list[str]]:
+def _check_m2s05_experiment_design(root: Path, text: str) -> tuple[bool, list[str]]:
     """Validate M2S05 experiment setup against the user's requirements."""
     messages: list[str] = []
     ok = True
@@ -1420,10 +1910,14 @@ def _check_m2s05_experiment_design(text: str) -> tuple[bool, list[str]]:
     else:
         messages.append(f"[PASS] M2S05: {exp_count} experiment IDs found")
 
+    registry_ok, registry_msgs, _protocols = _load_m2_metric_protocol_registry(root)
+    messages.extend(f"[{msg.split('] ', 1)[0].lstrip('[')}] M2S05: {msg.split('] ', 1)[1]}" if msg.startswith("[") and "] " in msg else msg for msg in registry_msgs)
+    ok = ok and registry_ok
+
     return ok, messages
 
 
-def _check_m2s06_experiment_plan(text: str) -> tuple[bool, list[str]]:
+def _check_m2s06_experiment_plan(root: Path, text: str) -> tuple[bool, list[str]]:
     """Validate M2S06 full experiment plan/report blueprint."""
     messages: list[str] = []
     ok = True
@@ -1474,6 +1968,22 @@ def _check_m2s06_experiment_plan(text: str) -> tuple[bool, list[str]]:
         ok = False
     else:
         messages.append("[PASS] M2S06: report blueprint has per-experiment subsection")
+
+    registry_ok, registry_msgs, protocols = _load_m2_metric_protocol_registry(root)
+    messages.extend(f"[{msg.split('] ', 1)[0].lstrip('[')}] M2S06 upstream: {msg.split('] ', 1)[1]}" if msg.startswith("[") and "] " in msg else msg for msg in registry_msgs)
+    ok = ok and registry_ok
+    if protocols:
+        if "metric_protocol_id" not in text and "指标协议" not in text:
+            messages.append("[FAIL] M2S06: plan must reference metric_protocol_id from M2S05")
+            ok = False
+        else:
+            messages.append("[PASS] M2S06: plan references metric protocol IDs")
+        for protocol_id in protocols:
+            if protocol_id not in text:
+                messages.append(f"[FAIL] M2S06: missing metric protocol reference {protocol_id}")
+                ok = False
+            else:
+                messages.append(f"[PASS] M2S06: references metric protocol {protocol_id}")
 
     return ok, messages
 
@@ -3586,7 +4096,7 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
             ok = False
         else:
             text = doc.read_text(encoding="utf-8")
-            design_ok, design_msgs = _check_m2s05_experiment_design(text)
+            design_ok, design_msgs = _check_m2s05_experiment_design(root, text)
             messages.extend(design_msgs)
             ok = ok and design_ok
         review_ok, review_msgs = _check_stage_reviews(root, stage)
@@ -3601,7 +4111,7 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
             ok = False
         else:
             text = doc.read_text(encoding="utf-8")
-            plan_ok, plan_msgs = _check_m2s06_experiment_plan(text)
+            plan_ok, plan_msgs = _check_m2s06_experiment_plan(root, text)
             messages.extend(plan_msgs)
             ok = ok and plan_ok
         review_ok, review_msgs = _check_stage_reviews(root, stage)
@@ -3744,6 +4254,14 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
             ok = False
         else:
             verified = 0
+            registry_ok, registry_msgs, protocols_by_id = _load_m2_metric_protocol_registry(root)
+            messages.extend(
+                f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S02 contract upstream: {msg.split('] ', 1)[1]}"
+                if msg.startswith("[") and "] " in msg
+                else msg
+                for msg in registry_msgs
+            )
+            ok = ok and registry_ok
             for contract in baseline_contracts:
                 try:
                     data = _load_yaml(contract)
@@ -3757,6 +4275,16 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                     messages.append(f"[FAIL] M3S02: incomplete primary metric in {contract}")
                     ok = False
                     continue
+                metric_ok, metric_msgs = _check_m3s02_metric_protocol_alignment(
+                    root,
+                    f"M3S02 metric_contract[{contract.relative_to(root)}]",
+                    data,
+                    protocols_by_id,
+                    eligible=True,
+                    primary=True,
+                )
+                messages.extend(metric_msgs)
+                ok = ok and metric_ok
                 if verdict in {"verified_match", "verified_close", "trusted_with_caveats"}:
                     verified += 1
                 elif verdict == "diverged":

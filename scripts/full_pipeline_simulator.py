@@ -491,6 +491,36 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "| Exp-3 | 实验目标 robustness purpose | H3 | robustness | baseline | accuracy metric | 可选 |\n\n"
             "随机种子 seed: 42. 单次固定 seed 实验，不要求多 seed 统计检验。可复现 reproducibility requirements git commit.\n",
         )
+        _write_yaml(
+            root / "knowledge" / "M2" / "M2S05_metric_protocol.yaml",
+            {
+                "schema_version": 1,
+                "metric_protocols": [
+                    {
+                        "metric_protocol_id": "mp_demo_accuracy",
+                        "dataset": "demo",
+                        "scenario": "classification",
+                        "split": "test",
+                        "metric_key": "accuracy",
+                        "definition": "fraction of correct labels",
+                        "calculation": "correct / total over the test split",
+                        "direction": "higher_is_better",
+                        "value_range": [0.0, 1.0],
+                        "normal_reference_range": [0.5, 0.95],
+                        "protocol_source": {
+                            "source_id": "PaperX",
+                            "table_or_section": "Table 1",
+                            "rationale": "standard classification metric for demo",
+                        },
+                        "metric_sanity_check": {
+                            "test_case": "two correct out of four examples",
+                            "expected_value": 0.5,
+                            "tolerance": 1.0e-6,
+                        },
+                    }
+                ],
+            },
+        )
     elif stage == "M2S06":
         _write(
             out,
@@ -516,7 +546,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "- 参考相关工作实验设置: PaperX reference protocol 论文\n"
             "- 数据集与划分: DemoSet dataset split\n"
             "- Baselines / 对照组: baseline\n"
-            "- 评价指标: accuracy metric\n"
+            "- 评价指标: metric_protocol_id=mp_demo_accuracy accuracy metric\n"
             "- 运行协议: seed=42 epoch hardware 超参\n"
             "- 预期结果形态: table plot\n"
             "- 成功标准: ...\n"
@@ -647,15 +677,51 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "### Baseline 1\n"
             "Verification path: verify-local-existing.\n"
             "Checkpoint verified loadable: not_applicable.\n"
+            "metric_protocol_id: mp_demo_accuracy; scenario: classification.\n"
             "Paper value: 0.75; local value: 0.75; relative_deviation: 0.0.\n"
             "verification_verdict: verified_match.\n\n"
             "## Smoke Test\nsmoke passed.\n\n"
             "## Baseline Lock Manifest\n"
             "`experiments/baselines/baseline_lock.yaml` declares baseline_1 as primary and m3s03_eligible.\n",
         )
+        _write(
+            root / "experiments" / "baselines" / "baseline_1" / "logs" / "metric_sanity.log",
+            "metric sanity passed: 2/4 accuracy = 0.5\n",
+        )
+        _write(
+            root / "experiments" / "baselines" / "baseline_1" / "logs" / "eval.log",
+            "local accuracy = 0.75\n",
+        )
         _write_yaml(
             root / "experiments" / "baselines" / "baseline_1" / "metric_contract.yaml",
-            {"verification_verdict": "verified_match", "metrics": {"primary": {"key": "accuracy", "value": 0.75}}},
+            {
+                "baseline_id": "baseline_1",
+                "verification_verdict": "verified_match",
+                "metric_protocol_id": "mp_demo_accuracy",
+                "dataset": "demo",
+                "scenario": "classification",
+                "split": "test",
+                "metrics": {"primary": {"key": "accuracy", "value": 0.75, "direction": "higher_is_better"}},
+                "reference_result": {
+                    "source": "paper",
+                    "value": 0.75,
+                    "dataset": "demo",
+                    "scenario": "classification",
+                    "split": "test",
+                    "metric": "accuracy",
+                    "table_or_section": "Table 1",
+                },
+                "local_validation": {
+                    "command": "python eval.py --metric accuracy",
+                    "raw_log_path": "experiments/baselines/baseline_1/logs/eval.log",
+                    "local_value": 0.75,
+                },
+                "deviation": {"relative_delta": 0.0, "tolerance": 0.10, "passed": True},
+                "metric_validation": {
+                    "status": "pass",
+                    "evidence_path": "experiments/baselines/baseline_1/logs/metric_sanity.log",
+                },
+            },
         )
         _write_yaml(
             root / "experiments" / "baselines" / "baseline_lock.yaml",
@@ -673,12 +739,34 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                         "implementation_fidelity": "official_code",
                         "implementation_path": "experiments/baselines/baseline_1/",
                         "metric_contract": "experiments/baselines/baseline_1/metric_contract.yaml",
+                        "metric_protocol_id": "mp_demo_accuracy",
                         "dataset": "demo",
+                        "scenario": "classification",
                         "split": "test",
                         "metric": "accuracy",
+                        "direction": "higher_is_better",
                         "paper_value": 0.75,
                         "local_value": 0.75,
                         "relative_deviation": 0.0,
+                        "reference_result": {
+                            "source": "paper",
+                            "value": 0.75,
+                            "dataset": "demo",
+                            "scenario": "classification",
+                            "split": "test",
+                            "metric": "accuracy",
+                            "table_or_section": "Table 1",
+                        },
+                        "local_validation": {
+                            "command": "python eval.py --metric accuracy",
+                            "raw_log_path": "experiments/baselines/baseline_1/logs/eval.log",
+                            "local_value": 0.75,
+                        },
+                        "deviation": {"relative_delta": 0.0, "tolerance": 0.10, "passed": True},
+                        "metric_validation": {
+                            "status": "pass",
+                            "evidence_path": "experiments/baselines/baseline_1/logs/metric_sanity.log",
+                        },
                         "verification_verdict": "verified_match",
                         "m3s03_eligible": True,
                         "checkpoint": {
@@ -692,8 +780,10 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                     "primary_baseline_id": "baseline_1",
                     "metric_contract": "experiments/baselines/baseline_1/metric_contract.yaml",
                     "dataset": "demo",
+                    "scenario": "classification",
                     "split": "test",
                     "metric": "accuracy",
+                    "metric_protocol_id": "mp_demo_accuracy",
                 },
             },
         )

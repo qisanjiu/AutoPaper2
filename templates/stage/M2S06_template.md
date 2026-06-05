@@ -116,12 +116,19 @@ M3/M4 执行后，每个实验必须按以下蓝图回填完整实验报告；M2
 - **参考相关工作实验设置**: [论文X 的 dataset/metric/protocol/baseline]
 - **数据集与划分**: ...
 - **Baselines / 对照组**: ...
-- **评价指标**: ...
+- **评价指标**: metric_protocol_id=`mp_...`，必须来自 `knowledge/M2/M2S05_metric_protocol.yaml`
+- **指标正确性约束**: dataset/scenario/split/metric/direction/value_range/normal_reference_range 不得在 M3 中改写；若发现指标不适配，必须 BACKTRACK 到 M2S05，而不是在 M3 静默替换。
 - **运行协议**: seed、epoch、硬件、超参、公平性约束
 - **预期结果形态**: 表格 / 主结果图 / 消融图 / 失败案例
 - **成功标准**: ...
 - **失败时诊断路径**: implementation / design / hypothesis / data / baseline
 - **需要保存的证据**: raw logs、config、checkpoint、results.tsv、plot script
+
+### 7.1 Metric Protocol Reference（必须）
+
+| 实验 ID | metric_protocol_id | Dataset | Scenario | Split | Metric | Direction | 正常参考范围 | 异常处理 |
+|---------|--------------------|---------|----------|-------|--------|-----------|--------------|----------|
+| Exp-1 | mp_... | ... | ... | test | ... | higher_is_better | [...] | 超出范围必须记录 anomaly_triage，并回溯到 M2S05 或 M3S02/M3S01 |
 
 ---
 

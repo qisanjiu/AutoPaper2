@@ -4,7 +4,7 @@
 > **Module**: M2 — Method Design
 > **Agent**: Method Agent
 > **Input**: M2S04_algorithm_theory.md, M1S02_literature_deepdive.md
-> **Output**: knowledge/M2/M2S05_experiment_setup.md
+> **Output**: knowledge/M2/M2S05_experiment_setup.md + knowledge/M2/M2S05_metric_protocol.yaml
 
 ---
 
@@ -123,9 +123,40 @@
 ### 3.4 评估协议
 
 - **评估指标**:
-  | 指标 | 定义 | 计算方式 | 方向（高/低为好） |
-  |------|------|---------|-----------------|
-  | {{metric_1}} | ... | ... | 高/低 |
+  | metric_protocol_id | 数据集 | 场景/任务 | Split | 指标 | 定义 | 计算方式 | 方向 | 取值范围 | 正常参考范围 | 协议来源 |
+  |--------------------|--------|-----------|-------|------|------|----------|------|----------|--------------|----------|
+  | mp_{{dataset}}_{{metric}} | {{dataset}} | {{scenario}} | test | {{metric_1}} | ... | ... | higher_is_better / lower_is_better | [0, 1] | [{{normal_low}}, {{normal_high}}] | paper/official benchmark/leaderboard |
+
+- **指标协议锁定原则**:
+  - M2S05 必须为每个会进入 M3/M4 的 dataset + scenario + split + metric 组合分配唯一 `metric_protocol_id`。
+  - 指标必须说明它对哪个数据集、哪个场景/任务、哪个 split 是正常指标；不得只写 "accuracy"、"F1" 等裸指标名。
+  - 必须给出 `value_range` 与 `normal_reference_range`。超出 `value_range` 是实现错误；超出 `normal_reference_range` 是异常结果，M3 必须报告并做 triage，不能静默推进。
+  - 必须给出 `metric_sanity_check`，用一个可手算小样例证明指标方向、公式、平均方式、类别/样本权重处理正确。
+
+同步写入 `knowledge/M2/M2S05_metric_protocol.yaml`：
+
+```yaml
+schema_version: 1
+metric_protocols:
+  - metric_protocol_id: mp_{{dataset}}_{{metric}}
+    dataset: "{{dataset}}"
+    scenario: "{{scenario_or_task}}"
+    split: "test"
+    metric_key: "{{metric_1}}"
+    definition: "..."
+    calculation: "..."
+    direction: higher_is_better
+    value_range: [0.0, 1.0]
+    normal_reference_range: [{{normal_low}}, {{normal_high}}]
+    protocol_source:
+      source_id: "{{paper_or_benchmark_id}}"
+      table_or_section: "..."
+      rationale: "why this metric is standard for this dataset/scenario"
+    metric_sanity_check:
+      test_case: "..."
+      expected_value: 0.0
+      tolerance: 1.0e-6
+```
 
 - **统计检验**:
   - 检验方法: 不适用（固定 seed=42 的单次实验）
