@@ -79,7 +79,8 @@ requirements:
       evidence for proposed results; M3 baselines cannot be ablations or
       simplified implementations. M3S02 baseline contracts must align with
       M2S05 metric_protocol_id and report anomalous metric values instead of
-      silently advancing.
+      silently advancing. Dataset/baseline/checkpoint/model-asset acquisition
+      failures must trigger continued attempts or non-PASS/HALT, never PASS.
     enforced_by:
       stage_gates: [M3S01, M3S02, M3S03, M3S04]
       configs: [config/execution_env.yaml]
@@ -202,7 +203,8 @@ requirements:
     user_requirement: >
       The main agent must orchestrate only: project creation, routing, stage
       advancement, review scheduling, gates, and backtracking. It must never
-      directly execute stage or review work.
+      directly execute stage or review work, and must block ambiguous PASS or
+      blocked-acquisition PASS reviews/gates from advancing.
     enforced_by:
       scripts: [scripts/state_manager.py]
       dispatch: [spiral/dispatch.py]

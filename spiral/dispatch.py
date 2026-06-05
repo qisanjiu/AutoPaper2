@@ -55,6 +55,7 @@ REVIEWER_BOUNDARIES = [
     "Review only; do not modify the stage output under review.",
     "Read the original file paths directly; do not rely on executor summaries.",
     "Write exactly one review file at the requested output path.",
+    "Do not return PASS when evidence is pending, failed, unavailable, ambiguous, or waiting for human/manual action.",
     "For non-PASS verdicts, include target_stage, blocking_reason, required_fix, success_criteria, evidence_paths, rebuild_mode, rerun_scope, and handoff_updates.",
 ]
 

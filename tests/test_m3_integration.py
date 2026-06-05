@@ -270,6 +270,24 @@ class TestM3StageGate(unittest.TestCase):
                 f"{ledger_rows}",
                 encoding="utf-8",
             )
+            if execution_mode == "ssh":
+                (self.root / "experiments" / "logs" / "remote_download.log").write_text(
+                    "download completed; checksum passed\n",
+                    encoding="utf-8",
+                )
+                (self.root / "experiments" / "logs" / "rsync_push.log").write_text(
+                    "rsync completed; remote workspace ready\n",
+                    encoding="utf-8",
+                )
+            else:
+                (self.root / "experiments" / "logs" / "demo_download.log").write_text(
+                    "download completed; checksum passed\n",
+                    encoding="utf-8",
+                )
+                (self.root / "experiments" / "logs" / "import_smoke.log").write_text(
+                    "import smoke passed\n",
+                    encoding="utf-8",
+                )
 
     def _write_m3s02_files(
         self,
@@ -296,6 +314,7 @@ class TestM3StageGate(unittest.TestCase):
         include_metric_validation_evidence: bool = True,
         checkpoint_required: bool = False,
         checkpoint_verified: bool = False,
+        checkpoint_file_exists: bool = True,
     ) -> None:
         for rel in (
             "knowledge/M2",
@@ -336,6 +355,11 @@ class TestM3StageGate(unittest.TestCase):
                 "metric sanity passed: 2/4 accuracy = 0.5\n",
                 encoding="utf-8",
             )
+        checkpoint_rel = "experiments/baselines/baseline_1/checkpoints/model.pth"
+        if checkpoint_required and checkpoint_file_exists:
+            checkpoint_path = self.root / checkpoint_rel
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            checkpoint_path.write_text("checkpoint-bytes", encoding="utf-8")
         (self.root / "experiments" / "baselines" / "baseline_1" / "logs" / "eval.log").write_text(
             f"local accuracy = {local_value}\n",
             encoding="utf-8",
@@ -445,6 +469,12 @@ class TestM3StageGate(unittest.TestCase):
                 f"      required: {'true' if checkpoint_required else 'false'}\n"
                 f"      status: {'verified_loadable' if checkpoint_verified else 'not_applicable'}\n"
                 f"      verified_loadable: {'true' if checkpoint_verified else 'false'}\n"
+                f"      source_url: {'https://example.test/model.pth' if checkpoint_required else ''}\n"
+                f"      local_path: {checkpoint_rel if checkpoint_required else ''}\n"
+                f"      checksum: {'sha256:demo' if checkpoint_required else ''}\n"
+                "      search_attempts:\n"
+                f"        - official_release: {'attempted' if checkpoint_required else 'not_applicable'}\n"
+                f"        - huggingface: {'attempted' if checkpoint_required else 'not_applicable'}\n"
                 "m3s03_contract:\n"
                 "  primary_baseline_id: baseline_1\n"
                 "  metric_contract: experiments/baselines/baseline_1/metric_contract.yaml\n"
@@ -887,6 +917,18 @@ class TestM3StageGate(unittest.TestCase):
         self.assertTrue(any("implementation doc records ssh/remote execution mode" in message for message in messages), messages)
         self.assertTrue(any("SSH mode ledger includes remote execution/rsync evidence" in message for message in messages), messages)
 
+    def test_m3s01_stage_gate_blocks_incomplete_dataset_download(self) -> None:
+        self._write_m3s01_files()
+        ledger = self.root / "experiments" / "logs" / "m3s01_longrun_ledger.md"
+        text = ledger.read_text(encoding="utf-8")
+        text = text.replace("| completed | `experiments/logs/demo_download.log`", "| blocked_user_action | `experiments/logs/demo_download.log`", 1)
+        ledger.write_text(text, encoding="utf-8")
+
+        ok, messages = check_stage(self.root, "M3S01")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("acquisition task dataset: demo is not completed" in message for message in messages), messages)
+
     def test_m3s02_stage_gate_accepts_baseline_lock_manifest(self) -> None:
         self._write_m3s02_files()
 
@@ -907,6 +949,20 @@ class TestM3StageGate(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertTrue(any("alternate stage review file" in message for message in messages), messages)
+
+    def test_stage_review_pass_cannot_contain_blocking_download_language(self) -> None:
+        self._write_m3s02_files()
+        (self.root / "knowledge" / "reviews" / "M3S02_baseline_result_review.md").write_text(
+            "# M3S02 Baseline Result Review\n\n"
+            "Verdict: PASS\n\n"
+            "Checkpoint download pending; should be okay to proceed.\n",
+            encoding="utf-8",
+        )
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("PASS verdict but contains blocking/ambiguous language" in message for message in messages), messages)
 
     def test_m3s02_stage_gate_requires_baseline_lock_manifest(self) -> None:
         self._write_m3s02_files(include_lock=False)
@@ -963,6 +1019,18 @@ class TestM3StageGate(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertTrue(any("metric_validation status must be pass" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_requires_checkpoint_file_when_needed(self) -> None:
+        self._write_m3s02_files(
+            checkpoint_required=True,
+            checkpoint_verified=True,
+            checkpoint_file_exists=False,
+        )
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("required checkpoint local_path missing or does not exist" in message for message in messages), messages)
 
     def test_m3s02_stage_gate_rejects_weird_metric_value_without_triage(self) -> None:
         self._write_m3s02_files(paper_value=0.99, local_value=0.99)

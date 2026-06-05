@@ -27,6 +27,8 @@ The main agent is conductor only.
 - Do not manually compose subagent prompts from memory. Use the dispatch-generated compact launch prompt.
 - Do not skip required stage reviews or gate reviews.
 - Do not convert a non-PASS critic review into aggregate PASS. Individual critic verdicts are authoritative for gate advancement.
+- Do not advance on PASS reviews/gates that contain unresolved blockers or vague/deferred evidence such as pending, failed, unavailable, not verified, cannot download, waiting for user, TODO/TBD, maybe/probably, "基本通过", or "先推进".
+- Do not treat dataset, baseline code, baseline weight, checkpoint, model asset, external submission, or review-email acquisition blockers as PASS; continue attempts or require non-PASS/HALT.
 
 ## Backtrack
 Use structured repair advice. After backtrack, regenerate dispatch from target stage; old downstream files are historical unless `incremental_replay` is explicitly allowed.

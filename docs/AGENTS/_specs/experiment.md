@@ -19,6 +19,7 @@
 
 ## Stop / Backtrack Rules
 - Do not skip dataset/checkpoint/download just because it is slow; record wait/resume commands.
+- Download/acquisition blockers are not PASS conditions. If datasets, baseline code, baseline weights, checkpoints, or model assets are still `failed`, `running`, `queued`, `blocked_user_action`, unavailable, or not verified, the stage/review must be non-PASS until the artifact is completed with evidence or a HALT is raised for human action after recorded attempts.
 - Watchdog alerts require an agent decision: `continue`, `fix_and_rerun`, `early_stop`, or `backtrack_request` with evidence.
 - If design, dataset, metric, or baseline is invalid, request structured backtrack instead of silently changing upstream assumptions.
 - Do not mark M3S03 complete while a required training stage is still running. E0/random/untrained weights are diagnostic only and must never populate the final proposed/ours result row.
@@ -29,6 +30,7 @@
 - M3S02 must not define or silently replace metrics. Each primary comparator must cite an M2S05 `metric_protocol_id` and match that protocol's dataset, scenario, split, metric key, direction, value range, and normal reference range.
 - If a baseline local value is outside the M2 normal reference range or has a large paper/local deviation, M3S02 must write structured anomaly/deviation triage with evidence paths and request REVISE/BACKTRACK as needed; it must not mark that result as `verified_match` or `verified_close`.
 - If a baseline depends on pretrained weights/checkpoints, actively locate and acquire them from official releases, README-linked storage, framework auto-download, HuggingFace, third-party mirrors, or project cache before declaring it unavailable.
+- Required checkpoints must record source URL, local path, checksum, loadability verification, and acquisition/search attempts. A required checkpoint without a real local file cannot enter M3S03.
 - M3 baselines must be external comparators from prior work, official packages, or full faithful reproductions. They must not be ablations, variants, or disabled-component versions of the proposed method; ablations are M4-only.
 - A self-implemented/reimplemented baseline must be a full reproduction of the paper/model. Simplified, toy, minimal, proxy, or partial implementations are forbidden as M3 baselines; if full fidelity cannot be reached, request backtrack or mark the comparator ineligible.
 - Baseline code is mutable only during M3S02 repair. After `baseline_code_immutable_after_lock: true`, M3S03 must treat baseline code, checkpoint, dataset split, and metric contract as read-only.

@@ -127,6 +127,40 @@ class TestGateRubricValidation(unittest.TestCase):
             self.assertTrue(ok, "\n".join(messages))
             self.assertTrue(any("rubric G1-R1 evidence path exists" in message for message in messages))
 
+    def test_gate_critic_pass_cannot_hide_pending_download(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            root.mkdir()
+            _setup_g1_project(root)
+            critic_path = gate_critic_review_paths(root, "G1")["logic"]
+            critic_path.write_text(
+                "# G1 logic Review\n\n"
+                "Verdict: PASS\n\n"
+                "Dataset download pending; maybe okay to proceed.\n",
+                encoding="utf-8",
+            )
+
+            ok, messages = validate_gate_critic_reviews(root, "G1")
+
+            self.assertFalse(ok)
+            self.assertTrue(any("PASS verdict but contains blocking/ambiguous language" in message for message in messages), messages)
+
+    def test_gate_aggregate_pass_cannot_hide_pending_download(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            root.mkdir()
+            _setup_g1_project(root)
+            aggregate = root / "knowledge" / "reviews" / "G1_aggregate.md"
+            aggregate.write_text(
+                _rubric_aggregate(root, "G1") + "\nCheckpoint download pending but probably acceptable.\n",
+                encoding="utf-8",
+            )
+
+            ok, messages = validate_gate_rubric(root, "G1", aggregate)
+
+            self.assertFalse(ok)
+            self.assertTrue(any("aggregate verdict PASS but review contains blocking/ambiguous language" in message for message in messages), messages)
+
     def test_gate_advance_blocks_missing_rubric_row(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "proj"

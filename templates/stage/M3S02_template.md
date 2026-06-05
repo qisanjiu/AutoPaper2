@@ -248,3 +248,5 @@ m3s03_contract:
 如果 `source: reimplementation` 或自行实现，`implementation_fidelity` 必须是 `full_reproduction`、`paper_faithful_reproduction` 或 `official_equivalent`，并且 `fidelity_evidence` 必须指向已存在的复现一致性报告。不得使用 simplified / toy / minimal / proxy baseline。
 
 M3S02 不得重新定义指标。所有 primary baseline 必须引用 M2S05 的 `metric_protocol_id`，并与其 dataset、scenario、split、metric、direction、value_range、normal_reference_range 一致。若本地结果超出正常参考范围，必须写入 `anomaly_triage`，提供真实日志/证据路径，并根据根因 REVISE 或 BACKTRACK；不得把异常结果标成 `verified_match` 或 `verified_close` 后继续推进。
+
+若 baseline 代码、baseline 权重或 checkpoint 无法获取，M3S02 不能 PASS。Agent 必须先记录官方 release、README/model zoo、代码自动下载、HuggingFace/ModelScope/PyTorch Hub、第三方镜像、项目缓存/SSH 公共缓存等尝试；仍失败时 review 应给出 REVISE/BACKTRACK/HALT 和人工介入需求，而不是把 baseline 标成 eligible。

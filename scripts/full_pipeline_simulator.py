@@ -670,6 +670,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "|---|---|---|---|---|---|---|---|---|\n"
             "| dataset | local | `wget -c https://example.test/demo.zip` | completed | `experiments/logs/download.log` | timeout=12h; poll_interval=30m | `wget -c https://example.test/demo.zip` | none | checksum passed |\n",
         )
+        _write(root / "experiments" / "logs" / "download.log", "download completed; checksum passed\n")
     elif stage == "M3S02":
         _write(
             out,

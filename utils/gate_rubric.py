@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 from utils.file_guard import find_alternate_outputs
+from utils.review_integrity import find_pass_integrity_issues
 
 RUBRIC_CONFIG_PATH = Path(__file__).parent.parent / "config" / "gate_rubrics.yaml"
 
@@ -183,7 +184,15 @@ def validate_gate_critic_reviews(
                 )
             ok = False
         else:
-            messages.append(f"[PASS] Gate {gate_id}: critic review {critic} PASS")
+            integrity_issues = find_pass_integrity_issues(text)
+            if integrity_issues:
+                messages.append(
+                    f"[FAIL] Gate {gate_id}: critic review {review_path.name} has PASS verdict but contains "
+                    "blocking/ambiguous language: " + " | ".join(integrity_issues[:3])
+                )
+                ok = False
+            else:
+                messages.append(f"[PASS] Gate {gate_id}: critic review {critic} PASS")
 
     return ok, messages
 
@@ -304,7 +313,15 @@ def validate_gate_rubric(
         messages.append(f"[FAIL] Gate {gate_id}: aggregate verdict must be explicit PASS for advancement")
         ok = False
     else:
-        messages.append(f"[PASS] Gate {gate_id}: aggregate verdict PASS")
+        integrity_issues = find_pass_integrity_issues(text)
+        if integrity_issues:
+            messages.append(
+                f"[FAIL] Gate {gate_id}: aggregate verdict PASS but review contains "
+                "blocking/ambiguous language: " + " | ".join(integrity_issues[:3])
+            )
+            ok = False
+        else:
+            messages.append(f"[PASS] Gate {gate_id}: aggregate verdict PASS")
 
     if "rubric results" not in text.lower() and "rubric id" not in text.lower():
         messages.append(f"[FAIL] Gate {gate_id}: aggregate review missing Rubric Results table")

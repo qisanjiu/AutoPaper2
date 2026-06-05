@@ -21,6 +21,7 @@ from spiral.verdict_parser import (
     is_valid_rebuild_mode,
 )
 from utils.file_guard import find_alternate_outputs
+from utils.review_integrity import find_pass_integrity_issues
 
 _STAGE_REVIEW_REQUIREMENTS: dict[str, dict[str, str]] = {
     "M2S01": {
@@ -1457,7 +1458,8 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
         checkpoint = raw.get("checkpoint") if isinstance(raw.get("checkpoint"), dict) else {}
         checkpoint_required = _truthy(raw.get("checkpoint_required")) or _truthy(checkpoint.get("required"))
         checkpoint_status = str(raw.get("checkpoint_status") or checkpoint.get("status") or "").strip().lower()
-        checkpoint_has_path = bool(str(raw.get("checkpoint_local_path") or checkpoint.get("local_path") or "").strip())
+        checkpoint_path_ref = raw.get("checkpoint_local_path") or checkpoint.get("local_path")
+        checkpoint_has_path = bool(str(checkpoint_path_ref or "").strip())
         checkpoint_verified = (
             _truthy(raw.get("checkpoint_verified_loadable"))
             or _truthy(checkpoint.get("verified_loadable"))
@@ -1468,11 +1470,30 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
             messages.append(f"[FAIL] {label}: checkpoint is required/present but not verified loadable")
             ok = False
         elif checkpoint_required or checkpoint_has_path:
+            if checkpoint_required:
+                source_url = str(checkpoint.get("source_url") or raw.get("checkpoint_source_url") or "").strip()
+                checksum = str(checkpoint.get("checksum") or raw.get("checkpoint_checksum") or "").strip()
+                search_attempts = checkpoint.get("search_attempts") or raw.get("checkpoint_search_attempts")
+                if not source_url:
+                    messages.append(f"[FAIL] {label}: required checkpoint missing source_url")
+                    ok = False
+                if not checkpoint_has_path or not _project_path_exists(root, checkpoint_path_ref):
+                    messages.append(f"[FAIL] {label}: required checkpoint local_path missing or does not exist")
+                    ok = False
+                if not checksum:
+                    messages.append(f"[FAIL] {label}: required checkpoint missing checksum")
+                    ok = False
+                if not _nonempty(search_attempts):
+                    messages.append(f"[FAIL] {label}: required checkpoint missing search_attempts/acquisition attempts")
+                    ok = False
+                if source_url and checkpoint_has_path and _project_path_exists(root, checkpoint_path_ref) and checksum and _nonempty(search_attempts):
+                    messages.append(f"[PASS] {label}: required checkpoint source/path/checksum/search attempts recorded")
             messages.append(f"[PASS] {label}: checkpoint verified loadable")
         elif checkpoint_not_applicable:
             messages.append(f"[PASS] {label}: checkpoint marked not applicable")
         else:
-            messages.append(f"[WARN] {label}: checkpoint applicability not declared")
+            messages.append(f"[FAIL] {label}: checkpoint applicability not declared")
+            ok = False
 
         metric_ok, metric_msgs = _check_m3s02_metric_protocol_alignment(
             root,
@@ -1680,6 +1701,65 @@ def _contains_table_with_headers(text: str, headers: tuple[str, ...]) -> bool:
     """Heuristic check for a markdown table/list carrying all required headers."""
     lowered = text.lower()
     return all(header.lower() in lowered for header in headers)
+
+
+def _markdown_table_rows(text: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines) - 1:
+        header_line = lines[index].strip()
+        separator = lines[index + 1].strip()
+        if "|" not in header_line or not re.match(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$", separator):
+            index += 1
+            continue
+        headers = [cell.strip().lower() for cell in header_line.strip("|").split("|")]
+        index += 2
+        while index < len(lines) and "|" in lines[index]:
+            raw = lines[index].strip()
+            if not raw:
+                break
+            cells = [cell.strip().strip("`") for cell in raw.strip("|").split("|")]
+            if len(cells) < len(headers):
+                cells.extend([""] * (len(headers) - len(cells)))
+            rows.append({headers[cell_index]: cells[cell_index] for cell_index in range(len(headers))})
+            index += 1
+    return rows
+
+
+def _table_value(row: dict[str, str], names: tuple[str, ...]) -> str:
+    for name in names:
+        lowered = name.lower()
+        if lowered in row:
+            return row[lowered]
+    return ""
+
+
+def _looks_like_acquisition_task(item: str, command: str) -> bool:
+    text = f"{item} {command}".lower()
+    return any(
+        marker in text
+        for marker in (
+            "dataset",
+            "data:",
+            "checkpoint",
+            "baseline weight",
+            "weights",
+            "model asset",
+            "download",
+            "wget",
+            "curl",
+            "kaggle",
+            "huggingface",
+            "modelscope",
+            "torch.hub",
+            "rsync",
+            "数据",
+            "权重",
+            "基线",
+            "下载",
+        )
+    )
 
 
 def _load_m1_gap_ids(root: Path) -> set[str]:
@@ -2958,6 +3038,56 @@ def _check_m3s01_longrun_ledger(root: Path, execution_mode: str = "") -> tuple[b
             ok = False
             break
 
+    rows = _markdown_table_rows(text)
+    acquisition_rows = []
+    for row in rows:
+        item = _table_value(row, ("item", "任务", "条目"))
+        command = _table_value(row, ("command", "cmd", "命令"))
+        status = _table_value(row, ("status", "state", "状态")).strip().lower()
+        if not _looks_like_acquisition_task(item, command):
+            continue
+        acquisition_rows.append(row)
+        label = item or command[:60] or "acquisition task"
+        if status not in {"completed", "complete", "success", "succeeded", "done", "完成", "已完成"}:
+            messages.append(f"[FAIL] M3S01: acquisition task {label} is not completed (status={status or 'unset'})")
+            ok = False
+            continue
+        log_ref = _table_value(row, ("log path", "log_path", "log", "日志路径", "日志"))
+        if not _project_path_exists(root, log_ref):
+            messages.append(f"[FAIL] M3S01: acquisition task {label} missing existing log path")
+            ok = False
+        else:
+            messages.append(f"[PASS] M3S01: acquisition task {label} has log evidence")
+        completion = _table_value(row, ("completion criteria", "criteria", "完成标准", "completion"))
+        if not _contains_any(
+            completion,
+            (
+                "checksum",
+                "sha256",
+                "md5",
+                "files visible",
+                "file exists",
+                "import test",
+                "smoke",
+                "ready",
+                "synced",
+                "sync complete",
+                "校验",
+                "文件存在",
+                "可见",
+                "通过",
+                "同步",
+                "就绪",
+            ),
+        ):
+            messages.append(f"[FAIL] M3S01: acquisition task {label} missing concrete completion criteria")
+            ok = False
+        else:
+            messages.append(f"[PASS] M3S01: acquisition task {label} records completion criteria")
+
+    if acquisition_rows:
+        messages.append(f"[PASS] M3S01: long-running ledger includes {len(acquisition_rows)} acquisition task(s)")
+
     mode = (execution_mode or "").lower()
     if mode == "ssh":
         if not _contains_any(text, ("ssh", "rsync", "remote", "远程")):
@@ -3749,7 +3879,15 @@ def _check_stage_reviews(root: Path, stage: str) -> tuple[bool, list[str]]:
             )
             ok = False
         else:
-            messages.append(f"[PASS] {stage}: stage review {checker} PASS")
+            integrity_issues = find_pass_integrity_issues(text)
+            if integrity_issues:
+                messages.append(
+                    f"[FAIL] {stage}: stage review {review_path.name} has PASS verdict but contains "
+                    "blocking/ambiguous language: " + " | ".join(integrity_issues[:3])
+                )
+                ok = False
+            else:
+                messages.append(f"[PASS] {stage}: stage review {checker} PASS")
 
     return ok, messages
 
@@ -4191,12 +4329,19 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
         else:
             messages.append("[WARN] M3S01: requirements.lock missing, requirements.txt used as fallback")
 
+        dataset_pending = root / "knowledge" / "M3" / "M3S01_dataset_pending.md"
+        if dataset_pending.exists():
+            messages.append("[FAIL] M3S01: dataset pending report exists; data acquisition is not complete")
+            ok = False
+
         if not data_dir.exists():
-            messages.append("[WARN] M3S01: experiments/data/ not found yet")
+            messages.append("[FAIL] M3S01: experiments/data/ not found")
+            ok = False
         else:
             dataset_entries = [p for p in data_dir.iterdir() if p.exists()]
             if len(dataset_entries) == 0:
-                messages.append("[WARN] M3S01: experiments/data/ is empty")
+                messages.append("[FAIL] M3S01: experiments/data/ is empty")
+                ok = False
             else:
                 messages.append(f"[PASS] M3S01: dataset directory prepared ({len(dataset_entries)} entries)")
 
