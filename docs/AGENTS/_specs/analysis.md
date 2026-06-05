@@ -13,6 +13,7 @@
 - Robustness/performance/boundary claims require baseline comparison unless explicitly downgraded.
 - Every downstream writing claim must cite M3/M4 evidence paths and evidence status.
 - M4S02 must translate every `Ana-*` slice into an executable task with command, dependencies, resource requirements, baseline policy, expected artifacts, and success criteria.
+- Ablations live in M4 only. Treat disabled-component, variant, removal, sensitivity, and partial-method experiments as `analysis_type=ablation` slices, never as M3 baselines.
 
 ## Backtrack Rules
 - `FIX`: bounded current-stage repair.
@@ -25,3 +26,4 @@
 - Every task needs `command`, `analysis_type`, `dependencies`, `resource_requirements`, `baseline_inclusion` or `baseline_required`, `expected_artifacts`, and `success_criteria`.
 - Baseline-required tasks need a `fairness_key` tying baseline and proposed-method rows to the same split, seed, metric, and resource class.
 - If a slice cannot be executed, state the blocker in M4S02 and do not mark it as a runnable queue task.
+- M4 may compare ablation variants against the locked M3 active baseline or full proposed method, but those variants do not become baseline_lock entries and must not rewrite M3 baseline contracts.

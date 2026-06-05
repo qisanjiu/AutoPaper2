@@ -785,6 +785,54 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def _resolve_project_path(root: Path, value: Any) -> Path | None:
+    text = str(value or "").strip().strip("`'\"")
+    if not text or text.lower() in {"n/a", "na", "none", "null", "-"}:
+        return None
+    text = text.removeprefix("project:").lstrip("./")
+    candidate = Path(text)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    try:
+        candidate.resolve().relative_to(root.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def _project_path_exists(root: Path, value: Any) -> bool:
+    candidate = _resolve_project_path(root, value)
+    return bool(candidate and candidate.exists())
+
+
+def _looks_like_ablation_baseline(raw: dict[str, Any]) -> bool:
+    fields = (
+        raw.get("comparison_role"),
+        raw.get("comparator_type"),
+        raw.get("baseline_type"),
+        raw.get("analysis_type"),
+        raw.get("baseline_id"),
+        raw.get("name"),
+        raw.get("notes"),
+    )
+    text = " ".join(str(field or "") for field in fields).lower()
+    if _truthy(raw.get("ablation_of_ours")) or _truthy(raw.get("is_ablation")):
+        return True
+    return any(marker in text for marker in ("ablation", "ablated", "消融"))
+
+
+def _looks_simplified_implementation(raw: dict[str, Any]) -> bool:
+    fields = (
+        raw.get("implementation_fidelity"),
+        raw.get("fidelity"),
+        raw.get("implementation_note"),
+        raw.get("notes"),
+        raw.get("source"),
+    )
+    text = " ".join(str(field or "") for field in fields).lower()
+    return any(marker in text for marker in ("simple", "simplified", "minimal", "toy", "简化", "简单", "玩具"))
+
+
 def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Path]) -> tuple[bool, list[str]]:
     """Validate the structured M3S02 baseline lock manifest.
 
@@ -837,10 +885,55 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
         baseline_id = str(raw.get("baseline_id") or raw.get("id") or raw.get("name") or f"baseline_{index}").strip()
         label = f"M3S02 baseline_lock[{baseline_id}]"
         role = str(raw.get("comparison_role") or raw.get("role") or "").strip().lower()
+        source = str(raw.get("source") or raw.get("implementation_source") or "").strip().lower()
         eligible = _truthy(raw.get("m3s03_eligible"))
         verdict = str(raw.get("verification_verdict") or "").strip().lower()
         waiver = str(raw.get("caveat_waiver_reason") or raw.get("waiver_reason") or "").strip()
         scope_limit = str(raw.get("comparison_scope_limit") or raw.get("scope_limit") or "").strip()
+
+        if _looks_like_ablation_baseline(raw):
+            messages.append(
+                f"[FAIL] {label}: M3 baseline cannot be an ablation or variant of the proposed method; ablations belong to M4."
+            )
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: comparator is not marked as an ablation")
+
+        if _looks_simplified_implementation(raw):
+            messages.append(f"[FAIL] {label}: simplified/toy/minimal baseline implementations are forbidden")
+            ok = False
+
+        implementation_fidelity = str(raw.get("implementation_fidelity") or raw.get("fidelity") or "").strip().lower()
+        reimplementation_sources = {
+            "reimplementation",
+            "self_implemented",
+            "self-implemented",
+            "from_scratch",
+            "reproduce",
+            "自行实现",
+            "复现",
+        }
+        if source in reimplementation_sources:
+            allowed_fidelity = {"full_reproduction", "paper_faithful_reproduction", "official_equivalent"}
+            if implementation_fidelity not in allowed_fidelity:
+                messages.append(
+                    f"[FAIL] {label}: reimplemented baselines must set implementation_fidelity to "
+                    "full_reproduction, paper_faithful_reproduction, or official_equivalent"
+                )
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: reimplemented baseline declares full reproduction fidelity")
+
+            fidelity_evidence = (
+                raw.get("fidelity_evidence")
+                or raw.get("reproduction_evidence")
+                or raw.get("architecture_match_evidence")
+            )
+            if not _project_path_exists(root, fidelity_evidence):
+                messages.append(f"[FAIL] {label}: reimplemented baseline missing existing fidelity_evidence path")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: fidelity_evidence path exists")
 
         if "primary" in role:
             seen_primary_ids.append(baseline_id)
@@ -1472,6 +1565,10 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
 
     if decision != "KEEP":
         return False, messages
+
+    trained_ok, trained_msgs = _check_m3s03_trained_weight_evidence(root, doc_text=text)
+    messages.extend(trained_msgs)
+    ok = ok and trained_ok
 
     artifact_dir = root / "experiments" / "artifacts" / "main_experiment"
     required_files = {
@@ -2896,6 +2993,167 @@ def _check_m3s03_runtime_watchdog(root: Path, *, doc_text: str = "") -> tuple[bo
     return ok, messages
 
 
+def _row_first(row: dict[str, Any], names: tuple[str, ...]) -> str:
+    lowered = {str(key).strip().lower(): value for key, value in row.items()}
+    for name in names:
+        value = lowered.get(name)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
+def _jsonl_has_completion_event(path: Path, run_ids: set[str]) -> tuple[bool, str]:
+    if not path.exists():
+        return False, "missing"
+    try:
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except Exception as exc:
+        return False, f"unreadable ({exc})"
+    if not lines:
+        return False, "empty"
+
+    completion_events = {
+        "training_completed",
+        "run_completed",
+        "experiment_completed",
+        "main_experiment_completed",
+        "checkpoint_saved",
+    }
+    running_after_completion: set[str] = set()
+    completed_for_target = 0
+    completion_total = 0
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            event = {}
+        event_type = str(event.get("event_type", "")).strip().lower()
+        run_id = str(event.get("run_id", "")).strip()
+        status = str(event.get("status", "")).strip().lower()
+        if event_type in completion_events or status in {"completed", "succeeded", "finished", "done"}:
+            completion_total += 1
+            if not run_ids or run_id in run_ids:
+                completed_for_target += 1
+                running_after_completion.discard(run_id)
+        if run_id in run_ids and (event_type in {"training_started", "run_started"} or status in {"running", "queued"}):
+            running_after_completion.add(run_id)
+    if completed_for_target <= 0:
+        return False, f"{len(lines)} line(s), but no completion event for proposed run"
+    if running_after_completion:
+        return False, "latest visible status includes running/queued proposed run(s): " + ", ".join(sorted(running_after_completion))
+    return True, f"{completion_total} completion event marker(s), {completed_for_target} for proposed run(s)"
+
+
+def _check_m3s03_trained_weight_evidence(root: Path, *, doc_text: str = "") -> tuple[bool, list[str]]:
+    """Require final M3S03 results to come from completed trained weights."""
+    messages: list[str] = []
+    ok = True
+    results = root / "experiments" / "results.tsv"
+    if not results.exists():
+        return False, ["[FAIL] M3S03: results.tsv missing, cannot verify trained-weight evidence"]
+
+    try:
+        import csv
+
+        rows = list(csv.DictReader(results.read_text(encoding="utf-8").splitlines(), delimiter="\t"))
+    except Exception as exc:
+        return False, [f"[FAIL] M3S03: results.tsv unreadable for trained-weight verification: {exc}"]
+
+    if not rows:
+        return False, ["[FAIL] M3S03: results.tsv has no rows for trained-weight verification"]
+
+    proposed_rows: list[dict[str, Any]] = []
+    for row in rows:
+        method_text = " ".join(
+            _row_first(row, names)
+            for names in (
+                ("method", "model", "system", "name"),
+                ("role", "method_role", "comparison_role"),
+            )
+        ).lower()
+        if any(marker in method_text for marker in ("ours", "proposed", "our_method", "本文", "方法")):
+            proposed_rows.append(row)
+
+    if not proposed_rows:
+        messages.append("[FAIL] M3S03: results.tsv has no proposed/ours row for trained-weight verification")
+        return False, messages
+
+    completed_statuses = {"completed", "succeeded", "success", "finished", "done", "pass", "passed"}
+    trained_states = {
+        "trained",
+        "trained_checkpoint",
+        "fine_tuned",
+        "finetuned",
+        "verified_trained",
+        "verified_loadable",
+        "completed_training",
+    }
+    invalid_states = {"random", "random_init", "random_weights", "untrained", "init", "e0", "epoch0", "scratch_untrained"}
+    proposed_run_ids: set[str] = set()
+    valid_rows = 0
+
+    for idx, row in enumerate(proposed_rows, start=1):
+        row_label = f"M3S03 proposed result row {idx}"
+        run_id = _row_first(row, ("run_id", "run", "id"))
+        if run_id:
+            proposed_run_ids.add(run_id)
+
+        status = _row_first(row, ("run_status", "training_status", "status", "completion_status")).lower()
+        if status not in completed_statuses:
+            messages.append(f"[FAIL] {row_label}: run_status/training_status must be completed, got {status or 'unset'}")
+            ok = False
+            continue
+
+        weight_state = _row_first(row, ("weight_state", "weights_state", "checkpoint_status", "model_state")).lower()
+        if weight_state in invalid_states:
+            messages.append(f"[FAIL] {row_label}: final result uses invalid weight_state={weight_state}")
+            ok = False
+            continue
+        if weight_state not in trained_states:
+            messages.append(f"[FAIL] {row_label}: weight_state must prove trained weights, got {weight_state or 'unset'}")
+            ok = False
+            continue
+
+        checkpoint_path = _row_first(row, ("checkpoint_path", "weights_path", "model_checkpoint", "trained_checkpoint", "checkpoint"))
+        if not checkpoint_path:
+            messages.append(f"[FAIL] {row_label}: missing checkpoint_path/weights_path for trained weights")
+            ok = False
+            continue
+        if not _project_path_exists(root, checkpoint_path):
+            messages.append(f"[FAIL] {row_label}: checkpoint path does not exist: {checkpoint_path}")
+            ok = False
+            continue
+
+        steps_value = _row_first(row, ("training_steps", "steps", "global_step", "epochs", "epoch"))
+        steps = _parse_floatish(steps_value)
+        if steps is not None and steps <= 0:
+            messages.append(f"[FAIL] {row_label}: training_steps/epoch must be > 0, got {steps_value}")
+            ok = False
+            continue
+
+        valid_rows += 1
+
+    if valid_rows <= 0:
+        messages.append("[FAIL] M3S03: no proposed/ours result row is backed by completed trained weights")
+        ok = False
+    else:
+        messages.append(f"[PASS] M3S03: {valid_rows} proposed/ours result row(s) use completed trained checkpoints")
+
+    runtime_events = root / "experiments" / "logs" / "runtime_events.jsonl"
+    completion_ok, completion_summary = _jsonl_has_completion_event(runtime_events, proposed_run_ids)
+    if completion_ok:
+        messages.append(f"[PASS] M3S03: runtime_events.jsonl records training completion ({completion_summary})")
+    else:
+        messages.append(f"[FAIL] M3S03: runtime_events.jsonl lacks completed-training evidence ({completion_summary})")
+        ok = False
+
+    if _contains_any(doc_text, ("random weights as final", "随机权重作为最终", "untrained final", "E0 only", "E0 只用")):
+        messages.append("[FAIL] M3S03: main experiment doc describes random/untrained weights as final evidence")
+        ok = False
+
+    return ok, messages
+
+
 # Backward-compatible aliases for internal callers
 _extract_structured_field_value = extract_m3_repair_field_value
 _extract_review_verdict = extract_stage_review_verdict
@@ -3550,6 +3808,10 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
             watchdog_ok, watchdog_msgs = _check_m3s03_runtime_watchdog(root, doc_text=text)
             messages.extend(watchdog_msgs)
             ok = ok and watchdog_ok
+
+            trained_ok, trained_msgs = _check_m3s03_trained_weight_evidence(root, doc_text=text)
+            messages.extend(trained_msgs)
+            ok = ok and trained_ok
 
         if not runs_dir.exists():
             messages.append("[FAIL] M3S03: experiments/runs/ not found")

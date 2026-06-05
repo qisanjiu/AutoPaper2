@@ -11,11 +11,17 @@
 
 ## 1. Baseline 验证记录
 
+> **硬性边界**: M3S02 只锁定外部 comparator 或完整忠实复现的 prior-work baseline。本文方法的消融、组件移除、轻量变体、调参版本、proxy/simple/toy/minimal 实现均不得进入 `baseline_lock.yaml`；消融只能在 M4 设计和执行。
+
 ### Baseline 1: [名称]
 
 | 属性 | 内容 |
 |------|------|
 | 来源 | 官方代码 / pip 包 / 自行实现 |
+| comparator_type | external_prior_work / official_baseline / reproduced_prior_work |
+| ablation_of_ours | false |
+| implementation_fidelity | official_code / official_package / full_reproduction / paper_faithful_reproduction |
+| fidelity_evidence | `experiments/baselines/{id}/fidelity_report.md` 或官方 repo/config 证据 |
 | 验证路径 | attach / import / verify-local-existing / reproduce / repair |
 | Checkpoint 来源 | 官方 Release / README 链接 / HuggingFace / 自动下载 / 无 |
 | Checkpoint 本地路径 | `experiments/baselines/{id}/checkpoints/...` |
@@ -48,6 +54,10 @@ checkpoint:
 ```yaml
 baseline_id: "..."
 source: "..."
+comparator_type: external_prior_work
+ablation_of_ours: false
+implementation_fidelity: official_code / full_reproduction / paper_faithful_reproduction
+fidelity_evidence: "experiments/baselines/{id}/fidelity_report.md"
 dataset: "..."
 split: "..."
 metrics:
@@ -147,6 +157,10 @@ baselines:
     name: "..."
     comparison_role: primary
     source: official_code / pip_package / reimplementation / imported_project
+    comparator_type: external_prior_work / official_baseline / reproduced_prior_work
+    ablation_of_ours: false
+    implementation_fidelity: official_code / official_package / full_reproduction / paper_faithful_reproduction
+    fidelity_evidence: experiments/baselines/baseline_1/fidelity_report.md
     implementation_path: experiments/baselines/baseline_1/
     metric_contract: experiments/baselines/baseline_1/metric_contract.yaml
     dataset: "..."
@@ -179,3 +193,5 @@ m3s03_contract:
 ```
 
 `trusted_with_caveats` 只有在 `caveat_waiver_reason` 和 `comparison_scope_limit` 都明确时才可进入 M3S03。若 baseline 依赖 checkpoint，`checkpoint.verified_loadable` 必须为 `true`。
+
+如果 `source: reimplementation` 或自行实现，`implementation_fidelity` 必须是 `full_reproduction`、`paper_faithful_reproduction` 或 `official_equivalent`，并且 `fidelity_evidence` 必须指向已存在的复现一致性报告。不得使用 simplified / toy / minimal / proxy baseline。

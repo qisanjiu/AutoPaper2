@@ -21,7 +21,7 @@ Check whether the core idea is substantively new relative to closest work, not j
 Check method soundness, migration validity, assumptions, formalization, component necessity, relation to existing work, and whether M2/M1 backtrack is needed.
 
 ## evidence
-Check empirical support, reproducibility, baseline fairness, metric contract, seeds/statistics, evidence ladder, negative results, resource records, and claim/evidence alignment.
+Check empirical support, reproducibility, baseline fairness, metric contract, seeds/statistics, evidence ladder, negative results, resource records, trained-checkpoint completion evidence, and claim/evidence alignment. For G3, PASS is forbidden if proposed/ours results rely on random, E0, untrained, or still-running weights.
 
 ## writing
 Check paper clarity, claim discipline, section coherence, citation/terminology consistency, abstract/conclusion numeric consistency, and whether text overclaims evidence.
@@ -45,7 +45,7 @@ Check M2S02 mappings: source problem, target problem, transferable mechanism, ad
 Check M2S03/M2S04 architecture/algorithm/theory: notation, components, assumptions, complexity, proof honesty, gap/hypothesis trace, implementation readiness.
 
 ## m2_experiment_design_review
-Check M2S05 dataset/baseline/metric/split/seed/fairness/resource design, relation to hypotheses, and baseline acquisition/verification plan.
+Check M2S05 dataset/baseline/metric/split/seed/fairness/resource design, relation to hypotheses, and baseline acquisition/verification plan. Baselines must be external comparators or full reproductions, not ablations or disabled-component variants of the proposed method.
 
 ## m2_experiment_plan_review
 Check M2S06 execution order, branching/failure logic, success criteria, risk budget, at least main + ablation + robustness/boundary plan, and report blueprint.
@@ -54,13 +54,13 @@ Check M2S06 execution order, branching/failure logic, success criteria, risk bud
 Check M3S01 dataset first, env lock, sandbox profile, resource plan, hardware probe, multi-resource queue/allocation where needed, SSH evidence, longrun ledger, smoke run, no secrets.
 
 ## m3_baseline_result_review
-Check M3S02 baseline verification, checkpoint acquisition/loadability, metric contract, smoke run, fairness, paper/history deviation, and locked comparator immutability.
+Check M3S02 baseline verification, checkpoint acquisition/loadability, metric contract, smoke run, fairness, paper/history deviation, full reproduction fidelity for self-implemented comparators, no simplified/toy baselines, no ablation-as-baseline misuse, and locked comparator immutability.
 
 ## m3_baseline_lock_audit
-Audit whether M3S02 is safe to unlock M3S03. Require a structured baseline lock manifest, at least one primary comparator with `m3s03_eligible: true`, loadable checkpoints when applicable, acceptable paper/local metric deviation or an explicit waiver, immutable baseline code after lock, and a clearly bounded comparison scope. PASS only if the locked comparator can be used by M3S03 without changing baseline assumptions.
+Audit whether M3S02 is safe to unlock M3S03. Require a structured baseline lock manifest, at least one primary external/prior-work comparator with `m3s03_eligible: true`, loadable checkpoints when applicable, acceptable paper/local metric deviation or an explicit waiver, immutable baseline code after lock, no ablation/proposed-method variant in the baseline list, full reproduction fidelity for self-implemented comparators, and a clearly bounded comparison scope. PASS only if the locked comparator can be used by M3S03 without changing baseline assumptions.
 
 ## m3_main_result_review
-Check M3S03 run contract, results.tsv, logs/configs/seeds, baseline comparison, resource utilization, watchdog decisions, negative attempts, and evidence ladder.
+Check M3S03 run contract, results.tsv, logs/configs/seeds, baseline comparison, completed trained-checkpoint paths for proposed/ours rows, training completion events, resource utilization, watchdog decisions, negative attempts, and evidence ladder. REVISE/BACKTRACK if Stage 1 or any required training is still running, if only E0/random weights are evaluated, or if no trained checkpoint can be loaded.
 
 ## m4_findings_audit
 Check M4S01 consolidation of main/negative/unexpected findings, claim candidates, efficiency need, source-log/protocol basis, and analysis campaign coverage.

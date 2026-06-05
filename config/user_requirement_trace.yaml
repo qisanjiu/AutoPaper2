@@ -72,7 +72,10 @@ requirements:
       whether results match expectations, supervise long-running training with
       periodic watchdog/alert checks, distribute independent M3 tasks across
       available local/SSH/GPU resources when provided, and trigger backtracking
-      when needed.
+      when needed. M3 must actively acquire datasets, baseline code/weights,
+      and checkpoints; M3S03 may advance only with completed trained-weight
+      evidence for proposed results; M3 baselines cannot be ablations or
+      simplified implementations.
     enforced_by:
       stage_gates: [M3S01, M3S02, M3S03, M3S04]
       configs: [config/execution_env.yaml]

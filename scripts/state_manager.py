@@ -22,7 +22,7 @@ from utils.file_guard import (
     get_canonical_output_path,
 )
 from utils.stage_gate import check_stage, _check_m1s02_rounds
-from utils.gate_rubric import validate_gate_rubric
+from utils.gate_rubric import validate_gate_critic_reviews, validate_gate_rubric
 from utils.source_log_validator import validate as validate_source_log
 from spiral.project_entry import normalize_keywords as _normalize_keywords, parse_anchor_input
 from spiral.verdict_parser import (
@@ -851,15 +851,24 @@ def cmd_advance(
         print(fg_msg)
 
     if is_gate_aggregate:
-        rubric_ok, rubric_msgs = validate_gate_rubric(project_dir, gate_num, output_file)
+        critic_ok, critic_msgs = validate_gate_critic_reviews(project_dir, gate_num)
+        for m in critic_msgs:
+            print(m)
+        if not critic_ok:
+            print("  [BLOCKED] Gate critic verdict validation failed; --force cannot bypass non-PASS or malformed critic reviews.")
+            sys.exit(1)
+
+        rubric_ok, rubric_msgs = validate_gate_rubric(
+            project_dir,
+            gate_num,
+            output_file,
+            require_critic_reviews=False,
+        )
         for m in rubric_msgs:
             print(m)
         if not rubric_ok:
-            if force:
-                print("  [WARN] --force used: bypassing gate rubric checks.")
-            else:
-                print("  [BLOCKED] Gate rubric validation failed.")
-                sys.exit(1)
+            print("  [BLOCKED] Gate rubric validation failed; --force cannot bypass aggregate gate evidence checks.")
+            sys.exit(1)
 
     # M1S02: survey memory state consistency check + source log validation + sync
     if stage == "M1S02":
@@ -1319,6 +1328,10 @@ def cmd_auto_run(project_dir: str) -> None:
     cur_stage = data.get("current", {}).get("stage", "M1S01")
     cur_status = data.get("current", {}).get("status", "initialized")
     auto_advance = data.get("settings", {}).get("auto_advance_modules", False)
+    if not auto_advance:
+        data.setdefault("settings", {})["auto_advance_modules"] = True
+        _save(state_file, data)
+        auto_advance = True
     ALL_STAGES_FLAT = [s for stages in MODULE_STAGES.values() for s in stages]
 
     try:
@@ -1344,7 +1357,7 @@ def cmd_auto_run(project_dir: str) -> None:
     print(f"        IF status == waiting_gate:")
     print(f"            TRIGGER Gate (Critic Team)")
     print(f"            PROCESS verdict")
-    print(f"        ELIF status == module_completed AND auto_advance:")
+    print(f"        ELIF status == module_completed:")
     print(f"            AUTO-ADVANCE to next module first stage")
     print(f"        ELSE:")
     print(f"            CALL auto-stage current_stage")
@@ -1352,16 +1365,11 @@ def cmd_auto_run(project_dir: str) -> None:
     print(f"        END")
     print(f"    END")
     print(f"\n  User Intervention Points:")
-    if auto_advance:
-        print(f"    [Auto-advance ON] Module transitions are automatic.")
-        print(f"    - Gate HALT")
-        print(f"    - Spiral limit reached (≥10 backtracks in same module)")
-        print(f"    - stage_gate / file_guard failure (unless --force)")
-    else:
-        print(f"    - Module completion (requires explicit 'run-module' or enable auto-advance)")
-        print(f"    - Gate HALT")
-        print(f"    - Spiral limit reached (≥10 backtracks in same module)")
-        print(f"    - stage_gate / file_guard failure (unless --force)")
+    print(f"    [Auto-run] Module transitions are automatic; auto_advance_modules has been enabled.")
+    print(f"    - Gate HALT")
+    print(f"    - Spiral limit reached (≥10 backtracks in same module)")
+    print(f"    - Missing secrets, license approval, paid/quota approval, storage/network access, or unsafe/destructive action")
+    print(f"    - Explicit user pause/stop")
     print(f"{'='*60}\n")
 
 

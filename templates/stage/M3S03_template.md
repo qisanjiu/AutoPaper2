@@ -103,14 +103,30 @@ python scripts/resource_planner.py allocate \
 - **告警不自动终止**: Watchdog 仅写告警；是否结束、继续、修复或回溯由 Experiment Agent 读取日志、metric 曲线、checkpoint 和资源监控后判断。
 - **若出现告警，必须记录证据链**: `run_id`、告警类型、原始日志路径、metric/curve 路径、checkpoint 路径、Agent 决策、决策理由、后续命令。
 
+## 2.5 Trained-Weight Evidence Contract（必须）
+
+M3S03 不得在训练未完成时推进。随机初始化、E0、未训练 checkpoint、仍在 running/queued 的训练结果只能作为负面/诊断记录，不能填入最终 proposed/ours 主结果。
+
+`experiments/results.tsv` 的 proposed/ours 行必须至少包含：
+
+| method | run_id | seed | metric | value | run_status | weight_state | checkpoint_path | training_steps | resource_monitor |
+|--------|--------|------|--------|-------|------------|--------------|-----------------|----------------|------------------|
+| ours | run_001 | 42 | ... | ... | completed | trained / trained_checkpoint / verified_loadable | `experiments/runs/run_001/checkpoints/best.pt` | >0 | `experiments/runs/run_001/resource_monitor.csv` |
+
+同时必须满足：
+- `checkpoint_path` 指向项目内真实存在的文件；
+- `run_status` / `training_status` 为 completed / succeeded / finished / done；
+- `weight_state` 证明是训练完成的权重，不得为 random / random_init / untrained / E0；
+- `experiments/logs/runtime_events.jsonl` 至少包含对应 run 的 `training_completed`、`run_completed`、`experiment_completed` 或 `checkpoint_saved` 事件。
+
 ---
 
 ## 3. Baseline 结果（本地运行）
 
-| Baseline | 主指标 | 次指标 | Seed | 运行时间 | 资源策略 | resource_id | Monitor | 备注 |
-|----------|--------|--------|------|---------|----------|-------------|---------|------|
-| Baseline-1 | ... | ... | 42 | ... | resource_plan / fair override | local / ssh:lab-a | `experiments/runs/.../resource_monitor.csv` | 官方代码 |
-| Baseline-2 | ... | ... | 42 | ... | resource_plan / fair override | `experiments/runs/.../resource_monitor.csv` | 自行实现 |
+| Baseline | 主指标 | 次指标 | Seed | run_status | weight_state | checkpoint_path | 运行时间 | resource_id | Monitor | 备注 |
+|----------|--------|--------|------|------------|--------------|-----------------|---------|-------------|---------|------|
+| Baseline-1 | ... | ... | 42 | completed | trained / verified_loadable / not_applicable | `...` | ... | local / ssh:lab-a | `experiments/runs/.../resource_monitor.csv` | 官方代码 |
+| Baseline-2 | ... | ... | 42 | completed | trained / verified_loadable / not_applicable | `...` | ... | ... | `experiments/runs/.../resource_monitor.csv` | 完整复现 |
 
 ---
 
@@ -141,10 +157,10 @@ python scripts/resource_planner.py allocate \
 
 ### 5.1 主结果表
 
-| 方法 | Seed | 主指标 | 次指标 | 运行时间 | 资源策略 | resource_id | server_id | Monitor |
-|------|------|--------|--------|---------|----------|-------------|-----------|---------|
-| Baseline-1 | 42 | ... | ... | ... | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
-| Ours | 42 | ... | ... | ... | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
+| 方法 | Run ID | Seed | 主指标 | 次指标 | run_status | weight_state | checkpoint_path | training_steps | resource_id | server_id | Monitor |
+|------|--------|------|--------|--------|------------|--------------|-----------------|----------------|-------------|-----------|---------|
+| Baseline-1 | baseline_1_run | 42 | ... | ... | completed | trained / verified_loadable / not_applicable | `...` | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
+| Ours | run_001 | 42 | ... | ... | completed | trained_checkpoint | `experiments/runs/run_001/checkpoints/best.pt` | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
 
 ### 5.2 与 Baseline 的对比
 
@@ -221,4 +237,5 @@ python scripts/resource_planner.py allocate \
 - **实验是否按预期收敛**: ...
 - **Watchdog 最终状态**: info / warning_resolved / critical_resolved / early_stopped / backtrack_requested
 - **Evidence Artifact 路径**: `experiments/runs/<best_run_id>/`
+- **Trained checkpoint**: `experiments/runs/<best_run_id>/checkpoints/best.pt`，runtime event 已记录 completed
 - **远程结果同步状态**（如适用）: 已同步 / 部分同步 / 未同步

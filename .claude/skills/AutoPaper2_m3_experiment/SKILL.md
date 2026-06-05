@@ -28,7 +28,13 @@ Experiment Agent: M3S01-M3S03; Analysis Agent: M3S04; Gate: method, evidence.
 2. Generate packet: `python scripts/state_manager.py dispatch next --write` or exact `stage/reviews/gate` command.
 3. Pass only compact launch prompt / packet path to the matching subagent.
 4. Verify output exists; for reviews parse verdict.
-5. PASS -> `state_manager.py advance`; non-PASS -> structured backtrack and regenerate dispatch.
+5. PASS -> `state_manager.py advance`; non-PASS -> use structured backtrack, regenerate dispatch for the target stage, and continue without asking unless a hard blocker occurs.
+
+## M3 Autonomy Policy
+- Do not stop at failed or weak first runs. Repair code/config/data, resume or rerun training, acquire missing checkpoints, retrain baselines, adjust resources, or backtrack to M3S02/M3S01/M2 as evidence requires.
+- Baseline weights, dataset downloads, and official code acquisition are Agent work by default. Ask only for credentials, licenses, paid/quota approvals, unavailable storage/network access, unsafe/destructive actions, or spiral limit.
+- M3S03 cannot PASS until proposed/ours results are produced by completed trained weights with loadable checkpoint evidence. E0/random/untrained weights are diagnostic only.
+- M3 baselines cannot be ablations or simplified implementations; ablations are deferred to M4.
 
 ## Forbidden Writes
 `knowledge/M*/`, `drafts/`, `knowledge/reviews/*_review.md`, `artifacts/paper.*` unless a delegated subagent owns the path.

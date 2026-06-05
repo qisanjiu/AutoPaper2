@@ -668,6 +668,9 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                         "name": "Simulated baseline",
                         "comparison_role": "primary",
                         "source": "verify-local-existing",
+                        "comparator_type": "external_prior_work",
+                        "ablation_of_ours": False,
+                        "implementation_fidelity": "official_code",
                         "implementation_path": "experiments/baselines/baseline_1/",
                         "metric_contract": "experiments/baselines/baseline_1/metric_contract.yaml",
                         "dataset": "demo",
@@ -704,11 +707,14 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "## Runtime Watchdog 与告警记录\n"
             "experiments/logs/runtime_events.jsonl and experiments/runs/run1/watchdog_checks.jsonl record watchdog 巡检. "
             "Watchdog only records alerts and does not automatically terminate the run. Agent 决策: continue; no alert observed.\n\n"
+            "## Trained-Weight Evidence Contract\n"
+            "Final proposed result uses trained checkpoint experiments/runs/run1/checkpoints/best.pt and runtime_events records training_completed.\n\n"
             "## 迭代循环记录\niterations with resource_monitor.csv.\n\n"
             "## Evidence Ladder\nsolid.\n\n"
             "## 随机种子\n42.\n",
         )
         _write(root / "experiments" / "runs" / "run1" / "log.txt", "ok\n")
+        _write(root / "experiments" / "runs" / "run1" / "checkpoints" / "best.pt", "trained checkpoint placeholder\n")
         _write(
             root / "experiments" / "runs" / "run1" / "resource_monitor.csv",
             "timestamp,command_pid,cpu_load_pct,mem_available_mb,gpu_index,gpu_util_pct,gpu_mem_used_mb,gpu_mem_total_mb\n"
@@ -718,12 +724,16 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             '{"timestamp":"2026-05-29T12:00:00","stage":"M3S03","event_type":"watchdog_check",'
             '"run_id":"run1","severity":"info","decision_required":false,'
             '"agent_action_policy":"record_alert_only_agent_decides_continue_fix_or_stop","signals":[]}\n'
+            '{"timestamp":"2026-05-29T12:30:00","stage":"M3S03","event_type":"training_completed",'
+            '"run_id":"run1","status":"completed","checkpoint_path":"experiments/runs/run1/checkpoints/best.pt"}\n'
         )
         _write(root / "experiments" / "logs" / "runtime_events.jsonl", watchdog_event)
         _write(root / "experiments" / "runs" / "run1" / "watchdog_checks.jsonl", watchdog_event)
         _write(
             root / "experiments" / "results.tsv",
-            "method\tseed\taccuracy\tresource_monitor\nbaseline\t42\t0.75\texperiments/runs/run1/resource_monitor.csv\nours\t42\t0.80\texperiments/runs/run1/resource_monitor.csv\n",
+            "method\trun_id\tseed\taccuracy\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\t0.75\tcompleted\tnot_applicable\t\t0\texperiments/runs/run1/resource_monitor.csv\n"
+            "ours\trun1\t42\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run1/checkpoints/best.pt\t120\texperiments/runs/run1/resource_monitor.csv\n",
         )
     elif stage == "M3S04":
         _write(
@@ -762,6 +772,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                 "method": "ours",
                 "dataset": "demo",
                 "baseline_refs": ["experiments/baselines/baseline_1/metric_contract.yaml"],
+                "trained_checkpoint": "experiments/runs/run1/checkpoints/best.pt",
                 "primary_metric": {"key": "accuracy", "value": 0.803},
                 "seed": 42,
                 "environment": {"python": "3.11", "hardware": "cpu"},

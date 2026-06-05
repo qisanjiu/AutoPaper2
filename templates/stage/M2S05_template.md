@@ -50,18 +50,22 @@
 
 ## 2. Baseline Selection
 
+> **硬性边界**: M3 baseline 只能是外部相关工作、官方实现、官方包或完整忠实复现的 comparator。本文方法的消融、禁用组件、轻量变体、替代超参版本、proxy/simple/toy 实现都不能作为 M3 baseline；这些只能在 M4 的 ablation / mechanism / robustness 分析中出现。
+
 ### 2.1 Baseline 列表
 
-| 方法 | 来源论文 | 选择理由 | 代码可用性 | 实现来源 | 备注 |
-|------|---------|---------|-----------|---------|------|
-| {{baseline_1}} | {{paper}} | {{reason}} | A(开源维护)/B(开源不可运行)/C(未开源) | 官方/复现/自行实现 | ... |
-| {{baseline_2}} | {{paper}} | {{reason}} | ... | ... | ... |
+| 方法 | 来源论文 | comparator_type | 选择理由 | 代码可用性 | 实现来源 | ablation_of_ours | 备注 |
+|------|---------|-----------------|---------|-----------|---------|------------------|------|
+| {{baseline_1}} | {{paper}} | external_prior_work / official_baseline / reproduced_prior_work | {{reason}} | A(开源维护)/B(开源不可运行)/C(未开源) | 官方/完整复现/官方包 | false | ... |
+| {{baseline_2}} | {{paper}} | ... | {{reason}} | ... | ... | false | ... |
 
 ### 2.2 代码可用性评估
 
-| Baseline | 代码可用性 | 评估依据 | 实现策略 |
-|----------|-----------|---------|---------|
-| {{baseline_1}} | {{grade}} | {{evidence}} | 直接使用/修复后使用/自行实现 |
+| Baseline | 代码可用性 | 评估依据 | 实现策略 | implementation_fidelity | fidelity_evidence |
+|----------|-----------|---------|---------|-------------------------|-------------------|
+| {{baseline_1}} | {{grade}} | {{evidence}} | 直接使用/修复后使用/完整忠实复现 | official_code / full_reproduction / paper_faithful_reproduction | source id / official repo / config match |
+
+自行实现只允许作为“完整忠实复现”。如果无法达到论文结构、关键模块、训练/评估协议和 checkpoint/配置的一致性，必须标记为不可作为 M3 baseline，并在 M4 或局限性中处理；不得退化为简单实现。
 
 ### 2.3 公平性保证
 
@@ -69,11 +73,11 @@
 - [ ] 所有方法使用**相同的评估指标**
 - [ ] 所有方法使用**相同的训练预算**（epochs/time）
 - [ ] 超参数调优策略**一致**（grid search / random search / fixed）
-- [ ] 与消融设计**无冲突**
+- [ ] baseline 列表中没有本文方法的消融/变体/禁用组件版本
 
 ### 2.4 与消融设计的协调
 
-> 确认 baseline 中的组件不会与后续消融实验产生冲突。
+> 确认 baseline 中的组件不会与后续消融实验产生冲突；若某个对照是“去掉本文组件”的变体，它不是 baseline，必须移到 M4。
 
 | Baseline 组件 | 消融实验中是否验证 | 冲突说明 |
 |--------------|-----------------|---------|

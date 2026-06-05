@@ -105,6 +105,7 @@ KEEP 只能在以下材料同时完成时使用：
 - `experiments/artifacts/main_experiment/metric_contract.yaml`：包含本文方法名称与 primary metric 的 `key/value`
 - `experiments/artifacts/main_experiment/comparison_table.csv`：包含 baseline 与 ours/proposed 行，并记录 `seed=42`
 - `experiments/artifacts/main_experiment/reproduction.md`：记录复现实验命令与关键配置
+- M3S03 final proposed/ours 行引用的 trained checkpoint 真实存在，且 `runtime_events.jsonl` 记录训练完成事件；random/E0/untrained 权重不得 KEEP
 - `knowledge/handoff_M3_M4.md`：包含 KEEP 决策、claim/evidence 映射、M3S04 来源、artifact 路径、M4 分析方向
 
 ### 如果 FIX
@@ -162,6 +163,7 @@ method: "..."
 dataset: "..."
 baseline_refs:
   - "experiments/baselines/baseline_1/metric_contract.yaml"
+trained_checkpoint: "experiments/runs/run_001/checkpoints/best.pt"
 primary_metric:
   key: "..."
   value: ...

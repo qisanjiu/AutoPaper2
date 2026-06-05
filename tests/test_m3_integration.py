@@ -276,6 +276,11 @@ class TestM3StageGate(unittest.TestCase):
         *,
         include_lock: bool = True,
         m3s03_eligible: bool = True,
+        source: str = "verify-local-existing",
+        comparator_type: str = "external_prior_work",
+        ablation_of_ours: bool = False,
+        implementation_fidelity: str = "official_code",
+        fidelity_evidence: str = "",
         verification_verdict: str = "verified_match",
         caveat_waiver_reason: str = "",
         comparison_scope_limit: str = "",
@@ -293,13 +298,17 @@ class TestM3StageGate(unittest.TestCase):
         (self.root / "knowledge" / "M3" / "M3S02_baseline_lock.md").write_text(
             "# M3S02 Baseline Lock\n\n"
             "### Baseline 1\n"
-            "Verification path: verify-local-existing.\n"
+            f"Verification path: {source}.\n"
             f"verification_verdict: {verification_verdict}.\n"
             "Paper value: 0.75; local value: 0.75.\n\n"
             "## Smoke Test\n"
             "Smoke Test passed with correct metric computation and checkpoint loading status.\n\n",
             encoding="utf-8",
         )
+        if fidelity_evidence:
+            evidence_path = self.root / fidelity_evidence
+            evidence_path.parent.mkdir(parents=True, exist_ok=True)
+            evidence_path.write_text("# Fidelity Report\n\nArchitecture and config match the paper.\n", encoding="utf-8")
         (self.root / "experiments" / "baselines" / "baseline_1" / "metric_contract.yaml").write_text(
             "baseline_id: baseline_1\n"
             f"verification_verdict: {verification_verdict}\n"
@@ -317,7 +326,11 @@ class TestM3StageGate(unittest.TestCase):
                 "  - baseline_id: baseline_1\n"
                 "    name: Demo baseline\n"
                 "    comparison_role: primary\n"
-                "    source: verify-local-existing\n"
+                f"    source: {source}\n"
+                f"    comparator_type: {comparator_type}\n"
+                f"    ablation_of_ours: {'true' if ablation_of_ours else 'false'}\n"
+                f"    implementation_fidelity: {implementation_fidelity}\n"
+                f"    fidelity_evidence: \"{fidelity_evidence}\"\n"
                 "    implementation_path: experiments/baselines/baseline_1/\n"
                 "    metric_contract: experiments/baselines/baseline_1/metric_contract.yaml\n"
                 "    dataset: demo\n"
@@ -398,6 +411,7 @@ class TestM3StageGate(unittest.TestCase):
             "experiments/configs",
             "experiments/logs",
             "experiments/runs/run_001",
+            "experiments/runs/run_001/checkpoints",
         ):
             (self.root / rel).mkdir(parents=True, exist_ok=True)
 
@@ -417,6 +431,9 @@ class TestM3StageGate(unittest.TestCase):
             "`experiments/runs/run_001/watchdog_checks.jsonl` record periodic 巡检. "
             "Watchdog only records alerts and does not automatically terminate the run. "
             "Agent 决策: continue because no NaN/Inf, OOM, non-convergence, or early_stop alert was observed.\n\n"
+            "## Trained-Weight Evidence Contract\n"
+            "Final proposed result uses trained checkpoint `experiments/runs/run_001/checkpoints/best.pt`; "
+            "runtime_events.jsonl records training_completed for run_001.\n\n"
             "## Baseline 结果\n"
             "baseline rows are included.\n\n"
             "## 迭代循环记录\n"
@@ -478,9 +495,13 @@ class TestM3StageGate(unittest.TestCase):
             encoding="utf-8",
         )
         (self.root / "experiments" / "results.tsv").write_text(
-            "method\tseed\tmetric\tvalue\tresource_monitor\n"
-            "baseline\t42\taccuracy\t0.70\texperiments/runs/run_001/resource_monitor.csv\n"
-            "ours\t42\taccuracy\t0.80\texperiments/runs/run_001/resource_monitor.csv\n",
+            "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\trun_001\t42\taccuracy\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "runs" / "run_001" / "checkpoints" / "best.pt").write_text(
+            "trained checkpoint placeholder\n",
             encoding="utf-8",
         )
         if include_monitor:
@@ -494,6 +515,8 @@ class TestM3StageGate(unittest.TestCase):
                 '{"timestamp":"2026-05-29T12:00:00","stage":"M3S03","event_type":"watchdog_check",'
                 '"run_id":"run_001","severity":"info","decision_required":false,'
                 '"agent_action_policy":"record_alert_only_agent_decides_continue_fix_or_stop","signals":[]}\n'
+                '{"timestamp":"2026-05-29T12:30:00","stage":"M3S03","event_type":"training_completed",'
+                '"run_id":"run_001","status":"completed","checkpoint_path":"experiments/runs/run_001/checkpoints/best.pt"}\n'
             )
             (self.root / "experiments" / "logs" / "runtime_events.jsonl").write_text(
                 watchdog_event,
@@ -511,12 +534,30 @@ class TestM3StageGate(unittest.TestCase):
     def _write_m3s04_artifacts(self) -> None:
         artifacts = self.root / "experiments" / "artifacts" / "main_experiment"
         artifacts.mkdir(parents=True, exist_ok=True)
+        (self.root / "experiments" / "runs" / "run_001" / "checkpoints").mkdir(parents=True, exist_ok=True)
+        (self.root / "experiments" / "runs" / "run_001" / "checkpoints" / "best.pt").write_text(
+            "trained checkpoint placeholder\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "logs").mkdir(parents=True, exist_ok=True)
+        (self.root / "experiments" / "logs" / "runtime_events.jsonl").write_text(
+            '{"timestamp":"2026-05-29T12:30:00","stage":"M3S03","event_type":"training_completed",'
+            '"run_id":"run_001","status":"completed","checkpoint_path":"experiments/runs/run_001/checkpoints/best.pt"}\n',
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "results.tsv").write_text(
+            "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\taccuracy\t0.753\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\trun_001\t42\taccuracy\t0.803\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\n",
+            encoding="utf-8",
+        )
         (artifacts / "manifest.yaml").write_text(
             "experiment_id: main_exp_v1\n"
             "method: ours\n"
             "dataset: demo\n"
             "baseline_refs:\n"
             "  - experiments/baselines/baseline_1/metric_contract.yaml\n"
+            "trained_checkpoint: experiments/runs/run_001/checkpoints/best.pt\n"
             "primary_metric:\n"
             "  key: accuracy\n"
             "  value: 0.803\n"
@@ -602,6 +643,11 @@ class TestM3StageGate(unittest.TestCase):
     def test_m3s03_stage_gate_accepts_multi_resource_allocation(self) -> None:
         self._write_m3s03_files(include_monitor=True, include_watchdog=True)
         (self.root / "experiments" / "runs" / "run_002").mkdir(parents=True, exist_ok=True)
+        (self.root / "experiments" / "runs" / "run_002" / "checkpoints").mkdir(parents=True, exist_ok=True)
+        (self.root / "experiments" / "runs" / "run_002" / "checkpoints" / "best.pt").write_text(
+            "trained checkpoint placeholder\n",
+            encoding="utf-8",
+        )
         (self.root / "experiments" / "runs" / "run_002" / "resource_monitor.csv").write_text(
             "timestamp,command_pid,cpu_load_pct,mem_available_mb,gpu_index,gpu_util_pct,gpu_mem_used_mb,gpu_mem_total_mb\n"
             "2026-05-29T12:00:00,124,70,16000,0,80,8000,24576\n",
@@ -620,6 +666,9 @@ class TestM3StageGate(unittest.TestCase):
             "## Runtime Watchdog 与告警记录\n"
             "`experiments/logs/runtime_events.jsonl` and watchdog checks record periodic 巡检. "
             "Watchdog only records alerts and does not automatically terminate the run. Agent 决策: continue.\n\n"
+            "## Trained-Weight Evidence Contract\n"
+            "Final proposed result uses trained checkpoint `experiments/runs/run_002/checkpoints/best.pt`; "
+            "runtime_events.jsonl records training_completed for run_002.\n\n"
             "## Baseline 结果\nbaseline rows are included.\n\n"
             "## 迭代循环记录\niterations with resource_monitor.csv.\n\n"
             "## Evidence Ladder\nminimum and solid reached.\n\n"
@@ -688,9 +737,15 @@ class TestM3StageGate(unittest.TestCase):
             encoding="utf-8",
         )
         (self.root / "experiments" / "results.tsv").write_text(
-            "method\tseed\tmetric\tvalue\tresource_id\tresource_kind\tresource_monitor\n"
-            "baseline\t42\taccuracy\t0.70\tlocal\tlocal\texperiments/runs/run_001/resource_monitor.csv\n"
-            "ours\t42\taccuracy\t0.80\tssh:lab-a\tssh\texperiments/runs/run_002/resource_monitor.csv\n",
+            "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_id\tresource_kind\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\tlocal\tlocal\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\trun_002\t42\taccuracy\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run_002/checkpoints/best.pt\t120\tssh:lab-a\tssh\texperiments/runs/run_002/resource_monitor.csv\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "logs" / "runtime_events.jsonl").write_text(
+            (self.root / "experiments" / "logs" / "runtime_events.jsonl").read_text(encoding="utf-8")
+            + '{"timestamp":"2026-05-29T13:00:00","stage":"M3S03","event_type":"training_completed",'
+            '"run_id":"run_002","status":"completed","checkpoint_path":"experiments/runs/run_002/checkpoints/best.pt"}\n',
             encoding="utf-8",
         )
 
@@ -777,6 +832,28 @@ class TestM3StageGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("trusted_with_caveats requires caveat_waiver_reason" in message for message in messages), messages)
 
+    def test_m3s02_stage_gate_rejects_ablation_as_baseline(self) -> None:
+        self._write_m3s02_files(ablation_of_ours=True, comparator_type="ablation")
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("cannot be an ablation" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_rejects_simplified_reimplementation(self) -> None:
+        self._write_m3s02_files(
+            source="reimplementation",
+            implementation_fidelity="simplified",
+            fidelity_evidence="experiments/baselines/baseline_1/fidelity_report.md",
+        )
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        joined = "\n".join(messages)
+        self.assertIn("simplified/toy/minimal baseline implementations are forbidden", joined)
+        self.assertIn("reimplemented baselines must set implementation_fidelity", joined)
+
     def test_m3s03_stage_gate_accepts_resource_monitor(self) -> None:
         self._write_m3s03_files(include_monitor=True, multi_gpu=True)
 
@@ -805,6 +882,22 @@ class TestM3StageGate(unittest.TestCase):
         joined = "\n".join(messages)
         self.assertIn("runtime_events.jsonl missing", joined)
         self.assertIn("no watchdog_checks.jsonl found", joined)
+
+    def test_m3s03_stage_gate_rejects_random_or_running_weights(self) -> None:
+        self._write_m3s03_files(include_monitor=True, include_watchdog=True)
+        (self.root / "experiments" / "results.tsv").write_text(
+            "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\trun_001\t42\taccuracy\t0.80\trunning\trandom_init\texperiments/runs/run_001/checkpoints/best.pt\t0\texperiments/runs/run_001/resource_monitor.csv\n",
+            encoding="utf-8",
+        )
+
+        ok, messages = check_stage(self.root, "M3S03")
+
+        self.assertFalse(ok)
+        joined = "\n".join(messages)
+        self.assertIn("run_status/training_status must be completed", joined)
+        self.assertIn("no proposed/ours result row is backed by completed trained weights", joined)
 
     def test_m3s04_stage_gate_accepts_keep_with_evidence_package(self) -> None:
         self._write_m3s04_report()

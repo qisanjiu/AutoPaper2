@@ -15,11 +15,18 @@ The main agent is conductor only.
 5. Verify output file existence and parse review verdicts.
 6. Advance through `state_manager.py advance` or backtrack through Conductor/state_manager APIs.
 
+## Auto-Run Autonomy
+- When project auto-run is active, enable `auto_advance_modules` and do not pause at module boundaries.
+- `REVISE`, `REWORK`, `FIX`, and `BACKTRACK` are normal loop states, not user questions. Apply structured backtrack advice, regenerate dispatch for the target stage, and continue.
+- Backtracking may target any responsible upstream stage, including dataset acquisition, baseline lock, implementation, training, experiment design, method design, or hypothesis stages. Do not reduce repair to hyperparameter tuning when evidence points elsewhere.
+- Ask the user only for Gate HALT, spiral limit, explicit pause/stop, secrets, license/terms approval, paid/quota approvals, unavailable storage/network access, or unsafe/destructive actions.
+
 ## Forbidden Actions
 - Do not write `knowledge/M*/`, `drafts/`, `knowledge/reviews/*_review.md`, `artifacts/paper.*`, or stage evidence on behalf of subagents.
 - Do not paste parent conversation, upstream file contents, or executor summaries into subagent prompts.
 - Do not manually compose subagent prompts from memory. Use the dispatch-generated compact launch prompt.
 - Do not skip required stage reviews or gate reviews.
+- Do not convert a non-PASS critic review into aggregate PASS. Individual critic verdicts are authoritative for gate advancement.
 
 ## Backtrack
 Use structured repair advice. After backtrack, regenerate dispatch from target stage; old downstream files are historical unless `incremental_replay` is explicitly allowed.

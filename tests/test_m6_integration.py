@@ -23,7 +23,7 @@ from utils.file_guard import (
     validate_stage_output,
     validate_gate_review,
 )
-from utils.gate_rubric import get_gate_rubric
+from utils.gate_rubric import gate_critic_review_paths, get_gate_rubric
 from utils.stage_gate import check_stage
 
 
@@ -283,6 +283,12 @@ class TestM6StateFlow(unittest.TestCase):
 
     def _write_gate_aggregate(self, proj: Path, gate_id: str) -> Path:
         gate_output = proj / "knowledge" / "reviews" / f"{gate_id}_aggregate.md"
+        for critic, critic_path in gate_critic_review_paths(proj, gate_id).items():
+            critic_path.parent.mkdir(parents=True, exist_ok=True)
+            critic_path.write_text(
+                f"# {gate_id} {critic} Review\n\nVerdict: PASS\n",
+                encoding="utf-8",
+            )
         lines = [
             f"# {gate_id} Aggregate Review",
             "",

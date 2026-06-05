@@ -7,11 +7,35 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from utils.file_guard import find_alternate_outputs
 
 RUBRIC_CONFIG_PATH = Path(__file__).parent.parent / "config" / "gate_rubrics.yaml"
 
-_VERDICT_RE = re.compile(r"(?im)^\s*(?:\*\*)?verdict(?:\*\*)?\s*[:：]?\s*(PASS|REVISE|BACKTRACK|FIX|HALT)\s*$")
+_VERDICT_RE = re.compile(r"(?im)^\s*(?:\*\*)?verdict(?:\*\*)?\s*[:：]?\s*(PASS|REVISE|REWORK|BACKTRACK|FIX|HALT)\s*$")
+_DECLARED_VERDICT_RE = re.compile(r"(?im)^\s*(?:\*\*)?verdict(?:\*\*)?\s*[:：]?\s*([A-Z][A-Z0-9_ -]*)\s*$")
 _TABLE_SEPARATOR_RE = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$")
+_GATE_CRITICS: dict[str, list[str]] = {
+    "G1": ["logic", "coverage"],
+    "G2": ["logic", "method", "novelty"],
+    "G3": ["method", "evidence"],
+    "G4": ["logic", "evidence", "novelty"],
+    "G5": ["logic", "writing", "evidence", "novelty", "ethics"],
+    "G6": ["logic", "evidence", "writing", "resolution"],
+}
+_REPAIR_FIELDS: tuple[str, ...] = (
+    "target_stage",
+    "blocking_reason",
+    "required_fix",
+    "success_criteria",
+    "rebuild_mode",
+    "rerun_scope",
+)
+_REPAIR_FIELD_PATTERNS: dict[str, re.Pattern[str]] = {
+    field: re.compile(
+        rf"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?`?{re.escape(field)}`?(?:\*\*)?\s*[:：]\s*(.+?)\s*$"
+    )
+    for field in _REPAIR_FIELDS
+}
 
 
 def load_gate_rubrics(path: str | Path | None = None) -> dict[str, Any]:
@@ -68,6 +92,100 @@ def _extract_verdict(text: str) -> str | None:
     if match:
         return match.group(1).upper()
     return None
+
+
+def _extract_declared_verdict(text: str) -> str | None:
+    match = _DECLARED_VERDICT_RE.search(text)
+    if match:
+        return match.group(1).strip().upper()
+    return None
+
+
+def _missing_repair_fields(text: str) -> list[str]:
+    missing: list[str] = []
+    for field, pattern in _REPAIR_FIELD_PATTERNS.items():
+        match = pattern.search(text)
+        if not match or not match.group(1).strip(" `*"):
+            missing.append(field)
+    return missing
+
+
+def gate_critic_review_paths(project_root: str | Path, gate_id: str) -> dict[str, Path]:
+    """Return the canonical individual critic-review paths for one gate."""
+    root = Path(project_root)
+    return {
+        critic: root / "knowledge" / "reviews" / f"{gate_id}_{critic}_review.md"
+        for critic in _GATE_CRITICS.get(gate_id, [])
+    }
+
+
+def validate_gate_critic_reviews(
+    project_root: str | Path,
+    gate_id: str,
+) -> tuple[bool, list[str]]:
+    """Validate individual gate critic reviews before aggregate advancement.
+
+    The aggregate file may summarize critic results, but it must not override
+    them.  Any missing, malformed, unsupported, or non-PASS critic verdict
+    blocks advancement and requires normal backtrack/re-review handling.
+    """
+    root = Path(project_root)
+    messages: list[str] = []
+    ok = True
+    paths = gate_critic_review_paths(root, gate_id)
+    if not paths:
+        return True, [f"[WARN] Gate {gate_id}: no configured critic reviews"]
+
+    for critic, review_path in paths.items():
+        alternates = find_alternate_outputs(review_path.parent, review_path.name)
+        if alternates:
+            messages.append(
+                f"[FAIL] Gate {gate_id}: alternate critic review file(s) found for {review_path.name}: "
+                + ", ".join(path.name for path in alternates)
+                + "; update the canonical review in place instead of creating revised copies."
+            )
+            ok = False
+        if not review_path.exists():
+            messages.append(f"[FAIL] Gate {gate_id}: required critic review missing: {review_path.name}")
+            ok = False
+            continue
+
+        try:
+            text = review_path.read_text(encoding="utf-8")
+        except Exception as exc:
+            messages.append(f"[FAIL] Gate {gate_id}: critic review {review_path.name} unreadable: {exc}")
+            ok = False
+            continue
+
+        verdict = _extract_verdict(text)
+        if verdict is None:
+            declared = _extract_declared_verdict(text)
+            if declared:
+                messages.append(
+                    f"[FAIL] Gate {gate_id}: critic review {review_path.name} uses unsupported verdict={declared}; "
+                    "allowed verdicts are PASS, REVISE, REWORK, BACKTRACK, FIX, HALT."
+                )
+            else:
+                messages.append(f"[FAIL] Gate {gate_id}: critic review {review_path.name} missing explicit verdict")
+            ok = False
+            continue
+
+        if verdict != "PASS":
+            messages.append(
+                f"[FAIL] Gate {gate_id}: critic review {review_path.name} verdict={verdict}; "
+                "aggregate PASS cannot override individual critic verdicts."
+            )
+            missing = _missing_repair_fields(text)
+            if missing:
+                messages.append(
+                    f"[FAIL] Gate {gate_id}: critic review {review_path.name} missing repair advice fields: "
+                    + ", ".join(missing)
+                )
+            ok = False
+        else:
+            messages.append(f"[PASS] Gate {gate_id}: critic review {critic} PASS")
+
+    return ok, messages
 
 
 def _parse_markdown_tables(text: str) -> list[list[dict[str, str]]]:
@@ -145,6 +263,7 @@ def validate_gate_rubric(
     aggregate_file: str | Path,
     *,
     rubric_path: str | Path | None = None,
+    require_critic_reviews: bool = True,
 ) -> tuple[bool, list[str]]:
     """Validate a gate aggregate review against the configured rubric."""
     root = Path(project_root)
@@ -152,9 +271,25 @@ def validate_gate_rubric(
     messages: list[str] = []
     ok = True
 
+    if require_critic_reviews:
+        critic_ok, critic_messages = validate_gate_critic_reviews(root, gate_id)
+        messages.extend(critic_messages)
+        ok = ok and critic_ok
+
     rubric_ids = required_rubric_ids(gate_id, rubric_path)
     if not rubric_ids:
         return True, [f"[WARN] Gate {gate_id}: no configured rubric items"]
+
+    if gate_id == "G3":
+        from utils.stage_gate import check_stage
+
+        m3_ok, m3_messages = check_stage(root, "M3S03")
+        if not m3_ok:
+            messages.append("[FAIL] Gate G3: M3S03 evidence gate is not currently PASS; aggregate review cannot advance.")
+            messages.extend(message for message in m3_messages if message.startswith("[FAIL] M3S03"))
+            ok = False
+        else:
+            messages.append("[PASS] Gate G3: M3S03 evidence gate PASS, including trained-weight checks")
 
     if not aggregate.exists():
         return False, [f"[FAIL] Gate {gate_id}: aggregate review missing: {aggregate}"]

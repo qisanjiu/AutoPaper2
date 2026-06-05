@@ -729,6 +729,8 @@ def build_gate_review_packets(
                         "If this gate critic review already existed, confirm the same canonical review file was updated in place.",
                         "Return verdict and the review path to the conductor.",
                         f"The conductor aggregates all critic reviews into {aggregate_output}.",
+                        "Use only PASS, REVISE, REWORK, BACKTRACK, FIX, or HALT. Do not use CONDITIONAL.",
+                        "Aggregate PASS cannot override any individual non-PASS critic review.",
                         "The aggregate review must include the configured Rubric Results table before advancement.",
                     ],
                 },

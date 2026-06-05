@@ -45,7 +45,7 @@ from scripts.state_manager import (
     _sync_source_log_to_survey_memory,
     cmd_run_module,
 )
-from utils.gate_rubric import get_gate_rubric
+from utils.gate_rubric import gate_critic_review_paths, get_gate_rubric
 from utils.stage_gate import check_stage
 
 
@@ -283,6 +283,11 @@ def _write_m1s05_doc(proj_dir: Path) -> None:
 def _write_gate_review(proj_dir: Path, gate_id: str = "G1") -> None:
     review = proj_dir / "knowledge" / "reviews" / f"{gate_id}_aggregate.md"
     review.parent.mkdir(parents=True, exist_ok=True)
+    for critic, critic_path in gate_critic_review_paths(proj_dir, gate_id).items():
+        critic_path.write_text(
+            f"# {gate_id} {critic} Review\n\nVerdict: PASS\n",
+            encoding="utf-8",
+        )
     lines = [
         f"# {gate_id} Aggregate Review",
         "",

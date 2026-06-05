@@ -16,7 +16,7 @@ if str(_project_root) not in sys.path:
 
 from scripts.state_manager import cmd_advance
 from spiral.state import PipelineState
-from utils.gate_rubric import get_gate_rubric, validate_gate_rubric
+from utils.gate_rubric import gate_critic_review_paths, get_gate_rubric, validate_gate_critic_reviews, validate_gate_rubric
 
 
 def _call_advance(
@@ -58,6 +58,22 @@ def _setup_g1_project(root: Path) -> None:
     ):
         (root / "knowledge" / "M1" / name).write_text(f"# {name}\n", encoding="utf-8")
     (root / "knowledge" / "M1" / "M1_source_log.yaml").write_text("sources: []\n", encoding="utf-8")
+    _write_gate_critic_reviews(root, "G1")
+
+
+def _write_gate_critic_reviews(root: Path, gate_id: str) -> None:
+    for critic, path in gate_critic_review_paths(root, gate_id).items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f"# {gate_id} {critic} Review\n\n"
+            "## Verdict\n"
+            "Verdict: PASS\n\n"
+            "## Rubric Results\n"
+            "| Rubric ID | Verdict | Score | Evidence paths | Notes |\n"
+            "|---|---|---|---|---|\n"
+            f"| {gate_id}-R1 | PASS | 2/2 | knowledge/reviews | checked |\n",
+            encoding="utf-8",
+        )
 
 
 def _rubric_aggregate(root: Path, gate_id: str, *, missing_last: bool = False) -> str:
@@ -124,6 +140,50 @@ class TestGateRubricValidation(unittest.TestCase):
             self.assertEqual(exit_code, 1, output)
             self.assertIn("Gate rubric validation failed", output)
             self.assertIn("missing rubric row G1-R3", output)
+
+    def test_gate_advance_blocks_individual_revise_even_if_aggregate_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            root.mkdir()
+            _setup_g1_project(root)
+            aggregate = root / "knowledge" / "reviews" / "G1_aggregate.md"
+            aggregate.write_text(_rubric_aggregate(root, "G1"), encoding="utf-8")
+            critic_review = root / "knowledge" / "reviews" / "G1_logic_review.md"
+            critic_review.write_text(
+                "# G1 Logic Review\n\n"
+                "Verdict: REVISE\n\n"
+                "- target_stage: M1S05\n"
+                "- blocking_reason: missing evidence\n"
+                "- required_fix: add evidence\n"
+                "- success_criteria: review can pass\n"
+                "- rebuild_mode: incremental_replay\n"
+                "- rerun_scope: M1S05\n",
+                encoding="utf-8",
+            )
+
+            critic_ok, critic_messages = validate_gate_critic_reviews(root, "G1")
+            exit_code, output = _call_advance(str(root), "M1S05", "critic_team", str(aggregate))
+
+            self.assertFalse(critic_ok, "\n".join(critic_messages))
+            self.assertEqual(exit_code, 1, output)
+            self.assertIn("aggregate PASS cannot override individual critic verdicts", output)
+
+    def test_gate_advance_blocks_unsupported_conditional_verdict(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            root.mkdir()
+            _setup_g1_project(root)
+            aggregate = root / "knowledge" / "reviews" / "G1_aggregate.md"
+            aggregate.write_text(_rubric_aggregate(root, "G1"), encoding="utf-8")
+            (root / "knowledge" / "reviews" / "G1_coverage_review.md").write_text(
+                "# G1 Coverage Review\n\nVerdict: CONDITIONAL\n",
+                encoding="utf-8",
+            )
+
+            exit_code, output = _call_advance(str(root), "M1S05", "critic_team", str(aggregate))
+
+            self.assertEqual(exit_code, 1, output)
+            self.assertIn("unsupported verdict=CONDITIONAL", output)
 
     def test_gate_advance_accepts_complete_rubric(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

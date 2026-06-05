@@ -659,6 +659,32 @@ class Conductor:
         }
 
     def handle_gate_verdict(self, gate_id: str, verdicts: list[dict[str, Any]]) -> dict[str, Any]:
+        if not verdicts:
+            return {"action": "BLOCKED", "reason": f"Gate {gate_id} has no critic verdicts"}
+
+        allowed_verdicts = {"PASS", "REVISE", "REWORK", "BACKTRACK", "FIX", "HALT"}
+        normalized_verdicts: list[dict[str, Any]] = []
+        for raw in verdicts:
+            verdict = str(raw.get("verdict", "")).strip().upper()
+            critic = raw.get("critic", "unknown")
+            if not verdict:
+                return {
+                    "action": "BLOCKED",
+                    "reason": f"Gate {gate_id} critic {critic} missing explicit verdict",
+                }
+            if verdict not in allowed_verdicts:
+                return {
+                    "action": "BLOCKED",
+                    "reason": (
+                        f"Gate {gate_id} critic {critic} has unsupported verdict={verdict}; "
+                        "allowed verdicts are PASS, REVISE, REWORK, BACKTRACK, FIX, HALT."
+                    ),
+                }
+            copied = dict(raw)
+            copied["verdict"] = verdict
+            normalized_verdicts.append(copied)
+        verdicts = normalized_verdicts
+
         for v in verdicts:
             if v.get("verdict") == "HALT":
                 self.state.log_decision("gate_halt", gate_id,
@@ -740,21 +766,22 @@ class Conductor:
                     }
 
         for v in verdicts:
-            if v.get("verdict") == "REVISE":
+            if v.get("verdict") in {"REVISE", "REWORK"}:
                 target = v.get("target_stage")
                 if not target:
                     gate_stage = GATE_STAGES.get(gate_id)
                     target = gate_stage
-                # REVISE triggers backtrack to the target stage
+                verdict = v.get("verdict", "REVISE")
+                # REVISE/REWORK triggers backtrack to the target stage
                 result = self.backtrack(
                     from_stage=GATE_STAGES.get(gate_id, ""),
                     to_stage=target,
-                    reason=f"Gate {gate_id} REVISE by {v['critic']}: {v.get('reason', '')}",
+                    reason=f"Gate {gate_id} {verdict} by {v['critic']}: {v.get('reason', '')}",
                     direction=v.get("direction", v.get("reason", "")),
                     advice=_build_backtrack_advice(
                         critic=v.get("critic", ""),
                         target_stage=target,
-                        reason=f"Gate {gate_id} REVISE by {v['critic']}: {v.get('reason', '')}",
+                        reason=f"Gate {gate_id} {verdict} by {v['critic']}: {v.get('reason', '')}",
                         direction=v.get("direction", ""),
                         verdict_payload=v,
                     ),
@@ -771,8 +798,14 @@ class Conductor:
                 else:
                     return {
                         "action": "HALT",
-                        "reason": result.get("error", "REVISE backtrack failed"),
+                        "reason": result.get("error", f"{verdict} backtrack failed"),
                     }
+
+        if any(v.get("verdict") != "PASS" for v in verdicts):
+            return {
+                "action": "BLOCKED",
+                "reason": f"Gate {gate_id} has non-PASS critic verdicts that were not resolved",
+            }
 
         self.state.clear_gate_re_review(gate_id)
         self.state.log_decision("gate_pass", gate_id,

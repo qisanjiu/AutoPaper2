@@ -56,6 +56,23 @@ class TestFullPipelineSimulation(unittest.TestCase):
 
             self.assertEqual(second_state.get_module_status("M5").get("status"), "pending")
 
+    def test_gate_verdict_rejects_unsupported_conditional(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = ProjectManager.create(
+                topic="Gate verdict simulation",
+                display_name="Gate-Verdict-Sim",
+                projects_root=Path(tmp),
+                venue="arxiv",
+            )
+
+            result = Conductor(proj).handle_gate_verdict(
+                "G3",
+                [{"critic": "evidence", "verdict": "CONDITIONAL", "reason": "trained weights pending"}],
+            )
+
+            self.assertEqual(result["action"], "BLOCKED")
+            self.assertIn("unsupported verdict=CONDITIONAL", result["reason"])
+
     def test_no_llm_full_pipeline_simulation_reaches_m6_completion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             summary = run_simulation(Path(tmp), keep_project=True)
