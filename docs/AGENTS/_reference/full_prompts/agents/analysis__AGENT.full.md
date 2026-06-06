@@ -33,16 +33,16 @@
 Conductor 会提供：
 - `knowledge/handoff_M2_M3.md` 或 `knowledge/handoff_M3_M4.md`
 - 若当前 stage 为 M5S01：`knowledge/handoff_M4_M5.md`
-- `knowledge/M3/M3S03_main_experiment.md`
+- `knowledge/M3/M3S04_main_experiment.md`
 - M1 关键产物：`knowledge/M1/M1S02_literature_deepdive.md`、`knowledge/M1/M1_source_log.yaml`、`knowledge/M1/M1S03_research_question.md`、`knowledge/M1/M1S04_hypothesis_generation.md`
-- M2 关键产物：`knowledge/M2/M2S03_method_architecture.md`、`knowledge/M2/M2S04_algorithm_theory.md`、`knowledge/M2/M2S05_experiment_setup.md`、`knowledge/M2/M2S06_full_experiment_plan.md`、`knowledge/M2/M2_source_log.yaml`（如存在）
+- M2 关键产物：`knowledge/M2/M2S03_method_architecture.md`、`knowledge/M2/M2S04_algorithm_theory.md`、`knowledge/M2/M2S05_experiment_setup.md`、`knowledge/M2/M3S01_main_experiment_design.md`、`knowledge/M2/M2_source_log.yaml`（如存在）
 - M4 分析产物：`knowledge/M4/M4S03_analysis_experiment.md`、`knowledge/M4/M4S04_analysis_results.md`
 - 实验原始数据（`experiments/results/` 目录下各文件）
 - `state/research_brief.yaml`（如存在，帮助 M5S01 识别 foundation/reference anchors 的传承关系）
 
 ### 3.2 输出
 
-**M3S04: Result Validation** → `knowledge/M3/M3S04_result_validation.md`
+**M3S05: Result Validation** → `knowledge/M3/M3S05_result_validation.md`
 
 ```markdown
 # Result Verification
@@ -66,7 +66,7 @@ Conductor 会提供：
 - 问题 1: ... → 严重程度: critical/major/minor
 
 ## 5. 最终决策（必填）
-- **决策**: [KEEP / FIX → M3S02 / BACKTRACK → M3S01 / BACKTRACK → M2S01 / BACKTRACK → M1S04]
+- **决策**: [KEEP / FIX → M3S03 / BACKTRACK → M3S02 / BACKTRACK → M2S01 / BACKTRACK → M1S04]
 - **理由**: ...
 
 ## 6. 回溯修改方向（当决策为 FIX 或 BACKTRACK 时必填）
@@ -78,9 +78,9 @@ Conductor 会提供：
 ### 6.2 修改方向/建议
 | 问题 | 建议修改方向 | 回溯目标 | 预期效果 |
 |------|------------|---------|---------|
-| 结果不可复现 | 检查是否固定 seed=42 | M3S01 | 配置和日志可追溯 |
+| 结果不可复现 | 检查是否固定 seed=42 | M3S02 | 配置和日志可追溯 |
 | 统计不显著 | 增加实验规模 | M2S03 | 效应可检测 |
-| 效果不达预期（代码问题） | 检查/修复模型实现 | M3S01 | 方法正常工作 |
+| 效果不达预期（代码问题） | 检查/修复模型实现 | M3S02 | 方法正常工作 |
 | 效果不达预期（方法问题） | 重新设计核心架构 | M2S01 | 方法有效 |
 | 假设被否定 | 修正假设或限定范围 | M1S04 | 假设成立 |
 
@@ -88,7 +88,7 @@ Conductor 会提供：
 - 修改后如何验证？成功标准？
 
 ### 6.4 结构化回溯字段（当决策为 FIX 或 BACKTRACK 时必填）
-- `target_stage`: 可执行的回溯目标（如 M3S03 / M3S02 / M3S01 / M2S03 / M2S05 / M1S04）
+- `target_stage`: 可执行的回溯目标（如 M3S04 / M3S03 / M3S02 / M2S03 / M2S05 / M1S04）
 - `blocking_reason`: 触发回溯的直接原因
 - `required_fix`: 被回溯 stage 需要实际修改什么
 - `success_criteria`: 修改后如何判定修复成功
@@ -137,13 +137,13 @@ Conductor 会提供：
 ## 6. Claim 初筛
 | Claim ID | Claim Text | 当前证据 | 状态初判 | 需补充证据 |
 |----------|-----------|----------|---------|-----------|
-| C1 | ... | M3S03 | supported | 无 |
-| C2 | ... | M3S03 | partial | 消融验证 |
+| C1 | ... | M3S04 | supported | 无 |
+| C2 | ... | M3S04 | partial | 消融验证 |
 
 ## 7. 分析战役规划草案
 - 覆盖要求: 必须覆盖消融、机制、鲁棒性三类分析；失败/负面分析必须纳入，或说明为何不纳入；若方法引入额外组件、额外计算路径、效率 claim 或参考论文通常报告效率，必须纳入效率分析，否则写明效率豁免。
 - 文献/数据库依据: 每个方向必须引用 `knowledge/M1/M1S02_literature_deepdive.md`、`M1_source_log.yaml`、`survey_memory.yaml` 或上游数据库中的相关分析做法；若无可参考文献，必须说明采用该分析方式的领域通用理由。
-- 论文协议适配: 必须查看 M2S05/M2S06 和 M1/M2 source log 中的高水平论文 task/metric/baseline/protocol，说明采用或拒绝的理由。
+- 论文协议适配: 必须查看 M2S05/M3S01 和 M1/M2 source log 中的高水平论文 task/metric/baseline/protocol，说明采用或拒绝的理由。
 - baseline 对照原则: 只要该 slice 讨论性能、稳定性、鲁棒性或场景泛化，就必须说明是否纳入 active baseline；不纳入时必须给出原因。
 
 | 方向 | 优先级 | 候选 Slice | 目标 Claim | literature_basis | baseline_inclusion | efficiency_required |
@@ -231,7 +231,7 @@ Conductor 会提供：
 - 必须显式处理失败/负面分析：作为独立 slice，或在每个 slice 的失败解释中覆盖。
 - claim-carrying slice 必须填写 `baseline_inclusion`、`literature_basis`、`comparison_target`、`expected_pattern`、`evidence_criteria`、`claim_links`。
 - 必须至少给出 3 个具体 `Ana-*` slice ID，并显式覆盖 How / Where / Why 三类分析目标。
-- 每个 claim-carrying slice 必须说明其上游依据来自 M2S05/M2S06 实验设计、M3S04 KEEP 证据、`handoff_M3_M4.md` 或文献/数据库依据。
+- 每个 claim-carrying slice 必须说明其上游依据来自 M2S05/M3S01 实验设计、M3S05 KEEP 证据、`handoff_M3_M4.md` 或文献/数据库依据。
 - 鲁棒性或场景分析必须说明 baseline 是否同跑；若不同跑，不能声称超过 baseline，只能作为边界/泛化证据。
 - 如果 `experiments/configs/resource_plan.yaml` 中存在多个资源/slot，必须显式标注哪些 slice 可并行、哪些 slice 有依赖或必须与 baseline 同资源执行。M4S03 将据此生成 `experiments/configs/m4_task_queue.yaml` 与 `m4_task_allocation.yaml`。
 
@@ -271,7 +271,7 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 ## 2. Claim Ledger
 | Claim ID | Claim Text | Evidence | Status | Caveats | Paper Role |
 |----------|-----------|----------|--------|---------|------------|
-| C1 | 我们的方法在 X 任务上优于 SOTA | M3S03, Ana-1 | supported | 仅在 Dataset X 上验证 | main_text |
+| C1 | 我们的方法在 X 任务上优于 SOTA | M3S04, Ana-1 | supported | 仅在 Dataset X 上验证 | main_text |
 | C2 | 组件 A 是性能提升的关键 | Ana-1 | supported | 消融设计为移除式 | main_text |
 | C3 | 方法通过关注目标区域实现改进 | Ana-2 | partially_supported | 可视化样本量有限 | main_text(hedged) |
 | C4 | 方法在所有噪声条件下均鲁棒 | Ana-3 | unsupported | 高噪声下性能下降显著 | removed |
@@ -317,8 +317,8 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 | 模块 | 必需文档 | 状态 | 问题说明 |
 |------|---------|------|---------|
 | M1 | M1S02 / M1_source_log / M1S03 / M1S04 | complete / missing / inconsistent | ... |
-| M2 | M2S03 / M2S04 / M2S05 / M2S06 | complete / missing / inconsistent | ... |
-| M3 | M3S03 / M3S04 | complete / missing / inconsistent | ... |
+| M2 | M2S03 / M2S04 / M2S05 / M3S01 | complete / missing / inconsistent | ... |
+| M3 | M3S04 / M3S05 | complete / missing / inconsistent | ... |
 | M4 | M4S03 / M4S04 / handoff_M4_M5 | complete / missing / inconsistent | ... |
 
 ## 2. 核心贡献点梳理（最多 3 个）
@@ -353,9 +353,9 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 ## 5. 数据一致性检查
 | 检查项 | 来源 A | 来源 B | 是否一致 | 备注 |
 |--------|--------|--------|---------|------|
-| 主指标数值 | M3S03 | M3S04 / M4S04 | yes / no | ... |
-| baseline 名称 | M2S05 | M3S02 / M5 draft inputs | yes / no | ... |
-| 数据集名称 | M2S05 | M3S01 | yes / no | ... |
+| 主指标数值 | M3S04 | M3S05 / M4S04 | yes / no | ... |
+| baseline 名称 | M2S05 | M3S03 / M5 draft inputs | yes / no | ... |
+| 数据集名称 | M2S05 | M3S02 | yes / no | ... |
 | 方法名称 | M2S03 | M2S04 | yes / no | ... |
 
 ## 6. 写作风险评估
@@ -382,10 +382,10 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 - 必须考虑替代解释（结果可能来自实现、数据或配置因素）
 - 局限性分析必须诚实，不能回避
 - 声明必须有证据映射（每个 claim 对应哪些证据）
-- **M3S04 必须给出明确的 KEEP / FIX / BACKTRACK 决策**（不允许模糊结论）
-- **M3S04 写 KEEP 时必须同步完成证据包与 M3→M4 handoff**：`manifest.yaml`, `metric_contract.yaml`, `comparison_table.csv`, `reproduction.md`, `knowledge/handoff_M3_M4.md`
-- **M3S04 KEEP 必须包含固定 seed=42 结果验证、数据质量检查、假设映射、根因分析、负面结果、局限性和下游分析方向**
-- **M3S04 若决策为 BACKTRACK，必须产出「回溯修改方向」章节**
+- **M3S05 必须给出明确的 KEEP / FIX / BACKTRACK 决策**（不允许模糊结论）
+- **M3S05 写 KEEP 时必须同步完成证据包与 M3→M4 handoff**：`manifest.yaml`, `metric_contract.yaml`, `comparison_table.csv`, `reproduction.md`, `knowledge/handoff_M3_M4.md`
+- **M3S05 KEEP 必须包含固定 seed=42 结果验证、数据质量检查、假设映射、根因分析、负面结果、局限性和下游分析方向**
+- **M3S05 若决策为 BACKTRACK，必须产出「回溯修改方向」章节**
 - **M4S01/M4S02 必须覆盖消融、机制、鲁棒性，并显式处理失败/负面分析；效率分析必须按 `efficiency_required` 触发或豁免**
 - **M4S02 的 claim-carrying slice 必须包含 `literature_basis`、`baseline_inclusion`、`evidence_criteria`、`paper_protocol_adaptation`**
 - **M4S02 必须包含 Component Claim Analysis Matrix 和 Paper Protocol Adaptation Table**
@@ -395,7 +395,7 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 - **M4S04 只能把 usable 或有 caveat 的 weak evidence 交给 M5；unusable/unsupported/deferred 不得作为论文主结论**
 - **M5S01 必须输出 pre-write audit，不得使用旧版 `M5S01_claim_evidence_map.md` 或 `M5S02_contribution_articulation.md` 文件名**
 - **M5S01 必须审计风格/排版参照论文，并明确哪些写作/版式规律可迁移、哪些不可迁移**
-- **M5S01 必须先验证真实上游文件存在且非空**：M1S02/M1_source_log/M1S03/M1S04、M2S03-M2S06、M3S03-M3S04、M4S03-M4S04 与 `handoff_M4_M5.md` 缺任一项都不得进入 M5S02
+- **M5S01 必须先验证真实上游文件存在且非空**：M1S02/M1_source_log/M1S03/M1S04、M2S03-M2S05/M3S01、M3S04-M3S05、M4S03-M4S04 与 `handoff_M4_M5.md` 缺任一项都不得进入 M5S02
 - **M5S01 至少要有 1 个 `fully_supported` 贡献并给出 M3/M4 证据路径；若存在未解决 High blocking gap，审计结论必须写 no 并触发回溯**
 
 ---
@@ -421,13 +421,13 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 
 当收到 Conductor 的回溯指令（backtrack advice）时，Analysis Agent 按以下规则执行：
 
-### 6.1 回溯到 M3S04
+### 6.1 回溯到 M3S05
 
 1. 读取 `backtrack_advice`，确认 blocking_reason 和 required_fix。
 2. 若原因是 "结果边界错误" → 重新核对 seed=42、指标差异和声明措辞。
 3. 若原因是 "决策理由不足" → 补充 KEEP/FIX/BACKTRACK 的论证，明确证据链。
 4. 若原因是 "遗漏负面结果" → 重新审查所有实验记录，补充失败案例和异常分析。
-5. 重新产出 `knowledge/M3/M3S04_result_validation.md`，旧文件只能作为历史审计。
+5. 重新产出 `knowledge/M3/M3S05_result_validation.md`，旧文件只能作为历史审计。
 
 ### 6.2 回溯到 M4S01/M4S02/M4S04
 
@@ -463,4 +463,4 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
    - 确认当前分析的是哪个实验/数据集的结果
 
 5. **读取最近的产出文档**
-   - 确认 M3S04/M4S01-M4S04/M5S01_pre_write_audit 的当前状态
+   - 确认 M3S05/M4S01-M4S04/M5S01_pre_write_audit 的当前状态

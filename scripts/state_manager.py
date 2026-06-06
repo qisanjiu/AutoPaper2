@@ -28,7 +28,7 @@ from spiral.project_entry import normalize_keywords as _normalize_keywords, pars
 from spiral.verdict_parser import (
     VerdictParser,
     missing_m3_repair_fields,
-    extract_m3s04_decision,
+    extract_m3s05_decision,
     is_valid_rebuild_mode,
 )
 
@@ -895,27 +895,27 @@ def cmd_advance(
         # Sync source log into survey memory (ensures project-level tracking)
         _sync_source_log_to_survey_memory(project_dir)
 
-    # M3S04 decision enforcement
-    if stage == "M3S04":
-        s34_path = Path(project_dir) / "knowledge" / "M3" / "M3S04_result_validation.md"
+    # M3S05 decision enforcement
+    if stage == "M3S05":
+        s34_path = Path(project_dir) / "knowledge" / "M3" / "M3S05_result_validation.md"
         if s34_path.exists():
             text = s34_path.read_text(encoding="utf-8")
-            decision = extract_m3s04_decision(text)
+            decision = extract_m3s05_decision(text)
             if decision in {"FIX", "BACKTRACK"}:
                 missing_fields = missing_m3_repair_fields(text)
                 has_guidance = "回溯修改方向" in text
                 if missing_fields or not has_guidance:
-                    print("[BLOCKED] M3S04 decision is FIX or BACKTRACK, and repair guidance is incomplete.")
+                    print("[BLOCKED] M3S05 decision is FIX or BACKTRACK, and repair guidance is incomplete.")
                     if not has_guidance:
                         print("  Missing section: 回溯修改方向")
                     if missing_fields:
                         print(f"  Missing fields: {', '.join(missing_fields)}")
                 else:
-                    print("[BLOCKED] M3S04 decision is FIX or BACKTRACK.")
+                    print("[BLOCKED] M3S05 decision is FIX or BACKTRACK.")
                     print("  Repair guidance is present; execute the requested backtrack before advancing.")
                 sys.exit(1)
             if decision != "KEEP":
-                print("[BLOCKED] M3S04 missing explicit KEEP decision.")
+                print("[BLOCKED] M3S05 missing explicit KEEP decision.")
                 sys.exit(1)
 
     if not skip_gates and not is_gate_aggregate:
@@ -925,8 +925,8 @@ def cmd_advance(
         if not sg_ok:
             stage_review_block = stage in {
                 "M2S01", "M2S02", "M2S03", "M2S04",
-                "M2S05", "M2S06",
-                "M3S01", "M3S02", "M3S03",
+                "M2S05",
+                "M3S01", "M3S02", "M3S03", "M3S04", "M3S05",
                 "M4S01", "M4S02", "M4S03",
                 "M5S01", "M5S02", "M5S03", "M5S04",
                 "M5S05", "M5S06", "M5S07", "M5S08", "M5S09",

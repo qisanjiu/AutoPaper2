@@ -17,8 +17,8 @@ from .project_entry import ENTRY_BRIEF_FILENAME, build_project_entry
 # Module -> Stage mapping (6 modules)
 MODULE_STAGES = {
     "M1": ["M1S01", "M1S02", "M1S03", "M1S04", "M1S05"],
-    "M2": ["M2S01", "M2S02", "M2S03", "M2S04", "M2S05", "M2S06"],
-    "M3": ["M3S01", "M3S02", "M3S03", "M3S04"],
+    "M2": ["M2S01", "M2S02", "M2S03", "M2S04", "M2S05"],
+    "M3": ["M3S01", "M3S02", "M3S03", "M3S04", "M3S05"],
     "M4": ["M4S01", "M4S02", "M4S03", "M4S04"],
     "M5": ["M5S01", "M5S02", "M5S04", "M5S05", "M5S06", "M5S03", "M5S07", "M5S08", "M5S09"],
     "M6": ["M6S01", "M6S02", "M6S03", "M6S04", "M6S05", "M6S06"],
@@ -26,8 +26,8 @@ MODULE_STAGES = {
 
 GATE_STAGES = {
     "G1": "M1S05",
-    "G2": "M2S06",
-    "G3": "M3S04",
+    "G2": "M2S05",
+    "G3": "M3S05",
     "G4": "M4S04",
     "G5": "M5S09",
     "G6": "M6S06",
@@ -47,12 +47,12 @@ AGENT_FOR_STAGE = {
     "M2S03": "method",
     "M2S04": "method",
     "M2S05": "method",
-    "M2S06": "method",
     # M3: Experiment Implementation & Execution
     "M3S01": "experiment",
     "M3S02": "experiment",
     "M3S03": "experiment",
-    "M3S04": "analysis",
+    "M3S04": "experiment",
+    "M3S05": "analysis",
     # M4: Deep Analysis
     "M4S01": "analysis",
     "M4S02": "analysis",

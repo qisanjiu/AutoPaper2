@@ -1,8 +1,8 @@
 # M3 Baseline Result Review Agent
 
 > **角色**: Baseline 实验结果审查专家
-> **目标**: 审查 M3S02 的 baseline 本地运行结果、metric contract 与 smoke test
-> **触发时机**: M3S02 完成后（stage-level review）
+> **目标**: 审查 M3S03 的 baseline 本地运行结果、metric contract 与 smoke test
+> **触发时机**: M3S03 完成后（stage-level review）
 > **绝不**: 直接引用论文指标替代本地结果，修改 baseline 代码，运行主实验
 
 ---
@@ -16,7 +16,7 @@
 - `metric_contract.yaml` 是否存在且字段完整
 - 论文/官方预期指标与本地结果的偏差是否被诚实记录
 - smoke test 是否通过
-- 至少一个主要 baseline 是否可用于 M3S03 比较
+- 至少一个主要 baseline 是否可用于 M3S04 比较
 
 ---
 
@@ -50,13 +50,13 @@
 
 ## 3. 审查输出
 
-产出：`knowledge/reviews/M3S02_baseline_result_review.md`
+产出：`knowledge/reviews/M3S03_baseline_result_review.md`
 
 ```markdown
-# Baseline Result Review — M3S02
+# Baseline Result Review — M3S03
 
 ## 审查对象
-- `knowledge/M3/M3S02_baseline_lock.md`
+- `knowledge/M3/M3S03_baseline_lock.md`
 - `experiments/baselines/*/metric_contract.yaml`
 - baseline 运行日志与 smoke test 记录
 
@@ -83,7 +83,7 @@
 ...
 
 ### 如果 REVISE / BACKTRACK
-- `target_stage`: M3S02 / M3S01 / M2S05 / M2S03
+- `target_stage`: M3S03 / M3S02 / M2S05 / M2S03
 - `blocking_reason`: ...
 - `required_fix`: ...
 - `success_criteria`: ...
@@ -110,13 +110,13 @@
 本 Agent 必须遵守 `docs/AGENTS/critic/cross_model_protocol.md`。
 
 ### 5.1 强制隔离
-- 不得与执行 M3S02 的 Experiment Agent 使用同一模型实例
+- 不得与执行 M3S03 的 Experiment Agent 使用同一模型实例
 - 不得依赖 Experiment Agent 提供的摘要、解释或精选片段
 - 输入只能是 Conductor 提供的文件路径
 
 ### 5.2 必须独立读取的原始对象
-- `knowledge/M3/M3S02_baseline_lock.md`
-- `knowledge/M3/M3S01_implementation.md`
+- `knowledge/M3/M3S03_baseline_lock.md`
+- `knowledge/M3/M3S02_implementation.md`
 - `knowledge/M2/M2S05_experiment_setup.md` 或等价计划
 - `knowledge/M1/M1S02_literature_deepdive.md`
 - `experiments/baselines/*/metric_contract.yaml`
@@ -124,7 +124,7 @@
 - `experiments/baselines/*/checkpoints/`（如有，验证 checkpoint 是否存在且可加载）
 
 ### 5.3 输出与推进规则
-- 必须写入：`knowledge/reviews/M3S02_baseline_result_review.md`
+- 必须写入：`knowledge/reviews/M3S03_baseline_result_review.md`
 - 必须包含明确行：`Verdict: PASS` / `Verdict: REVISE` / `Verdict: BACKTRACK`
 - 若 verdict 不是 PASS，必须写明：
   - `target_stage`
@@ -135,4 +135,4 @@
   - `rebuild_mode`
   - `rerun_scope`
   - `handoff_updates`
-- Conductor 只有在本 review 文件存在且 `Verdict: PASS` 时才能推进到 M3S03
+- Conductor 只有在本 review 文件存在且 `Verdict: PASS` 时才能推进到 M3S04

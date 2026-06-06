@@ -7,7 +7,7 @@
 4. Read packet `input_docs` selectively; write packet `output_path`.
 
 ## Objective
-Execute M2S01-M2S06 method design and experiment planning.
+Execute M2S01-M2S05 method design, experiment setup, metric protocol, and M2-to-M3 handoff.
 
 ## Hard Boundaries
 - Do not use parent conversation facts.

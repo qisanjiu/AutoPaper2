@@ -87,8 +87,8 @@ SSH_OPS_BOUNDARIES = [
 
 
 LONG_CONTEXT_STAGES = {
-    "M3S01",
-    "M3S03",
+    "M3S02",
+    "M3S04",
     "M4S03",
     "M5S08",
     "M5S09",
@@ -553,21 +553,28 @@ def build_stage_review_packets(project_root: str | Path, stage: str) -> list[dic
     if stage == "M3S01":
         extra_expected.extend(
             [
+                root / "knowledge" / "M2" / "M2S05_metric_protocol.yaml",
+                root / "knowledge" / "handoff_M2_M3.md",
+            ]
+        )
+    if stage == "M3S02":
+        extra_expected.extend(
+            [
                 root / "config" / "execution_env.yaml",
                 root / "state" / "ssh_allocation.yaml",
-                root / "experiments" / "logs" / "m3s01_longrun_ledger.md",
+                root / "experiments" / "logs" / "m3s02_longrun_ledger.md",
                 root / "experiments" / "requirements.lock",
                 root / "experiments" / "requirements.txt",
             ]
         )
-    if stage == "M3S02":
+    if stage == "M3S03":
         extra_expected.extend(
             [
                 root / "experiments" / "baselines" / "baseline_lock.yaml",
                 root / "experiments" / "baselines",
             ]
         )
-    if stage == "M3S03":
+    if stage == "M3S04":
         extra_expected.extend(
             [
                 root / "experiments" / "results.tsv",
@@ -635,9 +642,9 @@ def _m6_internal_review_inputs(root: Path, base_inputs: list[str]) -> list[str]:
         root / "knowledge" / "M1" / "M1_source_log.yaml",
         root / "knowledge" / "M2" / "M2S03_method_architecture.md",
         root / "knowledge" / "M2" / "M2S05_experiment_setup.md",
-        root / "knowledge" / "M2" / "M2S06_full_experiment_plan.md",
-        root / "knowledge" / "M3" / "M3S03_main_experiment.md",
-        root / "knowledge" / "M3" / "M3S04_result_validation.md",
+        root / "knowledge" / "M3" / "M3S01_main_experiment_design.md",
+        root / "knowledge" / "M3" / "M3S04_main_experiment.md",
+        root / "knowledge" / "M3" / "M3S05_result_validation.md",
         root / "knowledge" / "M4" / "M4S04_analysis_results.md",
         root / "knowledge" / "M5" / "M5S09_full_polish.md",
         root / "knowledge" / "M5" / "M5S08_final_compilation.md",

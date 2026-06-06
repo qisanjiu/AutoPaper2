@@ -98,13 +98,13 @@ Phase 1: 状态诊断
   → 检查 stale_stages（如有则提示需要先处理）
 
 Phase 2: 目标解析与依赖检查
-  → 若用户指定了具体 stage（如 M3S02）：
+  → 若用户指定了具体 stage（如 M3S03）：
      → 检查该 stage 是否在当前模块流程中可达
      → 若 target_stage < current_stage → 提示用户是否需要先回溯
   → 若用户指定了模块（如 M3）：
      → 调用 check_module_prerequisites(M3)
      → M2 未完成 → 提示先完成 M2
-     → M2 已完成 → 获取模块首 stage（M3S01）
+     → M2 已完成 → 获取模块首 stage（M3S02）
   → 若用户未指定模块/stage：
      → 返回项目当前状态摘要，等待用户下一步指令
 

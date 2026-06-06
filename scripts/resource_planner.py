@@ -2,8 +2,8 @@
 """Resource planning and monitoring helpers for AutoPaper2 experiments.
 
 The script is intentionally dependency-light so it can run before the project
-environment is fully installed.  M3S01 uses ``plan`` to create a durable
-resource plan; M3S03 can use ``run`` or ``monitor`` to record utilization
+environment is fully installed.  M3S02 uses ``plan`` to create a durable
+resource plan; M3S04 can use ``run`` or ``monitor`` to record utilization
 evidence for each experiment run.
 """
 
@@ -891,7 +891,7 @@ def main(argv: list[str] | None = None) -> int:
     alloc_p.add_argument("--project", default=".", help="Project root")
     alloc_p.add_argument("--plan", default="experiments/configs/resource_plan.yaml", help="Input resource plan YAML")
     alloc_p.add_argument("--tasks", required=True, help="Task queue YAML with tasks/runs/slices")
-    alloc_p.add_argument("--stage", default="", help="Optional stage filter, e.g. M3S03 or M4S03")
+    alloc_p.add_argument("--stage", default="", help="Optional stage filter, e.g. M3S04 or M4S03")
     alloc_p.add_argument("--output", default="", help="Output allocation YAML path")
 
     mon_p = sub.add_parser("monitor", help="Record CPU/GPU utilization samples")

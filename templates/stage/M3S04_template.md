@@ -1,202 +1,241 @@
-# M3S04: Result Validation & Evidence Packaging
+# M3S04: Main Experiment Result Review
 
 > **Stage**: M3S04
-> **Agent**: Analysis Agent
-> **输入**: `knowledge/M3/M3S03_main_experiment.md`, `knowledge/M3/M3S02_baseline_lock.md`, `experiments/results.tsv`, `knowledge/M1/M1S04_hypothesis_generation.md`
-> **输出**: `knowledge/M3/M3S04_result_validation.md` + `experiments/artifacts/main_experiment/`
+> **Agent**: Experiment Agent
+> **输入**: `knowledge/M3/M3S03_baseline_lock.md`, `knowledge/M3/M3S01_main_experiment_design.md`, `knowledge/M3/M3S02_implementation.md`
+> **输出**: `knowledge/M3/M3S04_main_experiment.md` + `experiments/results.tsv` + `experiments/runs/<run_id>/` + `experiments/logs/runtime_events.jsonl`
 >
-> **审查重点**: 统计验证、数据质量、诚实决策、证据打包
+> **审查重点**: 主实验结果是否超过 baseline、结果表是否完整、统计摘要是否齐全、负面结果是否诚实记录
 
 ---
 
-## 1. 实验停止原因
+## 1. Run Contract
 
-- **停止条件触发**: [指标收敛 / 预算耗尽 / 方向验证 / 外部中断]
-- **总迭代次数**: N
-- **当前 best 指标**: ...（vs baseline: ...）
-- **Evidence Ladder 达成层级**: minimum / solid / maximum
+### 1.1 锁定内容
 
----
+| 项目 | 内容 |
+|------|------|
+| 研究问题 | [来自 M1S03] |
+| 核心假设 | [来自 M1S04] |
+| 方法干预 | [本文方法与 baseline 的关键差异] |
+| 比较基准 | [引用 M3S03 锁定的 baseline metric contract] |
+| 数据集与划分 | [来自 M3S01 主实验设计，必须与 M2S05 指标协议一致] |
+| 主指标 | ... (方向: higher/lower_is_better) |
+| 次指标 | ... |
+| 停止条件 | 预算: X GPU-hours / 迭代: N 轮 / 收敛: 连续 3 轮 < 1% 提升 |
+| 放弃条件 | smoke test 级别结果连续 2 轮低于 baseline |
+| 资源执行合同 | `experiments/configs/resource_plan.yaml` |
+| 多资源任务分配 | `experiments/configs/m3_task_queue.yaml` / `experiments/configs/m3_task_allocation.yaml`（如适用） |
+| Runtime watchdog | 巡检间隔: 默认 4h / 最长 6h；告警只记录，不自动结束；Agent 决策: continue / fix_and_rerun / early_stop / backtrack_request |
 
-## 2. 数据质量检查
+### 1.2 证据层级目标
 
-### 2.1 过拟合检查
+- **minimum**: [目标，如"代码运行完成，指标可计算"]
+- **solid**: [目标，如"主指标显著优于 baseline"]
+- **maximum**: [目标，如"完整曲线、更多数据集或更完整日志"]
 
-| 检查项 | 结果 | 严重程度 | 备注 |
-|--------|------|---------|------|
-| Train/Val gap | ... | 正常/警告/严重 | ... |
-| 学习曲线分析 | ... | 正常/警告/严重 | ... |
-
-### 2.2 数据泄露检查
-
-| 检查项 | 结果 | 严重程度 | 备注 |
-|--------|------|---------|------|
-| 预处理管道隔离性 | ... | 正常/警告/严重 | ... |
-| 验证集信息是否间接用于训练 | ... | 否/是 | ... |
-
-### 2.3 训练稳定性检查
-
-| 检查项 | 结果 | 严重程度 | 备注 |
-|--------|------|---------|------|
-| Loss 曲线异常 | ... | 正常/警告/严重 | ... |
-| NaN/Inf 出现 | ... | 正常/警告/严重 | ... |
-| 梯度爆炸/消失 | ... | 正常/警告/严重 | ... |
-
-### 2.4 可复现性检查
-
-| 检查项 | 结果 | 备注 |
-|--------|------|------|
-| 固定 seed 配置 | seed=42 已记录 / 未记录 | ... |
+> 本实验当前追求层级: minimum → solid（maximum 留给 M4）
 
 ---
 
-## 3. 固定 Seed 单次结果验证
+## 2. 实验环境
 
-### 3.1 验证方法
+- **执行模式**: local / ssh
+- **Python**: ...
+- **PyTorch**: ...
+- **CUDA**: ...
+- **硬件**: ...
+- **Resource Plan**: `experiments/configs/resource_plan.yaml`
+- **Task Queue / Allocation**: `experiments/configs/m3_task_queue.yaml`, `experiments/configs/m3_task_allocation.yaml`（如启用多资源）
+- **设备策略**: distributed_data_parallel / single_gpu / cpu_parallel / task_parallel
+- **资源池**: local / ssh resources, resource_id, server_id/lease_id, GPU/CPU capacity, sync_required
+- **分配 GPU**: `gpu_ids=[...]`, `gpu_count=...`
+- **分配 CPU**: `cpu_cores=...`
+- **DataLoader**: `num_workers=...`, `pin_memory=...`, `persistent_workers=...`, `prefetch_factor=...`
+- **线程环境变量**: `OMP_NUM_THREADS=...`, `MKL_NUM_THREADS=...`
+- **Git 分支**: `exp/main`
+- **随机种子**: 42（固定单次实验；不做多 seed 重复实验）
 
-- **选择的方法**: fixed-seed single-run validation
-- **固定 seed**: 42
-- **选择理由**: 本框架不再要求多 seed 重复实验，结论基于 seed=42 的单次可复现实验
+### 2.1 远程执行配置（如适用）
 
-### 3.2 验证结果
-
-| 对比 | Seed | 主指标差异 | 相对提升 | 结论 |
-|------|------|------------|----------|------|
-| Ours vs Baseline-1 | 42 | ... | ... | 优于 / 持平 / 低于 |
-| Ours vs Baseline-2 | 42 | ... | ... | 优于 / 持平 / 低于 |
-
-### 3.3 统计限制说明
-
-- **统计显著性**: 不声称（未做多 seed 重复实验）
-- **不确定性估计**: 不要求 std / CI
-- **报告边界**: 只能报告固定 seed=42 下的结果，不得声称跨随机种子稳定
-
----
-
-## 4. 与假设的对应验证
-
-| 假设 | 预期结果 | 实际结果 | 支持程度 | 备注 |
-|------|---------|---------|---------|------|
-| H1 | ... | ... | 完全支持 / 部分支持 / 不支持 | ... |
-| H2 | ... | ... | 完全支持 / 部分支持 / 不支持 | ... |
+| 配置项 | 值 |
+|--------|-----|
+| SSH Host | ... |
+| 远程工作路径 | ... |
+| 同步策略 | metrics_only / all / selective |
 
 ---
 
-## 5. 潜在问题与根因分析
+## 2.2 多资源任务分配（如适用，必须）
 
-| 问题 | 严重程度 (critical/major/minor) | 根因 | 影响 |
-|------|-------------------------------|------|------|
-| ... | ... | ... | ... |
+当 `resource_plan.yaml.resource_pool.enabled == true` 或资源池中超过 1 个 resource/slot：
+
+```bash
+python scripts/resource_planner.py allocate \
+  --project . \
+  --stage M3S04 \
+  --tasks experiments/configs/m3_task_queue.yaml \
+  --output experiments/configs/m3_task_allocation.yaml
+```
+
+| Wave | Task / Run ID | parallelizable | resource_id | resource_kind | server_id / lease_id | slot / GPU ids | CPU cores | launch command | sync |
+|------|---------------|----------------|-------------|---------------|----------------------|----------------|-----------|----------------|------|
+| 0 | run_001 | yes | local | local | — | gpu:0 | 8 | `...` | no |
+| 0 | run_002 | yes | ssh:lab-a | ssh | lab-a / lease_x | gpu:0 | 16 | `ssh ...` | push/pull |
+
+必须说明未并行或未使用资源的原因：依赖、共用 checkpoint 写入、显存不足、数据未同步、DDP 不兼容、baseline 公平性、服务器配额或远程不可达。
+
+## 2.3 资源利用率执行记录（必须）
+
+| Run ID | resource_id | server_id | 启动命令 | Resource monitor | 平均 GPU 利用率 | 平均 CPU 利用率 | 低利用率处理 |
+|--------|-------------|-----------|----------|------------------|----------------|----------------|--------------|
+| run_001 | local / ssh:lab-a | lab-a / — | `python scripts/resource_planner.py run --output experiments/runs/run_001/resource_monitor.csv --interval 10 -- ...` | `experiments/runs/run_001/resource_monitor.csv` | ...% | ...% | optimized / documented blocker |
+
+如 `resource_plan.yaml` 分配多 GPU，则默认命令必须使用 `torchrun --nproc_per_node=<gpu_count>` 或等价 DDP。若未使用 DDP，必须写明替代资源策略和原因；不得通过多 seed 重复实验来填满资源。
+
+## 2.4 Runtime Watchdog 与告警记录（必须）
+
+| Run ID | Watchdog command / session | 巡检间隔 | Check log | Alert log | 最近状态 | Agent 决策 |
+|--------|----------------------------|----------|-----------|-----------|----------|------------|
+| run_001 | `python scripts/experiment_watchdog.py watch --project . --run-id run_001 --interval-seconds 14400 --log experiments/runs/run_001/logs/train.log --metrics experiments/runs/run_001/metrics.csv` | 4h | `experiments/runs/run_001/watchdog_checks.jsonl` | `experiments/runs/run_001/watchdog_alerts.jsonl` / 无告警 | info / warning / critical / early_stop_candidate | continue / fix_and_rerun / early_stop / backtrack_request |
+
+- **Runtime events**: `experiments/logs/runtime_events.jsonl`
+- **告警不自动终止**: Watchdog 仅写告警；是否结束、继续、修复或回溯由 Experiment Agent 读取日志、metric 曲线、checkpoint 和资源监控后判断。
+- **若出现告警，必须记录证据链**: `run_id`、告警类型、原始日志路径、metric/curve 路径、checkpoint 路径、Agent 决策、决策理由、后续命令。
+
+## 2.5 Trained-Weight Evidence Contract（必须）
+
+M3S04 不得在训练未完成时推进。随机初始化、E0、未训练 checkpoint、仍在 running/queued 的训练结果只能作为负面/诊断记录，不能填入最终 proposed/ours 主结果。
+
+`experiments/results.tsv` 的 proposed/ours 行必须至少包含：
+
+| method | run_id | seed | metric | value | run_status | weight_state | checkpoint_path | training_steps | resource_monitor |
+|--------|--------|------|--------|-------|------------|--------------|-----------------|----------------|------------------|
+| ours | run_001 | 42 | ... | ... | completed | trained / trained_checkpoint / verified_loadable | `experiments/runs/run_001/checkpoints/best.pt` | >0 | `experiments/runs/run_001/resource_monitor.csv` |
+
+同时必须满足：
+- `checkpoint_path` 指向项目内真实存在的文件；
+- `run_status` / `training_status` 为 completed / succeeded / finished / done；
+- `weight_state` 证明是训练完成的权重，不得为 random / random_init / untrained / E0；
+- `experiments/logs/runtime_events.jsonl` 至少包含对应 run 的 `training_completed`、`run_completed`、`experiment_completed` 或 `checkpoint_saved` 事件。
 
 ---
 
-## 6. 最终决策
+## 3. Baseline 结果（本地运行）
 
-### 决策: [KEEP / FIX / BACKTRACK]
+| Baseline | 主指标 | 次指标 | Seed | run_status | weight_state | checkpoint_path | 运行时间 | resource_id | Monitor | 备注 |
+|----------|--------|--------|------|------------|--------------|-----------------|---------|-------------|---------|------|
+| Baseline-1 | ... | ... | 42 | completed | trained / verified_loadable / not_applicable | `...` | ... | local / ssh:lab-a | `experiments/runs/.../resource_monitor.csv` | 官方代码 |
+| Baseline-2 | ... | ... | 42 | completed | trained / verified_loadable / not_applicable | `...` | ... | ... | `experiments/runs/.../resource_monitor.csv` | 完整复现 |
 
-### 理由
+---
+
+## 4. 迭代循环记录
+
+### Iteration 1
+
+- **Git commit**: `exp(iter1): 初始实现，按 M2S03 设计`
+- **修改描述**: ...
+- **关键指标**:
+  | 方法 | 主指标 | 次指标 | vs Baseline-1 | vs Baseline-2 |
+  |------|--------|--------|--------------|--------------|
+  | Ours | ... | ... | ... | ... |
+- **资源监控**: `experiments/runs/<run_id>/resource_monitor.csv`；平均 GPU 利用率 ...%；平均 CPU 利用率 ...%
+- **低利用率处置**: 无 / 已调 batch size / 已调 num_workers / 已切换 DDP / 已改 task_parallel / 不可优化原因 ...
+- **Watchdog 巡检**: `experiments/runs/<run_id>/watchdog_checks.jsonl`；最近状态 info / warning / critical / early_stop_candidate
+- **告警与 Agent 决策**: 无 / NaN / non_convergence / OOM / early_stop_candidate → continue / fix_and_rerun / early_stop / backtrack_request；理由: ...
+- **结论**: [改善/持平/恶化]
+- **决策**: [继续 / 调整方向 / 诊断]
+- **远程同步**（如适用）: push / pull 状态
+
+### Iteration 2
 ...
 
-### KEEP 完成条件（决策为 KEEP 时必填）
+---
 
-KEEP 只能在以下材料同时完成时使用：
+## 5. 最终结果
 
-- `experiments/artifacts/main_experiment/manifest.yaml`：包含 `experiment_id`, `method`, `dataset`, `baseline_refs`, `primary_metric.key/value`, `seed: 42`, `environment`
-- `experiments/artifacts/main_experiment/metric_contract.yaml`：包含本文方法名称与 primary metric 的 `key/value`
-- `experiments/artifacts/main_experiment/comparison_table.csv`：包含 baseline 与 ours/proposed 行，并记录 `seed=42`
-- `experiments/artifacts/main_experiment/reproduction.md`：记录复现实验命令与关键配置
-- M3S03 final proposed/ours 行引用的 trained checkpoint 真实存在，且 `runtime_events.jsonl` 记录训练完成事件；random/E0/untrained 权重不得 KEEP
-- `knowledge/handoff_M3_M4.md`：包含 KEEP 决策、claim/evidence 映射、M3S04 来源、artifact 路径、M4 分析方向
+### 5.1 主结果表
 
-### 如果 FIX
-- **修复目标**: M3S03 / M3S02 / M3S01
-- **修复内容**: ...
-- **预期效果**: ...
+| 方法 | Run ID | Seed | 主指标 | 次指标 | run_status | weight_state | checkpoint_path | training_steps | resource_id | server_id | Monitor |
+|------|--------|------|--------|--------|------------|--------------|-----------------|----------------|-------------|-----------|---------|
+| Baseline-1 | baseline_1_run | 42 | ... | ... | completed | trained / verified_loadable / not_applicable | `...` | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
+| Ours | run_001 | 42 | ... | ... | completed | trained_checkpoint | `experiments/runs/run_001/checkpoints/best.pt` | ... | ... | ... | `experiments/runs/.../resource_monitor.csv` |
 
-### 如果 BACKTRACK
-- **回溯目标**: M3S01 / M2S03 / M2S05 / M1S04
-- **回溯原因**: ...
-- **修改方向建议**: ...
-- **验证计划**: ...
+### 5.2 与 Baseline 的对比
 
-### 6.4 结构化回溯字段（当决策为 FIX 或 BACKTRACK 时必填）
-- `target_stage`: 可执行的回溯目标（如 M3S03 / M3S02 / M3S01 / M2S03 / M2S05 / M1S04）
-- `blocking_reason`: 触发回溯的直接原因
-- `required_fix`: 被回溯 stage 需要实际修改什么
-- `success_criteria`: 修改后如何判定修复成功
-- `evidence_paths`: 需要重新读取或补充的文件路径
-- `rebuild_mode`: `incremental_replay` / `full_regenerate`
-- `rerun_scope`: 从 `target_stage` 起需要重跑的范围，必须说明是否包含 downstream stale stages
-- `handoff_updates`: 如需要刷新交接文档时填写
+| 对比 | 绝对提升 | 相对提升 | 备注 |
+|------|---------|---------|------|
+| Ours vs Baseline-1 | ... | ...% | ... |
+| Ours vs Baseline-2 | ... | ...% | ... |
 
 ---
 
-## 7. 负面结果
+## 6. Evidence Ladder 自评
 
-（诚实报告实验中的负面发现）
+- [ ] **minimum** — 可执行、可比较
+- [ ] **solid** — 足以支撑主声明
+- [ ] **maximum** — 全面抛光
 
-- **负面发现 1**: ...
-- **负面发现 2**: ...
+**当前达成层级**: minimum / solid / maximum
 
----
-
-## 8. Evidence Artifact 打包
-
-### 8.1 Artifact 清单
-
-```
-experiments/artifacts/main_experiment/
-├── manifest.yaml          # 实验元数据
-├── metric_contract.yaml   # 本文方法的 metric contract
-├── comparison_table.csv   # 与 baseline 的对比
-├── training_curves/       # 训练曲线图
-├── logs/                  # 运行日志
-├── configs/               # 配置文件
-└── reproduction.md        # 复现指南
-```
-
-### 8.2 Manifest 内容
-
-```yaml
-experiment_id: "main_exp_v1"
-method: "..."
-dataset: "..."
-baseline_refs:
-  - "experiments/baselines/baseline_1/metric_contract.yaml"
-trained_checkpoint: "experiments/runs/run_001/checkpoints/best.pt"
-primary_metric:
-  key: "..."
-  value: ...
-seed: 42
-environment:
-  python: "..."
-  torch: "..."
-  cuda: "..."
-  hardware: "..."
-run_date: "YYYY-MM-DD"
-```
+**未达成更高层级的原因**（如适用）: ...
 
 ---
 
-## 9. 已知限制
+## 7. 训练曲线与日志
 
-| 限制 | 影响 | 建议的后续工作 |
-|------|------|--------------|
-| 只在数据集 X 上验证 | 外部效度有限 | M4 增加跨数据集验证 |
-| 超参未充分调优 | 可能非最优性能 | M4 做敏感性分析 |
-| ... | ... | ... |
+- **曲线路径**: `experiments/runs/<run_id>/curves/`
+- **日志路径**: `experiments/runs/<run_id>/logs/`
+- **Watchdog checks**: `experiments/runs/<run_id>/watchdog_checks.jsonl`
+- **Watchdog alerts**: `experiments/runs/<run_id>/watchdog_alerts.jsonl` / 无告警
+- **Runtime event stream**: `experiments/logs/runtime_events.jsonl`
+- **关键观察**: ...
+
+### 7.1 Agent 决策日志（针对告警或早停候选）
+
+| 时间 | Run ID | Watchdog severity | 证据路径 | Agent 决策 | 理由 | 后续动作 |
+|------|--------|-------------------|----------|------------|------|----------|
+| ... | run_001 | critical / warning / early_stop_candidate | `experiments/runs/run_001/watchdog_alerts.jsonl`; `experiments/runs/run_001/logs/train.log`; `experiments/runs/run_001/metrics.csv` | continue / fix_and_rerun / early_stop / backtrack_request | ... | ... |
 
 ---
 
-## 10. 传递给下游的信息
+## 8. 负面结果与失败记录
 
-- **核心假设验证状态**: ...
-- **固定 seed 结果边界**: seed=42，主指标差异 = ...，不声称统计显著
-- **Evidence Artifact 路径**: `experiments/artifacts/main_experiment/`
-- **关键发现（预期内）**: ...
-- **意外发现**: ...
-- **负面发现**: ...
-- **建议的 M4 分析方向**:
-  - 消融实验: ...
-  - 鲁棒性检查: ...
-  - 机制验证: ...
+| 迭代 | 尝试的修改 | 结果 | 失败类型 | 原因分析 |
+|------|-----------|------|---------|---------|
+| Iter-X | ... | 未改善 | direction_underperforming | ... |
+
+---
+
+## 9. 远程同步记录（如适用）
+
+| 时间 | 方向 | 内容 | 状态 |
+|------|------|------|------|
+| ... | push | 代码更新 | 完成 |
+| ... | pull | results.tsv + 日志 | 完成 |
+
+---
+
+## 10. 资源消耗
+
+- **总 GPU 时间**: ...
+- **总 Wall-clock 时间**: ...
+- **平均 GPU 利用率**: ...%
+- **平均 CPU 利用率**: ...%
+- **低利用率原因/优化记录**: ...
+- **存储占用**: ...
+- **与预算对比**: 未超支 / 超支 X%
+
+---
+
+## 11. 传递给下游的信息
+
+- **最优结果对应的配置**: ...
+- **关键超参数**: ...
+- **是否达到停止条件**: ...
+- **实验是否按预期收敛**: ...
+- **Watchdog 最终状态**: info / warning_resolved / critical_resolved / early_stopped / backtrack_requested
+- **Evidence Artifact 路径**: `experiments/runs/<best_run_id>/`
+- **Trained checkpoint**: `experiments/runs/<best_run_id>/checkpoints/best.pt`，runtime event 已记录 completed
+- **远程结果同步状态**（如适用）: 已同步 / 部分同步 / 未同步

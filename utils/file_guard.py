@@ -13,7 +13,7 @@ VALID_GATE_PATTERN = re.compile(r"^G[1-6]$")
 
 ALLOWED_EXTRA_STAGE_OUTPUTS = {
     # M2S05 writes a machine-readable metric protocol registry used by
-    # M2S06/M3S02 to prevent metric drift and late experiment backtracking.
+    # M3S01/M3S03 to prevent metric drift and late experiment backtracking.
     "M2S05": {"M2S05_metric_protocol.yaml"},
     # M6S03/M6S04 deliberately produce one primary stage report plus one
     # structured companion file used by downstream review/rebuttal planning.
@@ -53,18 +53,18 @@ def _get_canonical_name(stage: str) -> str:
         "M1S03": "research_question",
         "M1S04": "hypothesis_generation",
         "M1S05": "novelty_feasibility",
-        # M2 (updated for 6-Stage design)
+        # M2
         "M2S01": "cross_domain_search",
         "M2S02": "method_inspiration",
         "M2S03": "method_architecture",
         "M2S04": "algorithm_theory",
         "M2S05": "experiment_setup",
-        "M2S06": "full_experiment_plan",
-        # M3 (updated for 4-Stage design)
-        "M3S01": "implementation",
-        "M3S02": "baseline_lock",
-        "M3S03": "main_experiment",
-        "M3S04": "result_validation",
+        # M3
+        "M3S01": "main_experiment_design",
+        "M3S02": "implementation",
+        "M3S03": "baseline_lock",
+        "M3S04": "main_experiment",
+        "M3S05": "result_validation",
         # M4
         "M4S01": "other_findings",
         "M4S02": "analysis_experiment_design",

@@ -109,18 +109,20 @@ Core components:
 | `M2S03` | Method architecture design. |
 | `M2S04` | Algorithm and theory design. |
 | `M2S05` | Experiment setup design: datasets, metrics, baselines, fairness rules. |
-| `M2S06` | Full experiment plan and M2-to-M3 handoff. |
 
-**Gate G2** checks logic, method soundness, novelty, and experiment-plan readiness.
+**Gate G2** checks logic, method soundness, novelty, and experiment-setup readiness.
 
 ### M3 - Experiment Implementation & Execution
 
 | Stage | Purpose |
 |-------|---------|
-| `M3S01` | Dataset and environment setup. |
-| `M3S02` | Baseline lock and smoke tests. |
-| `M3S03` | Main experiment execution. |
-| `M3S04` | Result validation, evidence packaging, and M3-to-M4 handoff. |
+| `M3S01` | Main experiment design: dataset, metrics, baseline reference values, and same-condition protocol. |
+| `M3S02` | Dataset and environment setup. |
+| `M3S03` | Baseline lock and smoke tests. |
+| `M3S04` | Main experiment execution. |
+| `M3S05` | Result validation, evidence packaging, and M3-to-M4 handoff. |
+
+Each M3 stage has its own targeted stage reviewer: `m3_main_experiment_design_review`, `m3_dataset_env_review`, `m3_baseline_result_review` plus `m3_baseline_lock_audit`, `m3_main_result_review`, and `m3_result_validation_review`. M3 cannot rely on a generic reviewer to advance.
 
 **Gate G3** checks method implementation, baseline fairness, result validity, and evidence sufficiency.
 
@@ -230,10 +232,10 @@ When a review or gate fails, the Conductor:
 Structured backtrack example:
 
 ```bash
-python scripts/state_manager.py backtrack M3S04 M3S02 \
+python scripts/state_manager.py backtrack M3S05 M3S03 \
   "baseline protocol mismatch" \
   --required-fix "Re-lock baselines using the M2S05 metric contract" \
-  --success-criteria "M3S02 reports runnable baselines, seeds, metrics, and artifact paths" \
+  --success-criteria "M3S03 reports runnable baselines, seeds, metrics, and artifact paths" \
   --rebuild-mode full_regenerate \
   --evidence-paths knowledge/M2/M2S05_experiment_setup.md,experiments/results.tsv
 ```

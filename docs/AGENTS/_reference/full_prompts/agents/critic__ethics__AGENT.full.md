@@ -93,7 +93,7 @@
 ## 审查对象
 - Gate: G5 (Module 5: Writing & Finalization)
 - 核心审查文档:
-  - `knowledge/M3/M3S01_implementation.md`（数据集与伦理）
+  - `knowledge/M3/M3S02_implementation.md`（数据集与伦理）
   - `knowledge/M5/M5S05_experiments_results.md`
   - `knowledge/M5/M5S06_analysis_discussion.md`（Limitations）
   - `artifacts/paper.tex`

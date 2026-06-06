@@ -33,7 +33,7 @@ Check human subjects, sensitive data, privacy, bias/fairness, misuse/dual-use, l
 Review experiment code quality and reproducibility: runnable entrypoints, configs, hardcoded paths, dependency lock, logging, seeds, outputs, no secret leakage.
 
 ## data_checker
-Review dataset availability, licenses, checksums/splits, cache/symlink paths, longrun ledger acquisition status, and no hidden unavailable data dependency. PASS is forbidden if `M3S01_dataset_pending.md` exists or any dataset/model-asset acquisition ledger row is failed, running, queued, blocked_user_action, missing log evidence, or waiting for human action.
+Review dataset availability, licenses, checksums/splits, cache/symlink paths, longrun ledger acquisition status, and no hidden unavailable data dependency. PASS is forbidden if `M3S02_dataset_pending.md` exists or any dataset/model-asset acquisition ledger row is failed, running, queued, blocked_user_action, missing log evidence, or waiting for human action.
 
 ## m2_search_quality
 Check M2S01 search dimensions, source diversity, M1 cross-check, candidate novelty/difference, query ledger, and `M2_source_log.yaml` completeness.
@@ -47,20 +47,23 @@ Check M2S03/M2S04 architecture/algorithm/theory: notation, components, assumptio
 ## m2_experiment_design_review
 Check M2S05 dataset/baseline/metric/split/seed/fairness/resource design, relation to hypotheses, baseline acquisition/verification plan, and `knowledge/M2/M2S05_metric_protocol.yaml`. Baselines must be external comparators or full reproductions, not ablations or disabled-component variants of the proposed method. Every metric protocol must bind metric to dataset, scenario/task, split, definition, calculation, direction, value range, normal reference range, protocol source, and sanity-check case.
 
-## m2_experiment_plan_review
-Check M2S06 execution order, branching/failure logic, success criteria, risk budget, at least main + ablation + robustness/boundary plan, report blueprint, and explicit references to M2S05 metric_protocol_id values for every experiment.
+## m3_main_experiment_design_review
+Check M3S01 main-experiment-only design: dataset/scenario/split, metric_protocol_id references from M2S05, external/prior-work baseline list, concrete baseline reference values on the same dataset/scenario/split/metric, value source/table/section, proposed-method same-condition protocol, seed=42, fairness/resource constraints, and explicit blockers. PASS is forbidden if baseline values are TBD/missing/not source-located, if baselines are ablations of the proposed method, if metric protocol IDs are missing or inconsistent with M2S05, or if the document designs ablation/robustness/mechanism/M4 analysis work instead of only the main experiment.
 
 ## m3_dataset_env_review
-Check M3S01 dataset first, env lock, sandbox profile, resource plan, hardware probe, multi-resource queue/allocation where needed, SSH evidence, longrun ledger, smoke run, no secrets.
+Check M3S02 dataset first, env lock, sandbox profile, resource plan, hardware probe, multi-resource queue/allocation where needed, SSH evidence, longrun ledger, smoke run, no secrets.
 
 ## m3_baseline_result_review
-Check M3S02 baseline verification, checkpoint acquisition/loadability, metric contract, smoke run, fairness, paper/history deviation, metric_protocol_id alignment with M2S05, metric implementation sanity-check evidence, full reproduction fidelity for self-implemented comparators, no simplified/toy baselines, no ablation-as-baseline misuse, and locked comparator immutability. REVISE/BACKTRACK if a metric is wrong for the dataset/scenario, if the value is outside the M2 normal reference range without triage, if a large deviation is hidden behind `verified_match`/`verified_close`, or if required baseline code/weights/checkpoints are not downloaded, checksumed, and verified loadable.
+Check M3S03 baseline verification, checkpoint acquisition/loadability, metric contract, smoke run, fairness, paper/history deviation, metric_protocol_id alignment with M2S05, metric implementation sanity-check evidence, full reproduction fidelity for self-implemented comparators, no simplified/toy baselines, no ablation-as-baseline misuse, and locked comparator immutability. REVISE/BACKTRACK if a metric is wrong for the dataset/scenario, if the value is outside the M2 normal reference range without triage, if a large deviation is hidden behind `verified_match`/`verified_close`, or if required baseline code/weights/checkpoints are not downloaded, checksumed, and verified loadable.
 
 ## m3_baseline_lock_audit
-Audit whether M3S02 is safe to unlock M3S03. Require a structured baseline lock manifest, at least one primary external/prior-work comparator with `m3s03_eligible: true`, loadable checkpoints when applicable, M2S05 metric_protocol_id alignment, metric sanity-check evidence, acceptable paper/local metric deviation or an explicit waiver, immutable baseline code after lock, no ablation/proposed-method variant in the baseline list, full reproduction fidelity for self-implemented comparators, and a clearly bounded comparison scope. PASS only if the locked comparator can be used by M3S03 without changing baseline assumptions, metric definitions, dataset/scenario/split, checkpoint acquisition state, or comparison scope.
+Audit whether M3S03 is safe to unlock M3S04. Require a structured baseline lock manifest, at least one primary external/prior-work comparator with `m3s04_eligible: true`, loadable checkpoints when applicable, M2S05 metric_protocol_id alignment, metric sanity-check evidence, acceptable paper/local metric deviation or an explicit waiver, immutable baseline code after lock, no ablation/proposed-method variant in the baseline list, full reproduction fidelity for self-implemented comparators, and a clearly bounded comparison scope. PASS only if the locked comparator can be used by M3S04 without changing baseline assumptions, metric definitions, dataset/scenario/split, checkpoint acquisition state, or comparison scope.
 
 ## m3_main_result_review
-Check M3S03 run contract, results.tsv, logs/configs/seeds, baseline comparison, completed trained-checkpoint paths for proposed/ours rows, training completion events, resource utilization, watchdog decisions, negative attempts, and evidence ladder. REVISE/BACKTRACK if Stage 1 or any required training is still running, if only E0/random weights are evaluated, or if no trained checkpoint can be loaded.
+Check M3S04 run contract, results.tsv, logs/configs/seeds, baseline comparison, completed trained-checkpoint paths for proposed/ours rows, training completion events, resource utilization, watchdog decisions, negative attempts, and evidence ladder. REVISE/BACKTRACK if Stage 1 or any required training is still running, if only E0/random weights are evaluated, or if no trained checkpoint can be loaded.
+
+## m3_result_validation_review
+Check M3S05 result validation, evidence packaging, KEEP/FIX/BACKTRACK honesty, claim boundaries, M3S04-to-M3S05 metric consistency, baseline fairness carry-through, data-quality checks, single-seed limitations, negative/failed results, root-cause analysis, artifact manifest, metric contract, comparison table, reproduction notes, and M3-to-M4 handoff. PASS is forbidden if M3S05 claims KEEP while evidence artifacts are missing, if it ignores anomalous or weak results, if it broadens claims beyond fixed seed=42 evidence, if it fails to route needed repair to M3S04/M3S03/M3S02/M2, or if it uses vague language to advance despite unresolved blockers.
 
 ## m4_findings_audit
 Check M4S01 consolidation of main/negative/unexpected findings, claim candidates, efficiency need, source-log/protocol basis, and analysis campaign coverage.

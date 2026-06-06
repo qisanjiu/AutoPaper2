@@ -103,7 +103,7 @@ python scripts/email_monitor.py \
 |----------|-------------|-----------|
 | editorial / text_only | M5S03 / M5S08 / M5S09 | Writing Agent |
 | evidence_gap（现有证据不足） | M4S02-M4S04 | Analysis Agent |
-| experiment_gap（需新实验） | M3S03 / M4S03 | Experiment Agent |
+| experiment_gap（需新实验） | M3S04 / M4S03 | Experiment Agent |
 | claim_scope（声明过宽） | M5S02-M5S06 | Writing Agent + Analysis Agent |
 | method_issue | M2S03-M2S04 | Method Agent |
 | cannot_fully_address | — | 在 Rebuttal 中诚实说明 |

@@ -223,7 +223,7 @@
 ## 6. 针对性审查要点（与通用审查的区别）
 
 ### 区别于 Method Critic (G2)
-- Method Critic 在 M2S06 之后审查最终方法设计
+- Method Critic 在 M3S01 之后审查最终方法设计
 - Design Reviewer 在 M2S04 之后审查**早期设计**，目的是在投入实验设计之前发现问题
 - **关键区别**：Method Critic 看"方法好不好"，Design Reviewer 看"设计是否忠实于思想映射 + 是否可实验化"
 

@@ -2,7 +2,7 @@
 
 > **角色**: 实验证据可信度与统计严谨性审查专家
 > **目标**: 审查 M3 产出的实验证据是否可信、充分、可比较、统计上站得住脚
-> **审查对象**: M3S01 (Implementation), M3S02 (Baseline Lock), M3S03 (Main Experiment), M3S04 (Result Validation)
+> **审查对象**: M3S02 (Implementation), M3S03 (Baseline Lock), M3S04 (Main Experiment), M3S05 (Result Validation)
 > **触发时机**: Gate G3（与 Method Critic 并行）
 > **绝不**: 审查方法设计的新颖性、代码实现细节、写作质量
 
@@ -30,7 +30,7 @@
 - [ ] **随机种子已固定为 42**，结果表、配置和日志均记录 seed=42
 - [ ] **无数据泄露迹象**：验证集信息未间接用于训练（如用全数据集做特征标准化后划分）
 - [ ] **训练曲线正常**：无 NaN/Inf、无梯度爆炸/消失、loss 合理下降
-- [ ] **长跑监督可审计**：M3S03 对长时间 run 有 runtime watchdog / alert 记录；NaN/Inf、不收敛、OOM、异常退出或早停候选均有 Agent 决策而非脚本自动终止
+- [ ] **长跑监督可审计**：M3S04 对长时间 run 有 runtime watchdog / alert 记录；NaN/Inf、不收敛、OOM、异常退出或早停候选均有 Agent 决策而非脚本自动终止
 - [ ] **可复现性记录**：关键结果的命令、配置、日志和 seed=42 可追溯；不要求重复运行
 - [ ] **环境快照完整**：Python、PyTorch、CUDA、硬件版本已记录
 
@@ -95,13 +95,13 @@
 ## 审查对象
 - Gate: G3 (Module 3: Experiment Implementation)
 - 核心审查文档:
-  - `knowledge/M3/M3S01_implementation.md`
-  - `knowledge/M3/M3S02_baseline_lock.md`
-  - `knowledge/M3/M3S03_main_experiment.md`
-  - `knowledge/M3/M3S04_result_validation.md`
+  - `knowledge/M3/M3S02_implementation.md`
+  - `knowledge/M3/M3S03_baseline_lock.md`
+  - `knowledge/M3/M3S04_main_experiment.md`
+  - `knowledge/M3/M3S05_result_validation.md`
 - 辅助审查文档:
   - `knowledge/M2/M2S05_experiment_setup.md`
-  - `knowledge/M2/M2S06_full_experiment_plan.md`
+  - `knowledge/M2/M3S01_main_experiment_design.md`
   - `experiments/results.tsv`
   - `experiments/logs/runtime_events.jsonl`
   - `experiments/baselines/*/metric_contract.yaml`
@@ -191,7 +191,7 @@
 
 - **表面问题**: ...
 - **证据根因**: ...
-- **建议回溯到**: M3S04 / M3S03 / M3S02 / M3S01 / M2S05 / M2S03 / M1S04
+- **建议回溯到**: M3S05 / M3S04 / M3S03 / M3S02 / M2S05 / M2S03 / M1S04
 - **建议修正方向**: ...
 
 ## Verdict
@@ -225,30 +225,30 @@
 
 ### G3 审查重点
 
-1. **实现→设计一致性**：M3S01 的代码实现是否忠实于 M2S03/M2S04 的方法设计？
-2. **Baseline 验证质量**：M3S02 的 baseline 是否经过本地验证？metric contract 是否完整？
-3. **主实验证据质量**：M3S03 的 results.tsv 是否完整？git 历史是否清晰？是否达到 minimum 证据层级？
-4. **单次结果验证恰当性**：M3S04 是否记录 seed=42、差异幅度和声明边界？决策是否诚实？
+1. **实现→设计一致性**：M3S02 的代码实现是否忠实于 M2S03/M2S04 的方法设计？
+2. **Baseline 验证质量**：M3S03 的 baseline 是否经过本地验证？metric contract 是否完整？
+3. **主实验证据质量**：M3S04 的 results.tsv 是否完整？git 历史是否清晰？是否达到 minimum 证据层级？
+4. **单次结果验证恰当性**：M3S05 是否记录 seed=42、差异幅度和声明边界？决策是否诚实？
 5. **Evidence Artifact 完整性**：`experiments/artifacts/main_experiment/` 是否包含复现所需的全部信息？
 
 ### G3 回溯条件决策指南
 
 | 发现的问题 | 严重程度 | 建议 Verdict | 回溯目标 | 回溯原因 |
 |-----------|---------|------------|---------|---------|
-| Baseline 指标直接复制论文值，未经本地验证 | P0 | BACKTRACK | **M3S02** | baseline 不可信，比较无意义 |
-| 随机种子未固定为 42，结果不可复现 | P0 | BACKTRACK | **M3S03** | 证据不可信 |
-| 数据泄露迹象明显（如用全量数据标准化） | P0 | BACKTRACK | **M3S01** | 结果无效 |
-| 仅有 seed=42 单次结果却声称统计显著 | P0 | BACKTRACK | **M3S04** | 诚实性违规 |
-| 多重比较选择性报告，p-hacking 嫌疑 | P1 | REVISE | **M3S04** | 结果报告需修正 |
-| 结果声称跨 seed 稳定但只跑 seed=42 | P1 | REVISE | **M3S04** | 收窄声明边界 |
-| 固定 seed=42 下提升过小却强称重大突破 | P1 | REVISE | **M3S04** | 需重新评估实际意义 |
-| 训练曲线有异常但未被分析 | P1 | REVISE | **M3S04** | 补充异常分析 |
-| 长时间训练缺少 watchdog/巡检告警记录 | P1 | REVISE | **M3S03** | 无法判断 NaN/不收敛/早停是否被及时处理 |
-| Watchdog 告警显示 NaN/Inf/OOM 但 M3S03 未记录 Agent 决策 | P0 | BACKTRACK | **M3S03** | 运行异常被忽略，证据不可信 |
-| Baseline 与本文方法的评估协议不一致 | P1 | BACKTRACK | **M3S02** | 可比性破坏 |
-| 负面结果被隐瞒 | P0 | BACKTRACK | **M3S04** | 诚实性违规 |
-| 达到 minimum 但未达 solid，且未解释 | P1 | REVISE | **M3S04** | 需诚实说明证据限制 |
-| 方法实现与 M2 设计有重大偏差但未记录 | P0 | BACKTRACK | **M3S01** | 实现不忠实 |
+| Baseline 指标直接复制论文值，未经本地验证 | P0 | BACKTRACK | **M3S03** | baseline 不可信，比较无意义 |
+| 随机种子未固定为 42，结果不可复现 | P0 | BACKTRACK | **M3S04** | 证据不可信 |
+| 数据泄露迹象明显（如用全量数据标准化） | P0 | BACKTRACK | **M3S02** | 结果无效 |
+| 仅有 seed=42 单次结果却声称统计显著 | P0 | BACKTRACK | **M3S05** | 诚实性违规 |
+| 多重比较选择性报告，p-hacking 嫌疑 | P1 | REVISE | **M3S05** | 结果报告需修正 |
+| 结果声称跨 seed 稳定但只跑 seed=42 | P1 | REVISE | **M3S05** | 收窄声明边界 |
+| 固定 seed=42 下提升过小却强称重大突破 | P1 | REVISE | **M3S05** | 需重新评估实际意义 |
+| 训练曲线有异常但未被分析 | P1 | REVISE | **M3S05** | 补充异常分析 |
+| 长时间训练缺少 watchdog/巡检告警记录 | P1 | REVISE | **M3S04** | 无法判断 NaN/不收敛/早停是否被及时处理 |
+| Watchdog 告警显示 NaN/Inf/OOM 但 M3S04 未记录 Agent 决策 | P0 | BACKTRACK | **M3S04** | 运行异常被忽略，证据不可信 |
+| Baseline 与本文方法的评估协议不一致 | P1 | BACKTRACK | **M3S03** | 可比性破坏 |
+| 负面结果被隐瞒 | P0 | BACKTRACK | **M3S05** | 诚实性违规 |
+| 达到 minimum 但未达 solid，且未解释 | P1 | REVISE | **M3S05** | 需诚实说明证据限制 |
+| 方法实现与 M2 设计有重大偏差但未记录 | P0 | BACKTRACK | **M3S02** | 实现不忠实 |
 
 ### G3 跨模块回溯判定
 
@@ -272,19 +272,19 @@
 
 | 问题模式 | 例子 | 风险等级 | 发现位置 |
 |---------|------|---------|---------|
-| **Baseline 复制值** | Baseline 指标直接引用论文，未本地运行 | Critical | M3S02 |
-| **随机种子未固定为 42** | 每次运行结果不同，无法复现 | Critical | M3S03 |
-| **数据泄露** | 用全量数据做标准化后再划分 train/val | Critical | M3S01, M3S04 |
-| **p-hacking** | 尝试多种配置只报告有利结果 | Critical | M3S04 |
-| **单次结果却声称统计显著** | 只有 seed=42，却写"significantly outperforms" | Critical | M3S04 |
-| **提升幅度过小** | seed=42 下点估计差异无实际意义 | Major | M3S04 |
-| **多重比较选择性报告** | 与 5 个 baseline 比较，只报告有利比较 | Major | M3S04 |
-| **声明边界过宽** | 仅 1 个固定 seed，却声称结果稳定 | Major | M3S04 |
-| **指标定义不一致** | baseline 用 top-5，本文用 top-1 | Major | M3S02 |
-| **超参不公平** | 本文网格搜索 100 组，baseline 用默认参数 | Major | M3S03 |
-| **选择性报告** | 只报告有利的消融结果 | Major | M3S04 |
-| **训练异常未分析** | Loss 有剧烈震荡但直接忽略 | Major | M3S04 |
-| **环境差异未记录** | 本文用 A100，baseline 用 V100，未说明影响 | Minor | M3S02 |
+| **Baseline 复制值** | Baseline 指标直接引用论文，未本地运行 | Critical | M3S03 |
+| **随机种子未固定为 42** | 每次运行结果不同，无法复现 | Critical | M3S04 |
+| **数据泄露** | 用全量数据做标准化后再划分 train/val | Critical | M3S02, M3S05 |
+| **p-hacking** | 尝试多种配置只报告有利结果 | Critical | M3S05 |
+| **单次结果却声称统计显著** | 只有 seed=42，却写"significantly outperforms" | Critical | M3S05 |
+| **提升幅度过小** | seed=42 下点估计差异无实际意义 | Major | M3S05 |
+| **多重比较选择性报告** | 与 5 个 baseline 比较，只报告有利比较 | Major | M3S05 |
+| **声明边界过宽** | 仅 1 个固定 seed，却声称结果稳定 | Major | M3S05 |
+| **指标定义不一致** | baseline 用 top-5，本文用 top-1 | Major | M3S03 |
+| **超参不公平** | 本文网格搜索 100 组，baseline 用默认参数 | Major | M3S04 |
+| **选择性报告** | 只报告有利的消融结果 | Major | M3S05 |
+| **训练异常未分析** | Loss 有剧烈震荡但直接忽略 | Major | M3S05 |
+| **环境差异未记录** | 本文用 A100，baseline 用 V100，未说明影响 | Minor | M3S03 |
 
 ---
 
@@ -315,10 +315,10 @@
    - 文件路径：`state/pipeline_state.yaml`
 
 4. **确认审查对象文档**
-   - `knowledge/M3/M3S01_implementation.md`
-   - `knowledge/M3/M3S02_baseline_lock.md`
-   - `knowledge/M3/M3S03_main_experiment.md`
-   - `knowledge/M3/M3S04_result_validation.md`
+   - `knowledge/M3/M3S02_implementation.md`
+   - `knowledge/M3/M3S03_baseline_lock.md`
+   - `knowledge/M3/M3S04_main_experiment.md`
+   - `knowledge/M3/M3S05_result_validation.md`
    - `experiments/results.tsv`
    - `experiments/baselines/*/metric_contract.yaml`
 

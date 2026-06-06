@@ -56,7 +56,7 @@
 |-------|--------------|-------------|---------|-------------|----------------|----------------|-----------------|----------|
 | Ana-1 | docker / conda / venv / uv / ssh_remote | local / ssh:lab-a | `...` | `...` | `experiments/runs/...` | restricted / disabled / open | timeout / CPU / GPU / memory | `experiments/runs/analysis_*/logs/...` |
 
-- 每个 M4S03 analysis slice 必须说明是否沿用 M3S01 的 `execution.sandbox`。
+- 每个 M4S03 analysis slice 必须说明是否沿用 M3S02 的 `execution.sandbox`。
 - 如果某个 slice 需要额外联网下载、远程同步、GPU 时间或凭证，必须写入对应日志和 long-running ledger。
 - 禁止让分析脚本写出 `allowed_write_paths` 之外的位置，禁止在日志中打印 SSH key、API key、token 或密码。
 
@@ -88,7 +88,7 @@ python scripts/resource_planner.py allocate \
 
 ### 5.1 分流规则
 - `stage_in_fix`: 记录或参数错误、漏跑、轻微脚本问题，可在 M4S03 内补修。
-- `stage_out_backtrack`: 设计假设明显错位、baseline/metric contract 错误、上游 M3 结果不可信，需要回溯到 M4S02 / M4S01 / M3S03 / M3S02。
+- `stage_out_backtrack`: 设计假设明显错位、baseline/metric contract 错误、上游 M3 结果不可信，需要回溯到 M4S02 / M4S01 / M3S04 / M3S03。
 - `continue`: 结果符合预期，且没有新的结构性问题。
 
 ### 5.2 交给 reviewer 的重点

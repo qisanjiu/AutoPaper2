@@ -109,7 +109,7 @@
 | Abstract | 0.3 | 一句话概括、问题、方法、结果、贡献 | M5S07 |
 | 1. Introduction & Related Work | 1.5-2.5 | 背景、动机、贡献声明、论文组织、主题分类、对比批判 | M1S02, M1S03 |
 | 2. Methodology | 2-3 | 问题定义、方法概述、核心组件、伪代码 | M2S03, M2S04 |
-| 3. Experiments, Results and Analysis/Discussion | 3-4 | 设置、主结果、对比、深入解读、消融、Limitations | M3S03, M3S04, M4S03, M4S04 |
+| 3. Experiments, Results and Analysis/Discussion | 3-4 | 设置、主结果、对比、深入解读、消融、Limitations | M3S04, M3S05, M4S03, M4S04 |
 | 4. Conclusion | 0.3 | 总结、未来工作 | — |
 | References | — | — | M1S02 + 新增 |
 | Appendix（如有）| — | 补充实验、证明、实现细节 | M2S04, M4S03 |

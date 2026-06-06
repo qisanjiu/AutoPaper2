@@ -21,7 +21,7 @@ COPY src/ /workspace/src/
 COPY configs/ /workspace/configs/
 
 # 设置环境变量。不要固定 CUDA_VISIBLE_DEVICES=0；容器运行时使用 --gpus all，
-# 由 M3S01 生成的 experiments/configs/resource_plan.yaml 决定实际设备列表。
+# 由 M3S02 生成的 experiments/configs/resource_plan.yaml 决定实际设备列表。
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_DEVICE_ORDER=PCI_BUS_ID
 

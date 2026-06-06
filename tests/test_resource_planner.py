@@ -92,19 +92,19 @@ class TestResourcePlannerPool(unittest.TestCase):
                         "tasks": [
                             {
                                 "task_id": "run_a",
-                                "stage": "M3S03",
+                                "stage": "M3S04",
                                 "command": "python train.py --run a",
                                 "resource_requirements": {"min_gpu_count": 1},
                             },
                             {
                                 "task_id": "run_b",
-                                "stage": "M3S03",
+                                "stage": "M3S04",
                                 "command": "python train.py --run b",
                                 "resource_requirements": {"min_gpu_count": 1},
                             },
                             {
                                 "task_id": "run_c",
-                                "stage": "M3S03",
+                                "stage": "M3S04",
                                 "command": "python train.py --run c",
                                 "resource_requirements": {"min_gpu_count": 1},
                             },
@@ -115,7 +115,7 @@ class TestResourcePlannerPool(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            allocation = allocate_tasks(project, plan, tasks_path, stage="M3S03")
+            allocation = allocate_tasks(project, plan, tasks_path, stage="M3S04")
 
             self.assertFalse(allocation["blocked_tasks"])
             self.assertEqual(len(allocation["assignments"]), 3)

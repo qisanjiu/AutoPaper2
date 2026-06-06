@@ -28,7 +28,7 @@ Conductor 会提供以下文件路径（**仅路径**，不含摘要或解释）
 - `knowledge/M2/M2S03_method_architecture.md`
 - `knowledge/M2/M2S04_algorithm_theory.md`
 - `knowledge/M2/M2S05_experiment_setup.md`
-- `knowledge/M2/M2S06_full_experiment_plan.md`
+- `knowledge/M2/M3S01_main_experiment_design.md`
 
 ### 2.1 独立读取义务
 Method Critic 必须**独立读取**上述全部原始产出文件，自行提取证据。禁止基于 Method Agent 提供的摘要、精选片段或解释做出 verdict。
@@ -235,4 +235,4 @@ Method Critic 在 Gate G2 中触发跨模块回溯到 M1 的典型场景：
 1. 重新读取本 Agent 的 AGENT.md
 2. 重新读取 MD Protocol
 3. 读取 `state/pipeline_state.yaml`
-4. 读取 M2S01-M2S06 的产出文件
+4. 读取 M2S01-M2S05 的产出文件

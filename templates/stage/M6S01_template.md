@@ -13,8 +13,8 @@
 | M1 | knowledge/M1/M1S02_literature_deepdive.md | ⬜ | |
 | M2 | knowledge/M2/M2S03_method_architecture.md | ⬜ | |
 | M2 | knowledge/M2/M2S04_algorithm_theory.md | ⬜ | |
-| M3 | knowledge/M3/M3S03_main_experiment.md | ⬜ | |
-| M3 | knowledge/M3/M3S04_result_validation.md | ⬜ | |
+| M3 | knowledge/M3/M3S04_main_experiment.md | ⬜ | |
+| M3 | knowledge/M3/M3S05_result_validation.md | ⬜ | |
 | M4 | knowledge/M4/M4S04_analysis_results.md | ⬜ | |
 | M5 | artifacts/paper.pdf | ⬜ | |
 | M5 | artifacts/paper.tex | ⬜ | |

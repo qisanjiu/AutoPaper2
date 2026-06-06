@@ -123,8 +123,8 @@ python scripts/state_manager.py status
 - **本地有 GPU** → `--env-mode local`
 - **本地无 GPU，需远程服务器** → `--env-mode ssh`
 - **已有 SSH 密钥** → `--ssh-auth-method key`（无需密码）
-- **只有密码，无密钥** → `--ssh-auth-method password --ssh-password "xxx"`（M3S01 自动部署密钥后切换为 key）
-- **长时间下载/上传/训练前置任务** → M3S01 必须写入 `experiments/logs/m3s01_longrun_ledger.md`，记录命令、日志、轮询/等待、恢复命令和权限状态；不得因文件大或耗时长跳过。
+- **只有密码，无密钥** → `--ssh-auth-method password --ssh-password "xxx"`（M3S02 自动部署密钥后切换为 key）
+- **长时间下载/上传/训练前置任务** → M3S02 必须写入 `experiments/logs/m3s02_longrun_ledger.md`，记录命令、日志、轮询/等待、恢复命令和权限状态；不得因文件大或耗时长跳过。
 
 ### 5. 其他选项
 
@@ -167,7 +167,7 @@ python scripts/state_manager.py create \
   --python-version 3.10 \
   --cuda-version 12.1
 
-# 完整配置（SSH 远程，只有密码 → M3S01 自动部署密钥）
+# 完整配置（SSH 远程，只有密码 → M3S02 自动部署密钥）
 python scripts/state_manager.py create \
   "Semantic Communication for Images" \
   "SemCom-Image-RL" \
@@ -216,10 +216,10 @@ Phase 1: 自动执行循环（WHILE 未到达终点或用户未中断）
     → 创建对应 subagent 执行：
        - M1S01-M1S02 → Survey Agent subagent
        - M1S03-M1S05 → Ideation Agent subagent
-       - M2S01-M2S06 → Method Agent subagent
-       - M3S01-M3S03 → Experiment Agent subagent
-         * M3S01 必须产出 `experiments/logs/m3s01_longrun_ledger.md`
-       - M3S04/M4S01/M4S02/M4S04/M5S01 → Analysis Agent subagent
+       - M2S01-M2S05 → Method Agent subagent
+       - M3S02-M3S04 → Experiment Agent subagent
+         * M3S02 必须产出 `experiments/logs/m3s02_longrun_ledger.md`
+       - M3S05/M4S01/M4S02/M4S04/M5S01 → Analysis Agent subagent
        - M5S02-M5S08/M5S09 → Writing Agent subagent
        - M6S01-M6S02 → Submission Agent subagent
        - M6S01 internal review → `critic/m6_internal_peer_review/AGENT.md` reviewer subagent; must reach ≥8/10 before M6S02

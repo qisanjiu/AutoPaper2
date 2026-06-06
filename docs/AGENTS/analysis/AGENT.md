@@ -7,7 +7,7 @@
 4. Read packet `input_docs` selectively; write packet `output_path`.
 
 ## Objective
-Execute M3S04, M4S01, M4S02, M4S04, and M5S01 evidence analysis.
+Execute M3S05, M4S01, M4S02, M4S04, and M5S01 evidence analysis.
 
 ## Hard Boundaries
 - Do not use parent conversation facts.

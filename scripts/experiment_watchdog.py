@@ -322,7 +322,7 @@ def inspect_run(
     decision_required = severity in {"critical", "warning", "early_stop_candidate"}
     event = {
         "timestamp": _now(),
-        "stage": "M3S03",
+        "stage": "M3S04",
         "event_type": "watchdog_check",
         "run_id": run_id,
         "severity": severity,

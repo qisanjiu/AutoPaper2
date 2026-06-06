@@ -158,17 +158,17 @@ When a backtrack is triggered (by stage review, gate critic, or human review):
 | `{project}/knowledge/M2/M2S04_algorithm_theory.md` | Algorithm & theory design |
 | `{project}/knowledge/M2/M2S05_experiment_setup.md` | Experiment setup design |
 | `{project}/knowledge/M2/M2S05_metric_protocol.yaml` | Canonical metric protocol registry for dataset/scenario/split/metric correctness |
-| `{project}/knowledge/M2/M2S06_full_experiment_plan.md` | Full experiment plan |
 | `{project}/knowledge/handoff_M2_M3.md` | M2→M3 handoff document |
 | `{framework}/skills/AutoPaper2_m2_method_design/SKILL.md` | M2 execution skill |
 | `{framework}/templates/stage/M2S01_template.md` | M2S01 stage template |
 | `{framework}/docs/AGENTS/critic/method/AGENT.md` | Gate G2 Method Critic |
 | `{framework}/docs/AGENTS/conductor/AGENT.md` | Conductor / main orchestration agent |
 | `{project}/knowledge/M3/` | M3 outputs |
-| `{project}/knowledge/M3/M3S01_implementation.md` | Implementation & environment setup |
-| `{project}/knowledge/M3/M3S02_baseline_lock.md` | Baseline lock & smoke test |
-| `{project}/knowledge/M3/M3S03_main_experiment.md` | Main experiment execution |
-| `{project}/knowledge/M3/M3S04_result_validation.md` | Result validation & evidence packaging |
+| `{project}/knowledge/M3/M3S01_main_experiment_design.md` | Main experiment design with dataset, metrics, baseline reference values, and same-condition protocol |
+| `{project}/knowledge/M3/M3S02_implementation.md` | Implementation & environment setup |
+| `{project}/knowledge/M3/M3S03_baseline_lock.md` | Baseline lock & smoke test |
+| `{project}/knowledge/M3/M3S04_main_experiment.md` | Main experiment execution |
+| `{project}/knowledge/M3/M3S05_result_validation.md` | Result validation & evidence packaging |
 | `{project}/knowledge/handoff_M3_M4.md` | M3→M4 handoff document |
 | `{framework}/skills/AutoPaper2_m3_experiment/SKILL.md` | M3 execution skill |
 | `{framework}/templates/stage/M3S01_template.md` | M3S01 stage template |

@@ -226,8 +226,8 @@ class TestDispatchPackets(unittest.TestCase):
             "knowledge/M1/M1_source_log.yaml",
             "knowledge/M2/M2_source_log.yaml",
             "knowledge/M2/M2S05_experiment_setup.md",
-            "knowledge/M2/M2S06_full_experiment_plan.md",
-            "knowledge/M3/M3S04_result_validation.md",
+            "knowledge/M3/M3S01_main_experiment_design.md",
+            "knowledge/M3/M3S05_result_validation.md",
             "knowledge/M4/M4S01_other_findings.md",
             "knowledge/M4/M4S02_analysis_experiment_design.md",
         ):
@@ -240,14 +240,14 @@ class TestDispatchPackets(unittest.TestCase):
 
         self.assertEqual(m4s02["role"], "analysis")
         self.assertTrue(any(path.endswith("knowledge/handoff_M3_M4.md") for path in m4s02["input_docs"]))
-        self.assertTrue(any(path.endswith("knowledge/M2/M2S06_full_experiment_plan.md") for path in m4s02["input_docs"]))
+        self.assertTrue(any(path.endswith("knowledge/M3/M3S01_main_experiment_design.md") for path in m4s02["input_docs"]))
         self.assertTrue(any(path.endswith("knowledge/M1/M1_source_log.yaml") for path in m4s02["input_docs"]))
         self.assertTrue(any(path.endswith("knowledge/M2/M2_source_log.yaml") for path in m4s02["input_docs"]))
         self.assertTrue(any(path.endswith("state/survey_memory.yaml") for path in m4s02["input_docs"]))
 
         self.assertEqual(m4s03["role"], "experiment")
         self.assertTrue(any(path.endswith("knowledge/handoff_M3_M4.md") for path in m4s03["input_docs"]))
-        self.assertTrue(any(path.endswith("knowledge/M3/M3S04_result_validation.md") for path in m4s03["input_docs"]))
+        self.assertTrue(any(path.endswith("knowledge/M3/M3S05_result_validation.md") for path in m4s03["input_docs"]))
 
     def test_m2_stage_review_packet_has_canonical_output(self) -> None:
         packets = build_stage_review_packets(self.root, "M2S01")
@@ -330,15 +330,25 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertTrue(packet["output_path"].endswith("knowledge/reviews/M2S05_experiment_design_review.md"))
         self.assertTrue(packet["subject_output"].endswith("knowledge/M2/M2S05_experiment_setup.md"))
 
-    def test_m2s06_stage_review_packet_has_canonical_output(self) -> None:
-        packets = build_stage_review_packets(self.root, "M2S06")
+    def test_m3s01_stage_review_packet_has_canonical_output(self) -> None:
+        packets = build_stage_review_packets(self.root, "M3S01")
 
         self.assertEqual(len(packets), 1)
         packet = packets[0]
-        self.assertEqual(packet["role"], "m2_experiment_plan_review")
-        self.assertTrue(packet["agent_md"].endswith("docs/AGENTS/critic/m2_experiment_plan_review/AGENT.md"))
-        self.assertTrue(packet["output_path"].endswith("knowledge/reviews/M2S06_experiment_plan_review.md"))
-        self.assertTrue(packet["subject_output"].endswith("knowledge/M2/M2S06_full_experiment_plan.md"))
+        self.assertEqual(packet["role"], "m3_main_experiment_design_review")
+        self.assertTrue(packet["agent_md"].endswith("docs/AGENTS/critic/m3_main_experiment_design_review/AGENT.md"))
+        self.assertTrue(packet["output_path"].endswith("knowledge/reviews/M3S01_main_experiment_design_review.md"))
+        self.assertTrue(packet["subject_output"].endswith("knowledge/M3/M3S01_main_experiment_design.md"))
+
+    def test_m3s05_stage_review_packet_has_canonical_output(self) -> None:
+        packets = build_stage_review_packets(self.root, "M3S05")
+
+        self.assertEqual(len(packets), 1)
+        packet = packets[0]
+        self.assertEqual(packet["role"], "m3_result_validation_review")
+        self.assertTrue(packet["agent_md"].endswith("docs/AGENTS/critic/m3_result_validation_review/AGENT.md"))
+        self.assertTrue(packet["output_path"].endswith("knowledge/reviews/M3S05_result_validation_review.md"))
+        self.assertTrue(packet["subject_output"].endswith("knowledge/M3/M3S05_result_validation.md"))
 
     def _write_pass_review(self, rel_path: str) -> None:
         path = self.root / rel_path
@@ -360,8 +370,6 @@ class TestDispatchPackets(unittest.TestCase):
             "| 实验 ID | 目的 | 目标假设 | 验证内容 | 对照组 | 指标 | 必需/可选 |\n"
             "|---|---|---|---|---|---|---|\n"
             "| Exp-1 | main purpose | H1 | main comparison | baseline | accuracy metric | 必需 |\n"
-            "| Exp-2 | component purpose | H2 | component check | baseline | accuracy metric | 必需 |\n"
-            "| Exp-3 | robustness purpose | H3 | robustness | baseline | accuracy metric | 可选 |\n\n"
             "随机种子 seed: 42. 单次固定 seed 实验。 "
             "可复现 reproducibility requirements include git commit and environment lock.\n",
             encoding="utf-8",
@@ -390,36 +398,29 @@ class TestDispatchPackets(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def _write_valid_m2s06(self) -> None:
-        (self.root / "knowledge" / "M2" / "M2S06_full_experiment_plan.md").write_text(
-            "# M2S06 Full Experiment Plan\n\n"
-            "## 1. 计划总览\n\n"
-            "| 阶段 | 实验 ID | 目的 | 预估时间 | 依赖 | 优先级 |\n"
-            "|---|---|---|---|---|---|\n"
-            "| 1 | Exp-1 | main purpose | 2h | none | P0 |\n"
-            "| 2 | Exp-2 | component purpose | 1h | Exp-1 | P0 |\n"
-            "| 3 | Exp-3 | robustness purpose | 1h | Exp-1 | P1 |\n\n"
-            "## 2. 执行顺序与分支逻辑\n"
-            "Phase 1 -> Phase 2. If failure, BACKTRACK 回溯 after 失败判定 and 诊断.\n\n"
-            "## 3. 成功/失败判定标准\n"
-            "成功标准 success criteria: significant improvement. failure diagnosis covers implementation, design, hypothesis, data, baseline.\n\n"
-            "## 4. 风险与应对\n"
-            "风险 risk control and 应对 measures.\n\n"
-            "## 5. 资源预算\n"
-            "资源 GPU storage 时间预算 budget.\n\n"
-            "## 7. 完整实验报告蓝图\n\n"
-            "### Exp-[N]: template\n"
-            "- 目的: ...\n"
-            "- 对应假设 / Gap: ...\n"
-            "- 参考相关工作实验设置: PaperX reference protocol 论文\n"
-            "- 数据集与划分: DemoSet dataset split\n"
-            "- Baselines / 对照组: baseline\n"
-            "- 评价指标: metric_protocol_id=mp_demo_accuracy accuracy metric\n"
-            "- 运行协议: seed=42 epoch hardware 超参\n"
-            "- 预期结果形态: table plot\n"
-            "- 成功标准: ...\n"
-            "- 失败时诊断路径: implementation / design / hypothesis / data / baseline\n"
-            "- 需要保存的证据: raw logs, config, checkpoint, results.tsv, plot script\n",
+    def _write_valid_m3s01(self) -> None:
+        path = self.root / "knowledge" / "M3" / "M3S01_main_experiment_design.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# M3S01 Main Experiment Design\n\n"
+            "## Scope Boundary\n"
+            "Main experiment only. Not include ablation, robustness, mechanism, or M4 analysis design; those are M4-only.\n\n"
+            "## Dataset And Metric Protocol\n\n"
+            "| experiment_id | dataset | scenario/task | split | metric_protocol_id | primary_metric | direction | normal_reference_range | source |\n"
+            "|---|---|---|---|---|---|---|---|---|\n"
+            "| Exp-1 | DemoSet | classification | test | mp_demo_accuracy | accuracy | higher_is_better | 0.5-0.95 | M2S05_metric_protocol.yaml |\n\n"
+            "## Baseline Reference Values\n\n"
+            "| baseline | comparator_type | dataset | scenario | split | metric_protocol_id | metric | reference_value | value_source | table_or_section | expected_tolerance | acquisition_plan |\n"
+            "|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+            "| Baseline-1 | external_prior_work | DemoSet | classification | test | mp_demo_accuracy | accuracy | 0.75 | PaperX | Table 1 | 0.02 | official code/checkpoint URL |\n\n"
+            "## Proposed Method Same-Condition Protocol\n\n"
+            "| 条件 | Baseline | Proposed method | 是否一致 | 差异说明 |\n"
+            "|---|---|---|---|---|\n"
+            "| dataset | DemoSet | DemoSet | yes | same condition |\n"
+            "| split | test | test | yes | same split |\n"
+            "| primary metric | accuracy | accuracy | yes | same metric |\n"
+            "| seed | 42 | 42 | yes | fixed seed single run |\n\n"
+            "Fairness 公平 constraints use 相同的数据划分 and 相同指标. Ours/proposed 所提方法 same condition.\n",
             encoding="utf-8",
         )
 
@@ -442,7 +443,7 @@ class TestDispatchPackets(unittest.TestCase):
         ok, messages = check_stage(self.root, "M2S05")
 
         self.assertTrue(ok, "\n".join(messages))
-        self.assertTrue(any("3 experiment IDs found" in message for message in messages))
+        self.assertTrue(any("experiment target ID" in message for message in messages))
         self.assertTrue(any("m2_experiment_design_review PASS" in message for message in messages))
 
     def test_m2s05_stage_gate_requires_metric_protocol_registry(self) -> None:
@@ -455,29 +456,45 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("metric protocol registry not found" in message for message in messages), messages)
 
-    def test_m2s06_stage_gate_blocks_incomplete_full_plan(self) -> None:
-        (self.root / "knowledge" / "M2" / "M2S06_full_experiment_plan.md").write_text(
-            "# M2S06\n\nExp-1 only.\n",
+    def test_m3s01_stage_gate_blocks_missing_baseline_values(self) -> None:
+        self._write_valid_m2s05()
+        path = self.root / "knowledge" / "M3" / "M3S01_main_experiment_design.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# M3S01\n\n"
+            "Main experiment dataset DemoSet metric_protocol_id mp_demo_accuracy seed 42. "
+            "Baseline table pending without reference_value.\n",
             encoding="utf-8",
         )
 
-        ok, messages = check_stage(self.root, "M2S06")
+        ok, messages = check_stage(self.root, "M3S01")
 
         self.assertFalse(ok)
-        self.assertTrue(any("fewer than 3 experiment IDs" in message for message in messages))
-        self.assertTrue(any("missing full experiment report blueprint" in message for message in messages))
+        self.assertTrue(any("missing baseline reference table rows" in message for message in messages), messages)
         self.assertTrue(any("required stage review missing" in message for message in messages))
 
-    def test_m2s06_stage_gate_accepts_full_plan_with_pass_review(self) -> None:
+    def test_m3s01_stage_gate_rejects_ablation_plan(self) -> None:
         self._write_valid_m2s05()
-        self._write_valid_m2s06()
-        self._write_pass_review("knowledge/reviews/M2S06_experiment_plan_review.md")
+        self._write_valid_m3s01()
+        path = self.root / "knowledge" / "M3" / "M3S01_main_experiment_design.md"
+        path.write_text(path.read_text(encoding="utf-8") + "\n## Ablation Plan\nRun ablation variant without module A.\n", encoding="utf-8")
+        self._write_pass_review("knowledge/reviews/M3S01_main_experiment_design_review.md")
 
-        ok, messages = check_stage(self.root, "M2S06")
+        ok, messages = check_stage(self.root, "M3S01")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("ablation/M4 analysis planning" in message for message in messages), messages)
+
+    def test_m3s01_stage_gate_accepts_main_design_with_pass_review(self) -> None:
+        self._write_valid_m2s05()
+        self._write_valid_m3s01()
+        self._write_pass_review("knowledge/reviews/M3S01_main_experiment_design_review.md")
+
+        ok, messages = check_stage(self.root, "M3S01")
 
         self.assertTrue(ok, "\n".join(messages))
-        self.assertTrue(any("3 experiment IDs found" in message for message in messages))
-        self.assertTrue(any("m2_experiment_plan_review PASS" in message for message in messages))
+        self.assertTrue(any("baseline reference value row" in message for message in messages))
+        self.assertTrue(any("m3_main_experiment_design_review PASS" in message for message in messages))
 
     def _write_m6s01_gate_files(self, score: str = "8.2", high: str = "0") -> None:
         (self.root / "artifacts").mkdir(parents=True, exist_ok=True)

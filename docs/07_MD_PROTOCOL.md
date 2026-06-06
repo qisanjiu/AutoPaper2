@@ -36,9 +36,9 @@
 |-----------|------------------|
 | Survey (M1S01-M1S02) | Source Log 引用对照表、Gap 列表（含类型标注） |
 | Ideation (M1S03-M1S05) | Pre-Idea Draft 摘要、反对意见与证伪路径 |
-| Method (M2S01-M2S06) | 问题形式化（符号+目标函数）、伪代码/算法框、复杂度分析 |
-| Experiment (M3S01-M3S03) | 环境配置锁定、Run Contract、Baseline 公平性声明 |
-| Analysis (M3S04/M4S01-M4S04/M5S01) | Claim Ledger、Evidence Ladder、统计显著性 |
+| Method (M2S01-M2S05) | 问题形式化（符号+目标函数）、伪代码/算法框、复杂度分析 |
+| Experiment (M3S02-M3S04) | 环境配置锁定、Run Contract、Baseline 公平性声明 |
+| Analysis (M3S05/M4S01-M4S04/M5S01) | Claim Ledger、Evidence Ladder、统计显著性 |
 | Writing (M5S02-M5S08/M5S09) | Style & Layout Profile 引用、Figure/Table 清单、Anti-Leakage 自检、Full-Polish 叙事连贯性审阅 |
 | Submission (M6S01-M6S02) | Venue 合规性检查表、投稿包清单 |
 | Rebuttal (M6S03-M6S06) | Review Matrix 引用、Action Plan、逐条解决度验证 |
@@ -188,7 +188,7 @@ PASS
 - **success_criteria**: 新架构能通过 m2_design_review 且与 M2S02 的映射表一致
 - **evidence_paths**: knowledge/M2/M2S02_method_inspiration.md
 - **rebuild_mode**: full_regenerate
-- **rerun_scope**: 重新执行 M2S03 及下游 M2S04-M2S06
+- **rerun_scope**: 重新执行 M2S03 及下游 M2S04-M2S05/M3S01
 - **handoff_updates**: 更新 handoff_M2_M3 中的架构摘要
 ```
 

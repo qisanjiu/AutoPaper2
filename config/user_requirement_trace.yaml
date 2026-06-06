@@ -41,21 +41,19 @@ requirements:
     user_requirement: >
       Use M1 problems to search library/internet sources for transferable or
       newly designed solutions, integrate inspirations, design methods, and
-      define experiment setup with datasets, metrics, purposes, and full reports.
+      define experiment setup with datasets, metrics, purposes, and M2-to-M3 handoff.
       M2S05 must lock metric protocols for each dataset/scenario/split before
       M3, including value range, normal reference range, source, and sanity check.
     enforced_by:
-      stage_gates: [M2S01, M2S02, M2S03, M2S04, M2S05, M2S06]
+      stage_gates: [M2S01, M2S02, M2S03, M2S04, M2S05]
       validators: [utils/source_log_validator.py]
-      reviews: [m2_search_quality, m2_migration, m2_design_review, m2_experiment_design_review, m2_experiment_plan_review]
+      reviews: [m2_search_quality, m2_migration, m2_design_review, m2_experiment_design_review]
     evidence_paths:
       - docs/AGENTS/method/AGENT.md
       - docs/AGENTS/critic/m2_search_quality/AGENT.md
       - docs/AGENTS/critic/m2_experiment_design_review/AGENT.md
-      - docs/AGENTS/critic/m2_experiment_plan_review/AGENT.md
       - templates/stage/M2S01_template.md
       - templates/stage/M2S05_template.md
-      - templates/stage/M2S06_template.md
       - templates/stage/M2_source_log_template.yaml
       - utils/source_log_validator.py
       - utils/stage_gate.py
@@ -74,25 +72,33 @@ requirements:
       whether results match expectations, supervise long-running training with
       periodic watchdog/alert checks, distribute independent M3 tasks across
       available local/SSH/GPU resources when provided, and trigger backtracking
-      when needed. M3 must actively acquire datasets, baseline code/weights,
-      and checkpoints; M3S03 may advance only with completed trained-weight
+      when needed. M3S01 must define the main experiment only, including
+      datasets, metrics, external baselines with concrete reference values, and
+      same-condition protocol; ablations remain M4-only. M3 must actively acquire datasets, baseline code/weights,
+      and checkpoints; M3S04 may advance only with completed trained-weight
       evidence for proposed results; M3 baselines cannot be ablations or
-      simplified implementations. M3S02 baseline contracts must align with
+      simplified implementations. M3S03 baseline contracts must align with
       M2S05 metric_protocol_id and report anomalous metric values instead of
       silently advancing. Dataset/baseline/checkpoint/model-asset acquisition
       failures must trigger continued attempts or non-PASS/HALT, never PASS.
     enforced_by:
-      stage_gates: [M3S01, M3S02, M3S03, M3S04]
+      stage_gates: [M3S01, M3S02, M3S03, M3S04, M3S05]
       configs: [config/execution_env.yaml]
       scripts: [scripts/experiment_watchdog.py, scripts/resource_planner.py]
-      reviews: [m3_dataset_env_review, m3_baseline_result_review, m3_main_result_review, evidence]
+      reviews: [m3_main_experiment_design_review, m3_dataset_env_review, m3_baseline_result_review, m3_baseline_lock_audit, m3_main_result_review, m3_result_validation_review, evidence]
     evidence_paths:
       - docs/AGENTS/experiment/AGENT.md
       - docs/AGENTS/analysis/AGENT.md
+      - docs/AGENTS/critic/m3_main_experiment_design_review/AGENT.md
       - docs/AGENTS/critic/m3_dataset_env_review/AGENT.md
+      - docs/AGENTS/critic/m3_baseline_result_review/AGENT.md
+      - docs/AGENTS/critic/m3_baseline_lock_audit/AGENT.md
+      - docs/AGENTS/critic/m3_main_result_review/AGENT.md
+      - docs/AGENTS/critic/m3_result_validation_review/AGENT.md
       - templates/stage/M3S01_template.md
-      - templates/stage/M3S03_template.md
+      - templates/stage/M3S02_template.md
       - templates/stage/M3S04_template.md
+      - templates/stage/M3S05_template.md
       - config/execution_env.yaml
       - scripts/env_probe.py
       - scripts/experiment_watchdog.py

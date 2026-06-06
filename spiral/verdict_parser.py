@@ -143,8 +143,8 @@ def extract_m3_repair_field_value(text: str, field: str) -> str:
     return match.group(1).strip(" `*") if match else ""
 
 
-def extract_m3s04_decision(text: str) -> str | None:
-    """Extract the KEEP/FIX/BACKTRACK decision from an M3S04 document."""
+def extract_m3s05_decision(text: str) -> str | None:
+    """Extract the KEEP/FIX/BACKTRACK decision from an M3S05 document."""
     decision_patterns = [
         r"决策\s*[:：]\s*(KEEP|FIX|BACKTRACK)",
         r"\*\*决策\*\*\s*[:：]\s*(KEEP|FIX|BACKTRACK)",

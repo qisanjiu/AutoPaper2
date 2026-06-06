@@ -33,7 +33,7 @@ gates:
           - knowledge/M1/M1S05_novelty_feasibility.md
 
   G2:
-    title: "Method design and experiment plan"
+    title: "Method design and experiment setup"
     items:
       - id: G2-R1
         criterion: "M2 searches for transferable methods from literature or web sources and records why each source can or cannot transfer."
@@ -47,35 +47,39 @@ gates:
           - knowledge/M2/M2S03_method_architecture.md
           - knowledge/M2/M2S04_algorithm_theory.md
       - id: G2-R3
-        criterion: "Experiment setup follows related-field protocols and gives datasets, metric protocol registry with dataset/scenario/split correctness, baselines, per-experiment purpose, and full report blueprint."
+        criterion: "Experiment setup follows related-field protocols and gives datasets, metric protocol registry with dataset/scenario/split correctness, candidate baselines, per-experiment purpose, and a clean M2-to-M3 handoff. M2 must not contain the full M3/M4 experiment plan."
         evidence_examples:
           - knowledge/M2/M2S05_experiment_setup.md
           - knowledge/M2/M2S05_metric_protocol.yaml
-          - knowledge/M2/M2S06_full_experiment_plan.md
           - knowledge/handoff_M2_M3.md
 
   G3:
     title: "Implementation and main experiment evidence"
     items:
       - id: G3-R1
-        criterion: "M3S01 builds the configured local, SSH, or multi-resource environment with sandbox policy, dependencies, data access, resource pool/task-allocation contract, and long-running task ledger."
+        criterion: "M3S01 defines the main experiment only: dataset/scenario/split, metric protocol IDs, external baselines with concrete same-dataset same-metric reference values and sources, proposed-method same-condition protocol, seed/fairness rules, and no ablation or M4 analysis plan."
         evidence_examples:
-          - knowledge/M3/M3S01_implementation.md
+          - knowledge/M3/M3S01_main_experiment_design.md
+          - knowledge/M2/M2S05_metric_protocol.yaml
+      - id: G3-R2
+        criterion: "M3S02 builds the configured local, SSH, or multi-resource environment with sandbox policy, dependencies, data access, resource pool/task-allocation contract, and long-running task ledger."
+        evidence_examples:
+          - knowledge/M3/M3S02_implementation.md
           - config/execution_env.yaml
           - experiments/configs/sandbox_profile.yaml
           - experiments/configs/resource_plan.yaml
           - experiments/configs/m3_task_allocation.yaml
-          - experiments/logs/m3s01_longrun_ledger.md
-      - id: G3-R2
+          - experiments/logs/m3s02_longrun_ledger.md
+      - id: G3-R3
         criterion: "Baselines are locked, smoke-tested, and comparable to the proposed method."
         evidence_examples:
-          - knowledge/M3/M3S02_baseline_lock.md
+          - knowledge/M3/M3S03_baseline_lock.md
           - experiments/baselines/baseline_1/metric_contract.yaml
-      - id: G3-R3
+      - id: G3-R4
         criterion: "Main experiment results have raw logs or tables, seed coverage, provenance, completed-trained-weight/checkpoint evidence for proposed results, resource assignment/monitoring evidence, runtime watchdog supervision/alerts, and validation against expectations. Random, untrained, E0-only, or still-running training outputs cannot satisfy this item."
         evidence_examples:
-          - knowledge/M3/M3S03_main_experiment.md
-          - knowledge/M3/M3S04_result_validation.md
+          - knowledge/M3/M3S04_main_experiment.md
+          - knowledge/M3/M3S05_result_validation.md
           - experiments/results.tsv
           - experiments/runs
           - experiments/configs/m3_task_allocation.yaml
@@ -89,7 +93,7 @@ gates:
         criterion: "M4 identifies post-experiment findings, negative results, component/claim coverage needs, efficiency triggers or waivers, and analysis questions grounded in M3 evidence."
         evidence_examples:
           - knowledge/M4/M4S01_other_findings.md
-          - knowledge/M3/M3S04_result_validation.md
+          - knowledge/M3/M3S05_result_validation.md
       - id: G4-R2
         criterion: "Analysis design covers ablation, mechanism, robustness, failure, efficiency when required, literature/source-log basis, paper protocol adaptation, baseline inclusion, and evidence criteria."
         evidence_examples:
@@ -97,7 +101,7 @@ gates:
           - knowledge/M1/M1_source_log.yaml
           - knowledge/M2/M2_source_log.yaml
           - knowledge/M2/M2S05_experiment_setup.md
-          - knowledge/M2/M2S06_full_experiment_plan.md
+          - knowledge/M3/M3S01_main_experiment_design.md
       - id: G4-R3
         criterion: "Analysis execution records sandboxed commands, logs, multi-resource task allocation when applicable, extended result tables, efficiency measurements when required, baseline comparisons when required, and usable claims."
         evidence_examples:

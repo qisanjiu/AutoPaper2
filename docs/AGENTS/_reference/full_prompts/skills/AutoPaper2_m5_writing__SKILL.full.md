@@ -260,7 +260,7 @@ Phase 11: Handoff & 完成
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/analysis/AGENT.md`
 - 当前 stage（M5S01）
-- 上游输入文档路径（handoff_M4_M5.md, M3S03-M3S04, M4S03-M4S04）
+- 上游输入文档路径（handoff_M4_M5.md, M3S04-M3S05, M4S03-M4S04）
 - 风格参照输入：`knowledge/M1/M1S02_literature_deepdive.md`、`knowledge/M1/M1_source_log.yaml`
 - `state/research_brief.yaml`（如存在，用于确认 foundation/reference anchors 的方法线归属）
 - 产出路径：`knowledge/M5/M5S01_pre_write_audit.md`
@@ -334,7 +334,7 @@ Phase 11: Handoff & 完成
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/critic/logic/AGENT.md`
 - M5S01-M5S09 全部产出路径
-- M1S03-M1S04, M2S03-M2S04, M3S03-M3S04, M4S04 产出路径（辅助，验证假设到论文的完整链条）
+- M1S03-M1S04, M2S03-M2S04, M3S04-M3S05, M4S04 产出路径（辅助，验证假设到论文的完整链条）
 - 产出路径：`knowledge/reviews/G5_logic_review.md`
 
 #### Writing Critic
@@ -365,7 +365,7 @@ Phase 11: Handoff & 完成
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/critic/ethics/AGENT.md`
 - M5S01-M5S09 全部产出路径
-- M3S01 产出路径（辅助，检查伦理合规）
+- M3S02 产出路径（辅助，检查伦理合规）
 - 产出路径：`knowledge/reviews/G5_ethics_review.md`
 
 ### Peer Review Simulation（可选增强）

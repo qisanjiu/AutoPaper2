@@ -15,7 +15,7 @@ if str(_framework_root) not in sys.path:
 
 from spiral.verdict_parser import (
     extract_stage_review_verdict,
-    extract_m3s04_decision,
+    extract_m3s05_decision,
     missing_m3_repair_fields,
     extract_m3_repair_field_value,
     is_valid_rebuild_mode,
@@ -39,18 +39,21 @@ _STAGE_REVIEW_REQUIREMENTS: dict[str, dict[str, str]] = {
     "M2S05": {
         "m2_experiment_design_review": "knowledge/reviews/M2S05_experiment_design_review.md",
     },
-    "M2S06": {
-        "m2_experiment_plan_review": "knowledge/reviews/M2S06_experiment_plan_review.md",
-    },
     "M3S01": {
-        "m3_dataset_env_review": "knowledge/reviews/M3S01_dataset_env_review.md",
+        "m3_main_experiment_design_review": "knowledge/reviews/M3S01_main_experiment_design_review.md",
     },
     "M3S02": {
-        "m3_baseline_result_review": "knowledge/reviews/M3S02_baseline_result_review.md",
-        "m3_baseline_lock_audit": "knowledge/reviews/M3S02_baseline_lock_audit.md",
+        "m3_dataset_env_review": "knowledge/reviews/M3S02_dataset_env_review.md",
     },
     "M3S03": {
-        "m3_main_result_review": "knowledge/reviews/M3S03_main_result_review.md",
+        "m3_baseline_result_review": "knowledge/reviews/M3S03_baseline_result_review.md",
+        "m3_baseline_lock_audit": "knowledge/reviews/M3S03_baseline_lock_audit.md",
+    },
+    "M3S04": {
+        "m3_main_result_review": "knowledge/reviews/M3S04_main_result_review.md",
+    },
+    "M3S05": {
+        "m3_result_validation_review": "knowledge/reviews/M3S05_result_validation_review.md",
     },
     "M4S01": {
         "m4_findings_audit": "knowledge/reviews/M4S01_findings_audit_review.md",
@@ -124,9 +127,9 @@ _M5S01_REQUIRED_UPSTREAM_DOCS: dict[str, str] = {
     "M2S03_method_architecture.md": "knowledge/M2/M2S03_method_architecture.md",
     "M2S04_algorithm_theory.md": "knowledge/M2/M2S04_algorithm_theory.md",
     "M2S05_experiment_setup.md": "knowledge/M2/M2S05_experiment_setup.md",
-    "M2S06_full_experiment_plan.md": "knowledge/M2/M2S06_full_experiment_plan.md",
-    "M3S03_main_experiment.md": "knowledge/M3/M3S03_main_experiment.md",
-    "M3S04_result_validation.md": "knowledge/M3/M3S04_result_validation.md",
+    "M3S01_main_experiment_design.md": "knowledge/M3/M3S01_main_experiment_design.md",
+    "M3S04_main_experiment.md": "knowledge/M3/M3S04_main_experiment.md",
+    "M3S05_result_validation.md": "knowledge/M3/M3S05_result_validation.md",
     "M4S03_analysis_experiment.md": "knowledge/M4/M4S03_analysis_experiment.md",
     "M4S04_analysis_results.md": "knowledge/M4/M4S04_analysis_results.md",
     "handoff_M4_M5.md": "knowledge/handoff_M4_M5.md",
@@ -1062,7 +1065,7 @@ def _load_m2_metric_protocol_registry(root: Path) -> tuple[bool, list[str], dict
     return ok, messages, protocols_by_id
 
 
-def _check_m3s02_metric_protocol_alignment(
+def _check_m3s03_metric_protocol_alignment(
     root: Path,
     label: str,
     raw: dict[str, Any],
@@ -1138,7 +1141,7 @@ def _check_m3s02_metric_protocol_alignment(
         messages.append(f"[PASS] {label}: local metric value inside protocol value_range")
     if local_value is not None and normal_range and not (normal_range[0] <= local_value <= normal_range[1]):
         messages.append(f"[FAIL] {label}: local metric value {local_value:.3g} outside normal_reference_range {normal_range}")
-        triage_ok, triage_messages = _check_m3s02_anomaly_triage(root, label, raw)
+        triage_ok, triage_messages = _check_m3s03_anomaly_triage(root, label, raw)
         messages.extend(triage_messages)
         ok = ok and triage_ok
     elif local_value is not None and normal_range:
@@ -1165,7 +1168,7 @@ def _check_m3s02_metric_protocol_alignment(
     return ok, messages
 
 
-def _check_m3s02_anomaly_triage(root: Path, label: str, raw: dict[str, Any]) -> tuple[bool, list[str]]:
+def _check_m3s03_anomaly_triage(root: Path, label: str, raw: dict[str, Any]) -> tuple[bool, list[str]]:
     messages: list[str] = []
     ok = True
     triage = _baseline_anomaly_triage(raw)
@@ -1215,7 +1218,7 @@ def _check_m3s02_anomaly_triage(root: Path, label: str, raw: dict[str, Any]) -> 
     return ok, messages
 
 
-def _check_m3s02_reference_deviation(
+def _check_m3s03_reference_deviation(
     root: Path,
     label: str,
     raw: dict[str, Any],
@@ -1285,7 +1288,7 @@ def _check_m3s02_reference_deviation(
             f"[FAIL] {label}: paper/local deviation {effective_deviation:.3g} exceeds tolerance {tolerance:.3g}"
         )
         ok = False
-        triage_ok, triage_messages = _check_m3s02_anomaly_triage(root, label, raw)
+        triage_ok, triage_messages = _check_m3s03_anomaly_triage(root, label, raw)
         messages.extend(triage_messages)
         ok = ok and triage_ok
         if verdict in {"verified_match", "verified_close"}:
@@ -1300,10 +1303,10 @@ def _check_m3s02_reference_deviation(
     return ok, messages
 
 
-def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Path]) -> tuple[bool, list[str]]:
-    """Validate the structured M3S02 baseline lock manifest.
+def _check_m3s03_baseline_lock_manifest(root: Path, baseline_contracts: list[Path]) -> tuple[bool, list[str]]:
+    """Validate the structured M3S03 baseline lock manifest.
 
-    The prose baseline report is useful, but M3S03 needs a deterministic
+    The prose baseline report is useful, but M3S04 needs a deterministic
     machine-readable contract so it cannot silently move ahead with an
     unfinished or non-comparable baseline.
     """
@@ -1312,32 +1315,32 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
     ok = True
 
     if not lock.exists():
-        return False, ["[FAIL] M3S02: experiments/baselines/baseline_lock.yaml not found"]
+        return False, ["[FAIL] M3S03: experiments/baselines/baseline_lock.yaml not found"]
 
     try:
         data = _load_yaml_mapping(lock)
     except Exception as exc:
-        return False, [f"[FAIL] M3S02: baseline_lock.yaml unreadable: {exc}"]
+        return False, [f"[FAIL] M3S03: baseline_lock.yaml unreadable: {exc}"]
 
     if not data:
-        return False, ["[FAIL] M3S02: baseline_lock.yaml must contain a mapping"]
+        return False, ["[FAIL] M3S03: baseline_lock.yaml must contain a mapping"]
 
     baselines = data.get("baselines")
     if not isinstance(baselines, list) or not baselines:
-        return False, ["[FAIL] M3S02: baseline_lock.yaml missing nonempty baselines list"]
+        return False, ["[FAIL] M3S03: baseline_lock.yaml missing nonempty baselines list"]
 
-    messages.append(f"[PASS] M3S02: baseline_lock.yaml lists {len(baselines)} baseline(s)")
+    messages.append(f"[PASS] M3S03: baseline_lock.yaml lists {len(baselines)} baseline(s)")
 
     immutable = data.get("baseline_code_immutable_after_lock", data.get("immutable_after_lock"))
     if not _truthy(immutable):
-        messages.append("[FAIL] M3S02: baseline_lock.yaml must set baseline_code_immutable_after_lock: true")
+        messages.append("[FAIL] M3S03: baseline_lock.yaml must set baseline_code_immutable_after_lock: true")
         ok = False
     else:
-        messages.append("[PASS] M3S02: baseline code immutable after lock")
+        messages.append("[PASS] M3S03: baseline code immutable after lock")
 
     registry_ok, registry_msgs, protocols_by_id = _load_m2_metric_protocol_registry(root)
     messages.extend(
-        f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S02 upstream: {msg.split('] ', 1)[1]}"
+        f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S03 upstream: {msg.split('] ', 1)[1]}"
         if msg.startswith("[") and "] " in msg
         else msg
         for msg in registry_msgs
@@ -1354,15 +1357,15 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
 
     for index, raw in enumerate(baselines, start=1):
         if not isinstance(raw, dict):
-            messages.append(f"[FAIL] M3S02: baseline_lock baselines[{index}] must be a mapping")
+            messages.append(f"[FAIL] M3S03: baseline_lock baselines[{index}] must be a mapping")
             ok = False
             continue
 
         baseline_id = str(raw.get("baseline_id") or raw.get("id") or raw.get("name") or f"baseline_{index}").strip()
-        label = f"M3S02 baseline_lock[{baseline_id}]"
+        label = f"M3S03 baseline_lock[{baseline_id}]"
         role = str(raw.get("comparison_role") or raw.get("role") or "").strip().lower()
         source = str(raw.get("source") or raw.get("implementation_source") or "").strip().lower()
-        eligible = _truthy(raw.get("m3s03_eligible"))
+        eligible = _truthy(raw.get("m3s04_eligible"))
         verdict = str(raw.get("verification_verdict") or "").strip().lower()
         waiver = str(raw.get("caveat_waiver_reason") or raw.get("waiver_reason") or "").strip()
         scope_limit = str(raw.get("comparison_scope_limit") or raw.get("scope_limit") or "").strip()
@@ -1495,7 +1498,7 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
             messages.append(f"[FAIL] {label}: checkpoint applicability not declared")
             ok = False
 
-        metric_ok, metric_msgs = _check_m3s02_metric_protocol_alignment(
+        metric_ok, metric_msgs = _check_m3s03_metric_protocol_alignment(
             root,
             label,
             raw,
@@ -1506,7 +1509,7 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
         messages.extend(metric_msgs)
         ok = ok and metric_ok
 
-        deviation_ok, deviation_msgs = _check_m3s02_reference_deviation(
+        deviation_ok, deviation_msgs = _check_m3s03_reference_deviation(
             root,
             label,
             raw,
@@ -1533,29 +1536,29 @@ def _check_m3s02_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
             ok = False
 
         if "primary" in role and not eligible:
-            messages.append(f"[FAIL] {label}: primary baseline must set m3s03_eligible: true")
+            messages.append(f"[FAIL] {label}: primary baseline must set m3s04_eligible: true")
             ok = False
 
     if not seen_primary_ids:
-        messages.append("[FAIL] M3S02: no primary baseline declared in baseline_lock.yaml")
+        messages.append("[FAIL] M3S03: no primary baseline declared in baseline_lock.yaml")
         ok = False
     elif primary_eligible < 1:
-        messages.append("[FAIL] M3S02: no primary baseline is eligible for M3S03")
+        messages.append("[FAIL] M3S03: no primary baseline is eligible for M3S04")
         ok = False
     else:
-        messages.append(f"[PASS] M3S02: {primary_eligible} primary baseline(s) eligible for M3S03")
+        messages.append(f"[PASS] M3S03: {primary_eligible} primary baseline(s) eligible for M3S04")
 
-    m3s03_contract = data.get("m3s03_contract")
-    if not isinstance(m3s03_contract, dict):
-        messages.append("[FAIL] M3S02: baseline_lock.yaml missing m3s03_contract mapping")
+    m3s04_contract = data.get("m3s04_contract")
+    if not isinstance(m3s04_contract, dict):
+        messages.append("[FAIL] M3S03: baseline_lock.yaml missing m3s04_contract mapping")
         ok = False
     else:
         for field in ("primary_baseline_id", "metric_contract", "dataset", "split", "metric"):
-            if not str(m3s03_contract.get(field, "")).strip():
-                messages.append(f"[FAIL] M3S02: m3s03_contract missing {field}")
+            if not str(m3s04_contract.get(field, "")).strip():
+                messages.append(f"[FAIL] M3S03: m3s04_contract missing {field}")
                 ok = False
             else:
-                messages.append(f"[PASS] M3S02: m3s03_contract includes {field}")
+                messages.append(f"[PASS] M3S03: m3s04_contract includes {field}")
 
     return ok, messages
 
@@ -1984,11 +1987,11 @@ def _check_m2s05_experiment_design(root: Path, text: str) -> tuple[bool, list[st
         messages.append("[PASS] M2S05: experiment target table fields present")
 
     exp_count = _count_exp_ids(text)
-    if exp_count < 3:
-        messages.append(f"[FAIL] M2S05: fewer than 3 experiment IDs found ({exp_count})")
+    if exp_count < 1:
+        messages.append(f"[FAIL] M2S05: no experiment target ID found ({exp_count})")
         ok = False
     else:
-        messages.append(f"[PASS] M2S05: {exp_count} experiment IDs found")
+        messages.append(f"[PASS] M2S05: {exp_count} experiment target ID(s) found")
 
     registry_ok, registry_msgs, _protocols = _load_m2_metric_protocol_registry(root)
     messages.extend(f"[{msg.split('] ', 1)[0].lstrip('[')}] M2S05: {msg.split('] ', 1)[1]}" if msg.startswith("[") and "] " in msg else msg for msg in registry_msgs)
@@ -1997,73 +2000,114 @@ def _check_m2s05_experiment_design(root: Path, text: str) -> tuple[bool, list[st
     return ok, messages
 
 
-def _check_m2s06_experiment_plan(root: Path, text: str) -> tuple[bool, list[str]]:
-    """Validate M2S06 full experiment plan/report blueprint."""
+def _has_numeric_metric_value(value: str) -> bool:
+    return bool(re.search(r"(?<![A-Za-z])[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?(?:\s*(?:%|±\s*\d+(?:\.\d+)?))?", value, flags=re.IGNORECASE))
+
+
+def _m3s01_forbidden_analysis_lines(text: str) -> list[str]:
+    forbidden = ("ablation", "robustness", "m4s02", "m4s03", "analysis slice", "ana-", "消融", "鲁棒")
+    allowed = (
+        "not include",
+        "not design",
+        "excluded",
+        "defer",
+        "m4 only",
+        "leave to m4",
+        "不包括",
+        "不设计",
+        "不得",
+        "留给 m4",
+        "留到 m4",
+        "仅在 m4",
+        "只能进入 m4",
+        "only in m4",
+    )
+    lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        lowered = line.lower()
+        if not any(marker in lowered or marker in line for marker in forbidden):
+            continue
+        if any(marker in lowered or marker in line for marker in allowed):
+            continue
+        lines.append(line)
+    return lines[:5]
+
+
+def _m3s01_baseline_reference_rows(text: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for row in _markdown_table_rows(text):
+        baseline = _table_value(row, ("baseline", "基线", "comparator", "method", "方法"))
+        dataset = _table_value(row, ("dataset", "数据集"))
+        metric = _table_value(row, ("metric", "指标", "metric_key", "评价指标"))
+        value = _table_value(row, ("value", "数值", "metric_value", "reported_value", "reference_value", "指标值"))
+        source = _table_value(row, ("source", "value_source", "reference", "citation", "paper", "来源", "出处", "论文"))
+        if baseline and dataset and metric and value and source and _has_numeric_metric_value(value):
+            rows.append(row)
+    return rows
+
+
+def _check_m3s01_main_experiment_design(root: Path, text: str) -> tuple[bool, list[str]]:
+    """Validate the M3S01 main-experiment-only design contract."""
     messages: list[str] = []
     ok = True
 
-    exp_count = _count_exp_ids(text)
-    if exp_count < 3:
-        messages.append(f"[FAIL] M2S06: fewer than 3 experiment IDs found ({exp_count})")
+    forbidden_lines = _m3s01_forbidden_analysis_lines(text)
+    if forbidden_lines:
+        messages.append("[FAIL] M3S01: main experiment design contains ablation/M4 analysis planning lines: " + " | ".join(forbidden_lines))
         ok = False
     else:
-        messages.append(f"[PASS] M2S06: {exp_count} experiment IDs found")
+        messages.append("[PASS] M3S01: no executable ablation/M4 analysis plan found")
 
     required_signals = {
-        "execution order": ("执行顺序", "Phase", "phase", "依赖"),
-        "branch/backtrack logic": ("BACKTRACK", "回溯", "失败判定", "诊断"),
-        "success criteria": ("成功标准", "success criteria", "显著优于"),
-        "risk control": ("风险", "risk", "应对"),
-        "resource budget": ("资源", "GPU", "storage", "时间预算", "预算"),
-        "full experiment report blueprint": ("完整实验报告蓝图", "experiment report blueprint"),
-        "related-work protocol per experiment": ("参考相关工作实验设置", "reference protocol", "论文"),
-        "dataset/split per experiment": ("数据集与划分", "dataset", "split"),
-        "baseline/control per experiment": ("Baselines", "baseline", "对照组"),
-        "metric per experiment": ("评价指标", "metric"),
-        "run protocol per experiment": ("运行协议", "seed", "epoch", "hardware", "超参"),
-        "required evidence": ("raw logs", "config", "checkpoint", "results.tsv", "plot script"),
-        "failure diagnosis": ("失败时诊断路径", "implementation", "design", "hypothesis", "data", "baseline"),
+        "main experiment scope": ("主实验", "main experiment"),
+        "dataset and scenario": ("数据集", "dataset", "scenario", "场景"),
+        "split protocol": ("split", "划分", "train", "val", "test"),
+        "metric protocol id": ("metric_protocol_id", "指标协议"),
+        "baseline table": ("baseline", "基线"),
+        "baseline numeric reference values": ("reported_value", "reference_value", "metric_value", "数值", "指标值"),
+        "baseline source/reference": ("source", "reference", "citation", "来源", "论文"),
+        "proposed method under same conditions": ("ours", "proposed", "所提方法", "同条件", "same condition", "same split", "same metric"),
+        "fairness constraints": ("fairness", "公平", "same split", "same metric", "相同的数据划分", "相同指标"),
+        "fixed seed": ("seed", "随机种子", "42"),
     }
     for label, terms in required_signals.items():
         if not _contains_any(text, terms):
-            messages.append(f"[FAIL] M2S06: missing {label}")
+            messages.append(f"[FAIL] M3S01: missing {label}")
             ok = False
         else:
-            messages.append(f"[PASS] M2S06: includes {label}")
+            messages.append(f"[PASS] M3S01: includes {label}")
 
     if not re.search(r"(?i)(?:seed|随机种子)[^\n]{0,80}\b42\b|\b42\b[^\n]{0,80}(?:seed|随机种子)", text):
-        messages.append("[FAIL] M2S06: full experiment plan must fix random seed to 42")
+        messages.append("[FAIL] M3S01: main experiment design must fix random seed to 42")
         ok = False
     else:
-        messages.append("[PASS] M2S06: random seed fixed to 42")
+        messages.append("[PASS] M3S01: random seed fixed to 42")
 
-    if not _contains_table_with_headers(text, ("实验 ID", "目的", "预估时间", "依赖", "优先级")):
-        messages.append("[FAIL] M2S06: plan overview table missing id/purpose/time/dependency/priority fields")
+    baseline_rows = _m3s01_baseline_reference_rows(text)
+    if not baseline_rows:
+        messages.append("[FAIL] M3S01: missing baseline reference table rows with baseline/dataset/metric/value/source")
         ok = False
     else:
-        messages.append("[PASS] M2S06: plan overview table fields present")
-
-    if not re.search(r"(?im)^#{2,4}\s*Exp-\[?N\]?|^#{2,4}\s*Exp-[A-Za-z0-9_-]+", text):
-        messages.append("[FAIL] M2S06: report blueprint missing per-experiment Exp-* subsection")
-        ok = False
-    else:
-        messages.append("[PASS] M2S06: report blueprint has per-experiment subsection")
+        messages.append(f"[PASS] M3S01: {len(baseline_rows)} baseline reference value row(s) found")
 
     registry_ok, registry_msgs, protocols = _load_m2_metric_protocol_registry(root)
-    messages.extend(f"[{msg.split('] ', 1)[0].lstrip('[')}] M2S06 upstream: {msg.split('] ', 1)[1]}" if msg.startswith("[") and "] " in msg else msg for msg in registry_msgs)
+    messages.extend(f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S01 upstream: {msg.split('] ', 1)[1]}" if msg.startswith("[") and "] " in msg else msg for msg in registry_msgs)
     ok = ok and registry_ok
     if protocols:
         if "metric_protocol_id" not in text and "指标协议" not in text:
-            messages.append("[FAIL] M2S06: plan must reference metric_protocol_id from M2S05")
+            messages.append("[FAIL] M3S01: design must reference metric_protocol_id from M2S05")
             ok = False
         else:
-            messages.append("[PASS] M2S06: plan references metric protocol IDs")
+            messages.append("[PASS] M3S01: design references metric protocol IDs")
         for protocol_id in protocols:
             if protocol_id not in text:
-                messages.append(f"[FAIL] M2S06: missing metric protocol reference {protocol_id}")
+                messages.append(f"[FAIL] M3S01: missing metric protocol reference {protocol_id}")
                 ok = False
             else:
-                messages.append(f"[PASS] M2S06: references metric protocol {protocol_id}")
+                messages.append(f"[PASS] M3S01: references metric protocol {protocol_id}")
 
     return ok, messages
 
@@ -2090,22 +2134,22 @@ def _primary_metric_mapping(data: Any) -> dict[str, Any] | None:
     return None
 
 
-def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
-    """Validate M3S04 result validation and the evidence package needed by M4."""
-    doc = root / "knowledge" / "M3" / "M3S04_result_validation.md"
+def _check_m3s05_result_validation(root: Path) -> tuple[bool, list[str]]:
+    """Validate M3S05 result validation and the evidence package needed by M4."""
+    doc = root / "knowledge" / "M3" / "M3S05_result_validation.md"
     messages: list[str] = []
     ok = True
 
     if not doc.exists():
-        return False, ["[FAIL] M3S04: M3S04_result_validation.md not found"]
+        return False, ["[FAIL] M3S05: M3S05_result_validation.md not found"]
 
     text = doc.read_text(encoding="utf-8")
-    decision = extract_m3s04_decision(text)
+    decision = extract_m3s05_decision(text)
     if decision is None:
-        messages.append("[FAIL] M3S04: Missing explicit KEEP/FIX/BACKTRACK decision")
+        messages.append("[FAIL] M3S05: Missing explicit KEEP/FIX/BACKTRACK decision")
         ok = False
     else:
-        messages.append(f"[PASS] M3S04: Decision found: {decision}")
+        messages.append(f"[PASS] M3S05: Decision found: {decision}")
 
     required_sections = {
         "experiment stop reason": ("实验停止原因", "停止条件", "stop reason", "Evidence Ladder", "best 指标"),
@@ -2126,10 +2170,10 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
     }
     for label, terms in required_sections.items():
         if not _contains_any(text, terms):
-            messages.append(f"[FAIL] M3S04: missing {label}")
+            messages.append(f"[FAIL] M3S05: missing {label}")
             ok = False
         else:
-            messages.append(f"[PASS] M3S04: includes {label}")
+            messages.append(f"[PASS] M3S05: includes {label}")
 
     if decision in {"FIX", "BACKTRACK"}:
         missing_fields = _missing_structured_fields(text)
@@ -2139,24 +2183,24 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
             or "回溯修改方向" in text
         )
         if not has_guidance:
-            messages.append("[FAIL] M3S04: FIX/BACKTRACK decision missing '回溯修改方向' section")
+            messages.append("[FAIL] M3S05: FIX/BACKTRACK decision missing '回溯修改方向' section")
             ok = False
         else:
-            messages.append("[PASS] M3S04: backtrack guidance section found")
+            messages.append("[PASS] M3S05: backtrack guidance section found")
         if missing_fields:
             messages.append(
-                f"[FAIL] M3S04: FIX/BACKTRACK decision missing repair advice fields: {', '.join(missing_fields)}"
+                f"[FAIL] M3S05: FIX/BACKTRACK decision missing repair advice fields: {', '.join(missing_fields)}"
             )
             ok = False
         else:
-            messages.append("[PASS] M3S04: repair advice fields found")
-        messages.append("[FAIL] M3S04: FIX/BACKTRACK decision blocks advancement until the requested rerun is executed")
+            messages.append("[PASS] M3S05: repair advice fields found")
+        messages.append("[FAIL] M3S05: FIX/BACKTRACK decision blocks advancement until the requested rerun is executed")
         return False, messages
 
     if decision != "KEEP":
         return False, messages
 
-    trained_ok, trained_msgs = _check_m3s03_trained_weight_evidence(root, doc_text=text)
+    trained_ok, trained_msgs = _check_m3s04_trained_weight_evidence(root, doc_text=text)
     messages.extend(trained_msgs)
     ok = ok and trained_ok
 
@@ -2169,10 +2213,10 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
     }
     for label, path in required_files.items():
         if not path.exists() or not path.read_text(encoding="utf-8").strip():
-            messages.append(f"[FAIL] M3S04: {label} missing or empty: {path.relative_to(root)}")
+            messages.append(f"[FAIL] M3S05: {label} missing or empty: {path.relative_to(root)}")
             ok = False
         else:
-            messages.append(f"[PASS] M3S04: {label} artifact present")
+            messages.append(f"[PASS] M3S05: {label} artifact present")
 
     manifest_path = required_files["manifest"]
     if manifest_path.exists():
@@ -2181,36 +2225,36 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
 
             manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
         except Exception as exc:
-            messages.append(f"[FAIL] M3S04: manifest.yaml unreadable: {exc}")
+            messages.append(f"[FAIL] M3S05: manifest.yaml unreadable: {exc}")
             ok = False
             manifest = {}
         if not isinstance(manifest, dict):
-            messages.append("[FAIL] M3S04: manifest.yaml must contain a mapping")
+            messages.append("[FAIL] M3S05: manifest.yaml must contain a mapping")
             ok = False
             manifest = {}
         for field in ("experiment_id", "method", "dataset", "environment"):
             if not _nonempty(manifest.get(field)):
-                messages.append(f"[FAIL] M3S04: manifest.yaml missing {field}")
+                messages.append(f"[FAIL] M3S05: manifest.yaml missing {field}")
                 ok = False
             else:
-                messages.append(f"[PASS] M3S04: manifest.yaml includes {field}")
+                messages.append(f"[PASS] M3S05: manifest.yaml includes {field}")
         baseline_refs = manifest.get("baseline_refs")
         if not isinstance(baseline_refs, list) or not any(_nonempty(item) for item in baseline_refs):
-            messages.append("[FAIL] M3S04: manifest.yaml missing non-empty baseline_refs")
+            messages.append("[FAIL] M3S05: manifest.yaml missing non-empty baseline_refs")
             ok = False
         else:
-            messages.append("[PASS] M3S04: manifest.yaml includes baseline_refs")
+            messages.append("[PASS] M3S05: manifest.yaml includes baseline_refs")
         primary = _primary_metric_mapping(manifest)
         if not primary:
-            messages.append("[FAIL] M3S04: manifest.yaml missing primary_metric")
+            messages.append("[FAIL] M3S05: manifest.yaml missing primary_metric")
             ok = False
         else:
             missing_metric = [field for field in ("key", "value") if not _nonempty(primary.get(field))]
             if missing_metric:
-                messages.append(f"[FAIL] M3S04: manifest.yaml primary_metric missing {', '.join(missing_metric)}")
+                messages.append(f"[FAIL] M3S05: manifest.yaml primary_metric missing {', '.join(missing_metric)}")
                 ok = False
             else:
-                messages.append("[PASS] M3S04: manifest.yaml primary_metric includes key/value")
+                messages.append("[PASS] M3S05: manifest.yaml primary_metric includes key/value")
         seeds = manifest.get("seeds")
         seed_value = manifest.get("seed")
         seed_values = set()
@@ -2219,10 +2263,10 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
         if _nonempty(seed_value):
             seed_values.add(str(seed_value).strip())
         if "42" not in seed_values:
-            messages.append("[FAIL] M3S04: manifest.yaml must record fixed seed 42")
+            messages.append("[FAIL] M3S05: manifest.yaml must record fixed seed 42")
             ok = False
         else:
-            messages.append("[PASS] M3S04: manifest.yaml records fixed seed 42")
+            messages.append("[PASS] M3S05: manifest.yaml records fixed seed 42")
 
     contract_path = required_files["metric contract"]
     if contract_path.exists():
@@ -2231,30 +2275,30 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
 
             contract = yaml.safe_load(contract_path.read_text(encoding="utf-8")) or {}
         except Exception as exc:
-            messages.append(f"[FAIL] M3S04: metric_contract.yaml unreadable: {exc}")
+            messages.append(f"[FAIL] M3S05: metric_contract.yaml unreadable: {exc}")
             ok = False
             contract = {}
         if not isinstance(contract, dict):
-            messages.append("[FAIL] M3S04: metric_contract.yaml must contain a mapping")
+            messages.append("[FAIL] M3S05: metric_contract.yaml must contain a mapping")
             ok = False
             contract = {}
         method = contract.get("method") or contract.get("method_name") or contract.get("system")
         if not _nonempty(method):
-            messages.append("[FAIL] M3S04: metric_contract.yaml missing method")
+            messages.append("[FAIL] M3S05: metric_contract.yaml missing method")
             ok = False
         else:
-            messages.append("[PASS] M3S04: metric_contract.yaml includes method")
+            messages.append("[PASS] M3S05: metric_contract.yaml includes method")
         primary = _primary_metric_mapping(contract)
         if not primary:
-            messages.append("[FAIL] M3S04: metric_contract.yaml missing primary metric")
+            messages.append("[FAIL] M3S05: metric_contract.yaml missing primary metric")
             ok = False
         else:
             missing_metric = [field for field in ("key", "value") if not _nonempty(primary.get(field))]
             if missing_metric:
-                messages.append(f"[FAIL] M3S04: metric_contract.yaml primary metric missing {', '.join(missing_metric)}")
+                messages.append(f"[FAIL] M3S05: metric_contract.yaml primary metric missing {', '.join(missing_metric)}")
                 ok = False
             else:
-                messages.append("[PASS] M3S04: metric_contract.yaml primary metric includes key/value")
+                messages.append("[PASS] M3S05: metric_contract.yaml primary metric includes key/value")
 
     comparison_path = required_files["comparison table"]
     if comparison_path.exists():
@@ -2263,57 +2307,57 @@ def _check_m3s04_result_validation(root: Path) -> tuple[bool, list[str]]:
 
             rows = list(csv.DictReader(comparison_path.read_text(encoding="utf-8").splitlines()))
         except Exception as exc:
-            messages.append(f"[FAIL] M3S04: comparison_table.csv unreadable: {exc}")
+            messages.append(f"[FAIL] M3S05: comparison_table.csv unreadable: {exc}")
             ok = False
             rows = []
         if not rows:
-            messages.append("[FAIL] M3S04: comparison_table.csv has no data rows")
+            messages.append("[FAIL] M3S05: comparison_table.csv has no data rows")
             ok = False
         else:
-            messages.append("[PASS] M3S04: comparison_table.csv has data rows")
+            messages.append("[PASS] M3S05: comparison_table.csv has data rows")
             joined = json.dumps(rows, ensure_ascii=False).lower()
             if "baseline" not in joined:
-                messages.append("[FAIL] M3S04: comparison_table.csv missing baseline rows")
+                messages.append("[FAIL] M3S05: comparison_table.csv missing baseline rows")
                 ok = False
             else:
-                messages.append("[PASS] M3S04: comparison_table.csv includes baseline rows")
+                messages.append("[PASS] M3S05: comparison_table.csv includes baseline rows")
             if "ours" not in joined and "proposed" not in joined:
-                messages.append("[FAIL] M3S04: comparison_table.csv missing ours/proposed row")
+                messages.append("[FAIL] M3S05: comparison_table.csv missing ours/proposed row")
                 ok = False
             else:
-                messages.append("[PASS] M3S04: comparison_table.csv includes ours/proposed row")
+                messages.append("[PASS] M3S05: comparison_table.csv includes ours/proposed row")
             headers = {str(header).lower() for header in rows[0].keys()}
             if "seed" not in headers:
-                messages.append("[FAIL] M3S04: comparison_table.csv missing fixed seed column")
+                messages.append("[FAIL] M3S05: comparison_table.csv missing fixed seed column")
                 ok = False
             else:
                 seed_key = next((key for key in rows[0].keys() if str(key).lower() == "seed"), "seed")
                 has_seed_42 = any(str(row.get(seed_key, "")).strip() == "42" for row in rows)
                 if not has_seed_42:
-                    messages.append("[FAIL] M3S04: comparison_table.csv must record fixed seed 42")
+                    messages.append("[FAIL] M3S05: comparison_table.csv must record fixed seed 42")
                     ok = False
                 else:
-                    messages.append("[PASS] M3S04: comparison_table.csv records fixed seed 42")
+                    messages.append("[PASS] M3S05: comparison_table.csv records fixed seed 42")
 
     handoff = root / "knowledge" / "handoff_M3_M4.md"
     if not handoff.exists() or not handoff.read_text(encoding="utf-8").strip():
-        messages.append("[FAIL] M3S04: handoff_M3_M4.md missing or empty")
+        messages.append("[FAIL] M3S05: handoff_M3_M4.md missing or empty")
         ok = False
     else:
         handoff_text = handoff.read_text(encoding="utf-8")
         handoff_terms = {
             "KEEP decision": ("KEEP", "validated", "验证通过"),
             "claim/evidence bridge": ("claim", "evidence", "证据", "主张"),
-            "M3S04 provenance": ("M3S04", "result validation"),
+            "M3S05 provenance": ("M3S05", "result validation"),
             "artifact path": ("experiments/artifacts/main_experiment", "manifest.yaml", "comparison_table.csv"),
             "M4 analysis direction": ("M4", "analysis", "消融", "鲁棒", "机制"),
         }
         for label, terms in handoff_terms.items():
             if not _contains_any(handoff_text, terms):
-                messages.append(f"[FAIL] M3S04: handoff_M3_M4.md missing {label}")
+                messages.append(f"[FAIL] M3S05: handoff_M3_M4.md missing {label}")
                 ok = False
             else:
-                messages.append(f"[PASS] M3S04: handoff_M3_M4.md includes {label}")
+                messages.append(f"[PASS] M3S05: handoff_M3_M4.md includes {label}")
 
     return ok, messages
 
@@ -2915,58 +2959,58 @@ def _check_m4s04_analysis_results(root: Path) -> tuple[bool, list[str]]:
     return ok, messages
 
 
-def _check_m3s01_execution_config(
+def _check_m3s02_execution_config(
     env_data: dict[str, Any],
     *,
     doc_text: str = "",
 ) -> tuple[bool, list[str], str]:
-    """Validate that M3S01 uses a concrete local/ssh execution configuration."""
+    """Validate that M3S02 uses a concrete local/ssh execution configuration."""
     messages: list[str] = []
     ok = True
     execution = env_data.get("execution", {}) if isinstance(env_data, dict) else {}
     if not isinstance(execution, dict):
-        return False, ["[FAIL] M3S01: execution_env.yaml missing execution mapping"], ""
+        return False, ["[FAIL] M3S02: execution_env.yaml missing execution mapping"], ""
 
     mode = str(execution.get("mode", "")).strip().lower()
-    messages.append(f"[PASS] M3S01: execution_env.yaml readable (mode={mode or 'unset'})")
+    messages.append(f"[PASS] M3S02: execution_env.yaml readable (mode={mode or 'unset'})")
     if mode not in {"local", "ssh"}:
-        messages.append("[FAIL] M3S01: execution.mode must be explicitly local or ssh")
+        messages.append("[FAIL] M3S02: execution.mode must be explicitly local or ssh")
         ok = False
         return ok, messages, mode
 
     doc_lower = doc_text.lower()
     if mode == "local":
         if doc_text and not _contains_any(doc_lower, ("local", "本地")):
-            messages.append("[FAIL] M3S01: implementation doc does not match local execution mode")
+            messages.append("[FAIL] M3S02: implementation doc does not match local execution mode")
             ok = False
         else:
-            messages.append("[PASS] M3S01: implementation doc records local execution mode")
+            messages.append("[PASS] M3S02: implementation doc records local execution mode")
         local = execution.get("local", {})
         if not isinstance(local, dict):
-            messages.append("[FAIL] M3S01: execution.local must be a mapping for local mode")
+            messages.append("[FAIL] M3S02: execution.local must be a mapping for local mode")
             ok = False
         else:
             env_manager = str(local.get("env_manager", "")).strip().lower()
             if env_manager not in {"conda", "venv", "uv", "docker"}:
-                messages.append("[FAIL] M3S01: local env_manager must be conda/venv/uv/docker")
+                messages.append("[FAIL] M3S02: local env_manager must be conda/venv/uv/docker")
                 ok = False
             else:
-                messages.append(f"[PASS] M3S01: local env_manager={env_manager}")
+                messages.append(f"[PASS] M3S02: local env_manager={env_manager}")
             if not str(local.get("python_version", "")).strip():
-                messages.append("[FAIL] M3S01: local python_version missing")
+                messages.append("[FAIL] M3S02: local python_version missing")
                 ok = False
             else:
-                messages.append("[PASS] M3S01: local python_version present")
+                messages.append("[PASS] M3S02: local python_version present")
 
     if mode == "ssh":
         if doc_text and not _contains_any(doc_lower, ("ssh", "remote", "rsync", "远程")):
-            messages.append("[FAIL] M3S01: implementation doc does not match ssh/remote execution mode")
+            messages.append("[FAIL] M3S02: implementation doc does not match ssh/remote execution mode")
             ok = False
         else:
-            messages.append("[PASS] M3S01: implementation doc records ssh/remote execution mode")
+            messages.append("[PASS] M3S02: implementation doc records ssh/remote execution mode")
         ssh = execution.get("ssh", {})
         if not isinstance(ssh, dict):
-            messages.append("[FAIL] M3S01: execution.ssh must be a mapping for ssh mode")
+            messages.append("[FAIL] M3S02: execution.ssh must be a mapping for ssh mode")
             ok = False
         else:
             required = {
@@ -2980,34 +3024,34 @@ def _check_m3s01_execution_config(
             }
             for field, label in required.items():
                 if not str(ssh.get(field, "")).strip():
-                    messages.append(f"[FAIL] M3S01: {label} missing")
+                    messages.append(f"[FAIL] M3S02: {label} missing")
                     ok = False
                 else:
-                    messages.append(f"[PASS] M3S01: {label} present")
+                    messages.append(f"[PASS] M3S02: {label} present")
             sync = ssh.get("sync", {})
             sync_method = str(sync.get("method", "")).strip().lower() if isinstance(sync, dict) else ""
             if sync_method not in {"rsync", "scp"}:
-                messages.append("[FAIL] M3S01: ssh sync.method must be rsync or scp")
+                messages.append("[FAIL] M3S02: ssh sync.method must be rsync or scp")
                 ok = False
             else:
-                messages.append(f"[PASS] M3S01: ssh sync.method={sync_method}")
+                messages.append(f"[PASS] M3S02: ssh sync.method={sync_method}")
 
     return ok, messages, mode
 
 
-def _check_m3s01_longrun_ledger(root: Path, execution_mode: str = "") -> tuple[bool, list[str]]:
-    """Validate the M3S01 long-running execution ledger."""
-    ledger = root / "experiments" / "logs" / "m3s01_longrun_ledger.md"
+def _check_m3s02_longrun_ledger(root: Path, execution_mode: str = "") -> tuple[bool, list[str]]:
+    """Validate the M3S02 long-running execution ledger."""
+    ledger = root / "experiments" / "logs" / "m3s02_longrun_ledger.md"
     messages: list[str] = []
     ok = True
 
     if not ledger.exists():
-        return False, ["[FAIL] M3S01: long-running execution ledger missing: experiments/logs/m3s01_longrun_ledger.md"]
+        return False, ["[FAIL] M3S02: long-running execution ledger missing: experiments/logs/m3s02_longrun_ledger.md"]
 
     try:
         text = ledger.read_text(encoding="utf-8")
     except Exception as exc:
-        return False, [f"[FAIL] M3S01: long-running execution ledger unreadable: {exc}"]
+        return False, [f"[FAIL] M3S02: long-running execution ledger unreadable: {exc}"]
 
     required_groups = {
         "execution mode": ("execution mode", "mode", "执行模式"),
@@ -3020,10 +3064,10 @@ def _check_m3s01_longrun_ledger(root: Path, execution_mode: str = "") -> tuple[b
     }
     for label, terms in required_groups.items():
         if not _contains_any(text, terms):
-            messages.append(f"[FAIL] M3S01: long-running ledger missing {label} evidence")
+            messages.append(f"[FAIL] M3S02: long-running ledger missing {label} evidence")
             ok = False
         else:
-            messages.append(f"[PASS] M3S01: long-running ledger includes {label} evidence")
+            messages.append(f"[PASS] M3S02: long-running ledger includes {label} evidence")
 
     prohibited_patterns = (
         r"(?i)skip(?:ped)?\s+because\s+(?:it\s+is\s+)?too\s+large",
@@ -3034,7 +3078,7 @@ def _check_m3s01_longrun_ledger(root: Path, execution_mode: str = "") -> tuple[b
     )
     for pattern in prohibited_patterns:
         if re.search(pattern, text):
-            messages.append("[FAIL] M3S01: long-running ledger records an invalid size/time-based skip")
+            messages.append("[FAIL] M3S02: long-running ledger records an invalid size/time-based skip")
             ok = False
             break
 
@@ -3049,15 +3093,15 @@ def _check_m3s01_longrun_ledger(root: Path, execution_mode: str = "") -> tuple[b
         acquisition_rows.append(row)
         label = item or command[:60] or "acquisition task"
         if status not in {"completed", "complete", "success", "succeeded", "done", "完成", "已完成"}:
-            messages.append(f"[FAIL] M3S01: acquisition task {label} is not completed (status={status or 'unset'})")
+            messages.append(f"[FAIL] M3S02: acquisition task {label} is not completed (status={status or 'unset'})")
             ok = False
             continue
         log_ref = _table_value(row, ("log path", "log_path", "log", "日志路径", "日志"))
         if not _project_path_exists(root, log_ref):
-            messages.append(f"[FAIL] M3S01: acquisition task {label} missing existing log path")
+            messages.append(f"[FAIL] M3S02: acquisition task {label} missing existing log path")
             ok = False
         else:
-            messages.append(f"[PASS] M3S01: acquisition task {label} has log evidence")
+            messages.append(f"[PASS] M3S02: acquisition task {label} has log evidence")
         completion = _table_value(row, ("completion criteria", "criteria", "完成标准", "completion"))
         if not _contains_any(
             completion,
@@ -3080,27 +3124,27 @@ def _check_m3s01_longrun_ledger(root: Path, execution_mode: str = "") -> tuple[b
                 "就绪",
             ),
         ):
-            messages.append(f"[FAIL] M3S01: acquisition task {label} missing concrete completion criteria")
+            messages.append(f"[FAIL] M3S02: acquisition task {label} missing concrete completion criteria")
             ok = False
         else:
-            messages.append(f"[PASS] M3S01: acquisition task {label} records completion criteria")
+            messages.append(f"[PASS] M3S02: acquisition task {label} records completion criteria")
 
     if acquisition_rows:
-        messages.append(f"[PASS] M3S01: long-running ledger includes {len(acquisition_rows)} acquisition task(s)")
+        messages.append(f"[PASS] M3S02: long-running ledger includes {len(acquisition_rows)} acquisition task(s)")
 
     mode = (execution_mode or "").lower()
     if mode == "ssh":
         if not _contains_any(text, ("ssh", "rsync", "remote", "远程")):
-            messages.append("[FAIL] M3S01: SSH mode ledger missing remote execution/rsync evidence")
+            messages.append("[FAIL] M3S02: SSH mode ledger missing remote execution/rsync evidence")
             ok = False
         else:
-            messages.append("[PASS] M3S01: SSH mode ledger includes remote execution/rsync evidence")
+            messages.append("[PASS] M3S02: SSH mode ledger includes remote execution/rsync evidence")
     elif mode == "local":
         if not _contains_any(text, ("local", "本地")):
-            messages.append("[FAIL] M3S01: local mode ledger missing local execution evidence")
+            messages.append("[FAIL] M3S02: local mode ledger missing local execution evidence")
             ok = False
         else:
-            messages.append("[PASS] M3S01: local mode ledger includes local execution evidence")
+            messages.append("[PASS] M3S02: local mode ledger includes local execution evidence")
 
     return ok, messages
 
@@ -3213,30 +3257,30 @@ def _check_experiment_sandbox_profile(
     return ok, messages
 
 
-def _check_m3s01_resource_plan(
+def _check_m3s02_resource_plan(
     root: Path,
     *,
     env_data: dict[str, Any] | None = None,
     doc_text: str = "",
 ) -> tuple[bool, list[str]]:
-    """Validate the M3S01 resource optimization contract."""
+    """Validate the M3S02 resource optimization contract."""
     messages: list[str] = []
     ok = True
 
     execution = env_data.get("execution", {}) if isinstance(env_data, dict) else {}
     optimization = execution.get("resource_optimization", {}) if isinstance(execution, dict) else {}
     if not isinstance(optimization, dict) or not optimization:
-        messages.append("[FAIL] M3S01: execution.resource_optimization missing")
+        messages.append("[FAIL] M3S02: execution.resource_optimization missing")
         ok = False
     elif optimization.get("enabled") is not True:
-        messages.append("[FAIL] M3S01: execution.resource_optimization.enabled must be true")
+        messages.append("[FAIL] M3S02: execution.resource_optimization.enabled must be true")
         ok = False
     else:
-        messages.append("[PASS] M3S01: resource optimization enabled")
+        messages.append("[PASS] M3S02: resource optimization enabled")
 
     plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
     if not plan_path.exists():
-        messages.append("[FAIL] M3S01: experiments/configs/resource_plan.yaml not found")
+        messages.append("[FAIL] M3S02: experiments/configs/resource_plan.yaml not found")
         return False, messages
 
     try:
@@ -3244,14 +3288,14 @@ def _check_m3s01_resource_plan(
 
         plan = yaml.safe_load(plan_path.read_text(encoding="utf-8")) or {}
     except Exception as exc:
-        messages.append(f"[FAIL] M3S01: resource_plan.yaml unreadable: {exc}")
+        messages.append(f"[FAIL] M3S02: resource_plan.yaml unreadable: {exc}")
         return False, messages
 
     if not isinstance(plan, dict):
-        messages.append("[FAIL] M3S01: resource_plan.yaml must contain a mapping")
+        messages.append("[FAIL] M3S02: resource_plan.yaml must contain a mapping")
         return False, messages
 
-    messages.append("[PASS] M3S01: resource_plan.yaml readable")
+    messages.append("[PASS] M3S02: resource_plan.yaml readable")
     plan_text = json.dumps(plan, ensure_ascii=False, sort_keys=True).lower()
     required = {
         "available hardware": ("available", "cpu", "gpus"),
@@ -3262,12 +3306,12 @@ def _check_m3s01_resource_plan(
     }
     for label, terms in required.items():
         if not all(term.lower() in plan_text for term in terms):
-            messages.append(f"[FAIL] M3S01: resource_plan.yaml missing {label}")
+            messages.append(f"[FAIL] M3S02: resource_plan.yaml missing {label}")
             ok = False
         else:
-            messages.append(f"[PASS] M3S01: resource_plan.yaml includes {label}")
+            messages.append(f"[PASS] M3S02: resource_plan.yaml includes {label}")
 
-    pool_ok, pool_msgs = _check_resource_pool_plan(root, plan, label="M3S01")
+    pool_ok, pool_msgs = _check_resource_pool_plan(root, plan, label="M3S02")
     messages.extend(pool_msgs)
     ok = ok and pool_ok
 
@@ -3294,26 +3338,26 @@ def _check_m3s01_resource_plan(
             "公平",
         )
         if not _contains_any(doc_text + plan_text, explanation_terms):
-            messages.append("[FAIL] M3S01: multiple GPUs visible but resource plan does not allocate/use them or explain why")
+            messages.append("[FAIL] M3S02: multiple GPUs visible but resource plan does not allocate/use them or explain why")
             ok = False
         else:
-            messages.append("[PASS] M3S01: partial GPU allocation has documented rationale")
+            messages.append("[PASS] M3S02: partial GPU allocation has documented rationale")
     elif visible_gpu_count >= 2:
         strategy_text = json.dumps(strategy, ensure_ascii=False).lower()
         launch_text = json.dumps(launch, ensure_ascii=False).lower()
         if not _contains_any(strategy_text + launch_text, ("ddp", "distributed", "torchrun", "task_parallel")):
-            messages.append("[FAIL] M3S01: multiple GPUs allocated without DDP/task-parallel strategy")
+            messages.append("[FAIL] M3S02: multiple GPUs allocated without DDP/task-parallel strategy")
             ok = False
         else:
-            messages.append("[PASS] M3S01: multi-GPU strategy present")
+            messages.append("[PASS] M3S02: multi-GPU strategy present")
 
     dataloader = strategy.get("dataloader", {}) if isinstance(strategy.get("dataloader"), dict) else {}
     num_workers = _safe_int(dataloader.get("num_workers"), default=-1)
     if visible_cpu >= 4 and allocated_cpu >= 4 and num_workers <= 0:
-        messages.append("[FAIL] M3S01: multi-core CPU available but dataloader num_workers is not planned")
+        messages.append("[FAIL] M3S02: multi-core CPU available but dataloader num_workers is not planned")
         ok = False
     elif visible_cpu >= 4 and allocated_cpu >= 4:
-        messages.append(f"[PASS] M3S01: dataloader num_workers planned ({num_workers})")
+        messages.append(f"[PASS] M3S02: dataloader num_workers planned ({num_workers})")
 
     return ok, messages
 
@@ -3448,13 +3492,13 @@ def _resource_monitor_summary(path: Path) -> tuple[bool, str]:
     return True, f"{len(rows)} sample row(s)"
 
 
-def _check_m3s03_resource_execution(root: Path, *, doc_text: str = "") -> tuple[bool, list[str]]:
-    """Validate resource utilization evidence for M3S03."""
+def _check_m3s04_resource_execution(root: Path, *, doc_text: str = "") -> tuple[bool, list[str]]:
+    """Validate resource utilization evidence for M3S04."""
     messages: list[str] = []
     ok = True
     plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
     if not plan_path.exists():
-        messages.append("[FAIL] M3S03: resource_plan.yaml not found")
+        messages.append("[FAIL] M3S04: resource_plan.yaml not found")
         ok = False
         plan: dict[str, Any] = {}
     else:
@@ -3462,21 +3506,21 @@ def _check_m3s03_resource_execution(root: Path, *, doc_text: str = "") -> tuple[
             import yaml
 
             plan = yaml.safe_load(plan_path.read_text(encoding="utf-8")) or {}
-            messages.append("[PASS] M3S03: resource_plan.yaml found")
+            messages.append("[PASS] M3S04: resource_plan.yaml found")
         except Exception as exc:
-            messages.append(f"[FAIL] M3S03: resource_plan.yaml unreadable: {exc}")
+            messages.append(f"[FAIL] M3S04: resource_plan.yaml unreadable: {exc}")
             ok = False
             plan = {}
 
     if not _contains_any(doc_text, ("resource_plan", "resource plan", "资源执行", "资源利用", "resource_monitor")):
-        messages.append("[FAIL] M3S03: main experiment doc missing resource utilization record")
+        messages.append("[FAIL] M3S04: main experiment doc missing resource utilization record")
         ok = False
     else:
-        messages.append("[PASS] M3S03: main experiment doc records resource utilization")
+        messages.append("[PASS] M3S04: main experiment doc records resource utilization")
 
     monitors = sorted((root / "experiments" / "runs").rglob("resource_monitor.csv")) if (root / "experiments" / "runs").exists() else []
     if not monitors:
-        messages.append("[FAIL] M3S03: no resource_monitor.csv found under experiments/runs/")
+        messages.append("[FAIL] M3S04: no resource_monitor.csv found under experiments/runs/")
         ok = False
     else:
         valid = 0
@@ -3484,12 +3528,12 @@ def _check_m3s03_resource_execution(root: Path, *, doc_text: str = "") -> tuple[
             monitor_ok, summary = _resource_monitor_summary(monitor)
             if monitor_ok:
                 valid += 1
-                messages.append(f"[PASS] M3S03: {monitor.relative_to(root)} has {summary}")
+                messages.append(f"[PASS] M3S04: {monitor.relative_to(root)} has {summary}")
             else:
-                messages.append(f"[FAIL] M3S03: {monitor.relative_to(root)} {summary}")
+                messages.append(f"[FAIL] M3S04: {monitor.relative_to(root)} {summary}")
                 ok = False
         if valid:
-            messages.append(f"[PASS] M3S03: {valid} resource monitor file(s) found")
+            messages.append(f"[PASS] M3S04: {valid} resource monitor file(s) found")
 
     allocation = plan.get("allocation", {}) if isinstance(plan.get("allocation"), dict) else {}
     strategy = plan.get("strategy", {}) if isinstance(plan.get("strategy"), dict) else {}
@@ -3498,7 +3542,7 @@ def _check_m3s03_resource_execution(root: Path, *, doc_text: str = "") -> tuple[
     pool_ok, pool_msgs = _check_resource_pool_plan(
         root,
         plan,
-        label="M3S03",
+        label="M3S04",
         require_allocation=True,
         allocation_name="m3_task_allocation.yaml",
         doc_text=doc_text,
@@ -3509,24 +3553,24 @@ def _check_m3s03_resource_execution(root: Path, *, doc_text: str = "") -> tuple[
     if allocated_gpu_count >= 2:
         combined = doc_text + "\n" + json.dumps(strategy, ensure_ascii=False)
         if not _contains_any(combined, ("ddp", "distributed", "torchrun", "task_parallel", "多卡", "任务并行")):
-            messages.append("[FAIL] M3S03: multi-GPU allocation lacks DDP/task-parallel execution evidence")
+            messages.append("[FAIL] M3S04: multi-GPU allocation lacks DDP/task-parallel execution evidence")
             ok = False
         else:
-            messages.append("[PASS] M3S03: multi-GPU execution strategy documented")
+            messages.append("[PASS] M3S04: multi-GPU execution strategy documented")
 
     if _contains_any(doc_text, ("low utilization", "低利用率", "underutilized")):
         if not _contains_any(doc_text, ("optimized", "documented blocker", "not observed", "none", "不可优化", "已调", "原因", "无")):
-            messages.append("[FAIL] M3S03: low utilization mentioned without optimize-or-document outcome")
+            messages.append("[FAIL] M3S04: low utilization mentioned without optimize-or-document outcome")
             ok = False
         else:
-            messages.append("[PASS] M3S03: low utilization has optimize-or-document outcome")
+            messages.append("[PASS] M3S04: low utilization has optimize-or-document outcome")
 
     if _resource_pool_enabled(plan):
         if not _contains_any(doc_text, ("resource_id", "resource kind", "resource_kind", "server_id", "m3_task_allocation", "同步", "sync")):
-            messages.append("[FAIL] M3S03: multi-resource execution missing resource_id/server/sync record in main doc")
+            messages.append("[FAIL] M3S04: multi-resource execution missing resource_id/server/sync record in main doc")
             ok = False
         else:
-            messages.append("[PASS] M3S03: multi-resource execution record present in main doc")
+            messages.append("[PASS] M3S04: multi-resource execution record present in main doc")
 
     return ok, messages
 
@@ -3562,29 +3606,29 @@ def _jsonl_has_watchdog_event(path: Path) -> tuple[bool, str]:
     return True, f"{len(lines)} line(s), {watchdog_events} watchdog event marker(s){suffix}"
 
 
-def _check_m3s03_runtime_watchdog(root: Path, *, doc_text: str = "") -> tuple[bool, list[str]]:
-    """Validate runtime watchdog supervision for long-running M3S03 runs."""
+def _check_m3s04_runtime_watchdog(root: Path, *, doc_text: str = "") -> tuple[bool, list[str]]:
+    """Validate runtime watchdog supervision for long-running M3S04 runs."""
     messages: list[str] = []
     ok = True
 
     if not _contains_any(doc_text, ("watchdog", "runtime_events", "巡检", "告警", "早停", "early_stop")):
-        messages.append("[FAIL] M3S03: main experiment doc missing runtime watchdog/alert supervision record")
+        messages.append("[FAIL] M3S04: main experiment doc missing runtime watchdog/alert supervision record")
         ok = False
     else:
-        messages.append("[PASS] M3S03: main experiment doc records runtime watchdog/alert supervision")
+        messages.append("[PASS] M3S04: main experiment doc records runtime watchdog/alert supervision")
 
     runtime_events = root / "experiments" / "logs" / "runtime_events.jsonl"
     runtime_ok, runtime_summary = _jsonl_has_watchdog_event(runtime_events)
     if not runtime_ok:
-        messages.append(f"[FAIL] M3S03: experiments/logs/runtime_events.jsonl {runtime_summary}")
+        messages.append(f"[FAIL] M3S04: experiments/logs/runtime_events.jsonl {runtime_summary}")
         ok = False
     else:
-        messages.append(f"[PASS] M3S03: runtime_events.jsonl has {runtime_summary}")
+        messages.append(f"[PASS] M3S04: runtime_events.jsonl has {runtime_summary}")
 
     runs_dir = root / "experiments" / "runs"
     checks = sorted(runs_dir.rglob("watchdog_checks.jsonl")) if runs_dir.exists() else []
     if not checks:
-        messages.append("[FAIL] M3S03: no watchdog_checks.jsonl found under experiments/runs/")
+        messages.append("[FAIL] M3S04: no watchdog_checks.jsonl found under experiments/runs/")
         ok = False
     else:
         valid_checks = 0
@@ -3592,12 +3636,12 @@ def _check_m3s03_runtime_watchdog(root: Path, *, doc_text: str = "") -> tuple[bo
             check_ok, summary = _jsonl_has_watchdog_event(check)
             if check_ok:
                 valid_checks += 1
-                messages.append(f"[PASS] M3S03: {check.relative_to(root)} has {summary}")
+                messages.append(f"[PASS] M3S04: {check.relative_to(root)} has {summary}")
             else:
-                messages.append(f"[FAIL] M3S03: {check.relative_to(root)} {summary}")
+                messages.append(f"[FAIL] M3S04: {check.relative_to(root)} {summary}")
                 ok = False
         if valid_checks:
-            messages.append(f"[PASS] M3S03: {valid_checks} watchdog check file(s) found")
+            messages.append(f"[PASS] M3S04: {valid_checks} watchdog check file(s) found")
 
     alerts = sorted(runs_dir.rglob("watchdog_alerts.jsonl")) if runs_dir.exists() else []
     nonempty_alerts = [path for path in alerts if _file_has_content(path)]
@@ -3617,18 +3661,18 @@ def _check_m3s03_runtime_watchdog(root: Path, *, doc_text: str = "") -> tuple[bo
                 "回溯",
             ),
         ):
-            messages.append("[FAIL] M3S03: watchdog alerts exist but Agent decision log is missing")
+            messages.append("[FAIL] M3S04: watchdog alerts exist but Agent decision log is missing")
             ok = False
         else:
-            messages.append("[PASS] M3S03: watchdog alerts have Agent decision evidence in main doc")
+            messages.append("[PASS] M3S04: watchdog alerts have Agent decision evidence in main doc")
     else:
-        messages.append("[PASS] M3S03: no nonempty watchdog alert file requiring decision log")
+        messages.append("[PASS] M3S04: no nonempty watchdog alert file requiring decision log")
 
     if _contains_any(doc_text, ("watchdog auto stop", "watchdog auto-stop", "watchdog 自动终止", "脚本自动结束")):
-        messages.append("[FAIL] M3S03: watchdog must not automatically terminate experiments")
+        messages.append("[FAIL] M3S04: watchdog must not automatically terminate experiments")
         ok = False
     else:
-        messages.append("[PASS] M3S03: watchdog policy does not claim automatic termination")
+        messages.append("[PASS] M3S04: watchdog policy does not claim automatic termination")
 
     return ok, messages
 
@@ -3684,23 +3728,23 @@ def _jsonl_has_completion_event(path: Path, run_ids: set[str]) -> tuple[bool, st
     return True, f"{completion_total} completion event marker(s), {completed_for_target} for proposed run(s)"
 
 
-def _check_m3s03_trained_weight_evidence(root: Path, *, doc_text: str = "") -> tuple[bool, list[str]]:
-    """Require final M3S03 results to come from completed trained weights."""
+def _check_m3s04_trained_weight_evidence(root: Path, *, doc_text: str = "") -> tuple[bool, list[str]]:
+    """Require final M3S04 results to come from completed trained weights."""
     messages: list[str] = []
     ok = True
     results = root / "experiments" / "results.tsv"
     if not results.exists():
-        return False, ["[FAIL] M3S03: results.tsv missing, cannot verify trained-weight evidence"]
+        return False, ["[FAIL] M3S04: results.tsv missing, cannot verify trained-weight evidence"]
 
     try:
         import csv
 
         rows = list(csv.DictReader(results.read_text(encoding="utf-8").splitlines(), delimiter="\t"))
     except Exception as exc:
-        return False, [f"[FAIL] M3S03: results.tsv unreadable for trained-weight verification: {exc}"]
+        return False, [f"[FAIL] M3S04: results.tsv unreadable for trained-weight verification: {exc}"]
 
     if not rows:
-        return False, ["[FAIL] M3S03: results.tsv has no rows for trained-weight verification"]
+        return False, ["[FAIL] M3S04: results.tsv has no rows for trained-weight verification"]
 
     proposed_rows: list[dict[str, Any]] = []
     for row in rows:
@@ -3715,7 +3759,7 @@ def _check_m3s03_trained_weight_evidence(root: Path, *, doc_text: str = "") -> t
             proposed_rows.append(row)
 
     if not proposed_rows:
-        messages.append("[FAIL] M3S03: results.tsv has no proposed/ours row for trained-weight verification")
+        messages.append("[FAIL] M3S04: results.tsv has no proposed/ours row for trained-weight verification")
         return False, messages
 
     completed_statuses = {"completed", "succeeded", "success", "finished", "done", "pass", "passed"}
@@ -3733,7 +3777,7 @@ def _check_m3s03_trained_weight_evidence(root: Path, *, doc_text: str = "") -> t
     valid_rows = 0
 
     for idx, row in enumerate(proposed_rows, start=1):
-        row_label = f"M3S03 proposed result row {idx}"
+        row_label = f"M3S04 proposed result row {idx}"
         run_id = _row_first(row, ("run_id", "run", "id"))
         if run_id:
             proposed_run_ids.add(run_id)
@@ -3774,21 +3818,21 @@ def _check_m3s03_trained_weight_evidence(root: Path, *, doc_text: str = "") -> t
         valid_rows += 1
 
     if valid_rows <= 0:
-        messages.append("[FAIL] M3S03: no proposed/ours result row is backed by completed trained weights")
+        messages.append("[FAIL] M3S04: no proposed/ours result row is backed by completed trained weights")
         ok = False
     else:
-        messages.append(f"[PASS] M3S03: {valid_rows} proposed/ours result row(s) use completed trained checkpoints")
+        messages.append(f"[PASS] M3S04: {valid_rows} proposed/ours result row(s) use completed trained checkpoints")
 
     runtime_events = root / "experiments" / "logs" / "runtime_events.jsonl"
     completion_ok, completion_summary = _jsonl_has_completion_event(runtime_events, proposed_run_ids)
     if completion_ok:
-        messages.append(f"[PASS] M3S03: runtime_events.jsonl records training completion ({completion_summary})")
+        messages.append(f"[PASS] M3S04: runtime_events.jsonl records training completion ({completion_summary})")
     else:
-        messages.append(f"[FAIL] M3S03: runtime_events.jsonl lacks completed-training evidence ({completion_summary})")
+        messages.append(f"[FAIL] M3S04: runtime_events.jsonl lacks completed-training evidence ({completion_summary})")
         ok = False
 
     if _contains_any(doc_text, ("random weights as final", "随机权重作为最终", "untrained final", "E0 only", "E0 只用")):
-        messages.append("[FAIL] M3S03: main experiment doc describes random/untrained weights as final evidence")
+        messages.append("[FAIL] M3S04: main experiment doc describes random/untrained weights as final evidence")
         ok = False
 
     return ok, messages
@@ -4241,17 +4285,17 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
         messages.extend(review_msgs)
         ok = ok and review_ok
 
-    # M2S06: Full Experiment Plan
-    if stage == "M2S06":
-        doc = root / "knowledge" / "M2" / "M2S06_full_experiment_plan.md"
+    # M3S01: Main Experiment Design
+    if stage == "M3S01":
+        doc = root / "knowledge" / "M3" / "M3S01_main_experiment_design.md"
         if not doc.exists():
-            messages.append("[FAIL] M2S06: M2S06_full_experiment_plan.md not found")
+            messages.append("[FAIL] M3S01: M3S01_main_experiment_design.md not found")
             ok = False
         else:
             text = doc.read_text(encoding="utf-8")
-            plan_ok, plan_msgs = _check_m2s06_experiment_plan(root, text)
-            messages.extend(plan_msgs)
-            ok = ok and plan_ok
+            design_ok, design_msgs = _check_m3s01_main_experiment_design(root, text)
+            messages.extend(design_msgs)
+            ok = ok and design_ok
         review_ok, review_msgs = _check_stage_reviews(root, stage)
         messages.extend(review_msgs)
         ok = ok and review_ok
@@ -4262,9 +4306,9 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
         with open(path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
 
-    # M3S01: Dataset & Environment Review
-    if stage == "M3S01":
-        doc = root / "knowledge" / "M3" / "M3S01_implementation.md"
+    # M3S02: Dataset & Environment Review
+    if stage == "M3S02":
+        doc = root / "knowledge" / "M3" / "M3S02_implementation.md"
         env_cfg = root / "config" / "execution_env.yaml"
         req_lock = root / "experiments" / "requirements.lock"
         req_txt = root / "experiments" / "requirements.txt"
@@ -4272,92 +4316,92 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
         experiments = root / "experiments"
         execution_mode = ""
         env_data: dict[str, Any] | None = None
-        m3s01_text = ""
+        m3s02_text = ""
 
         if not doc.exists():
-            messages.append("[FAIL] M3S01: M3S01_implementation.md not found")
+            messages.append("[FAIL] M3S02: M3S02_implementation.md not found")
             ok = False
         else:
-            m3s01_text = doc.read_text(encoding="utf-8")
-            if "数据集" not in m3s01_text and "dataset" not in m3s01_text.lower():
-                messages.append("[WARN] M3S01: implementation doc missing dataset review section")
+            m3s02_text = doc.read_text(encoding="utf-8")
+            if "数据集" not in m3s02_text and "dataset" not in m3s02_text.lower():
+                messages.append("[WARN] M3S02: implementation doc missing dataset review section")
             else:
-                messages.append("[PASS] M3S01: dataset review section found")
-            if "环境" not in m3s01_text and "execution_env" not in m3s01_text and "local / ssh" not in m3s01_text:
-                messages.append("[WARN] M3S01: implementation doc missing environment review section")
+                messages.append("[PASS] M3S02: dataset review section found")
+            if "环境" not in m3s02_text and "execution_env" not in m3s02_text and "local / ssh" not in m3s02_text:
+                messages.append("[WARN] M3S02: implementation doc missing environment review section")
             else:
-                messages.append("[PASS] M3S01: environment review section found")
-            if not _contains_any(m3s01_text, ("long-running", "longrun", "long run", "等待策略", "权限", "m3s01_longrun_ledger")):
-                messages.append("[FAIL] M3S01: implementation doc missing long-running execution policy/ledger section")
+                messages.append("[PASS] M3S02: environment review section found")
+            if not _contains_any(m3s02_text, ("long-running", "longrun", "long run", "等待策略", "权限", "m3s02_longrun_ledger")):
+                messages.append("[FAIL] M3S02: implementation doc missing long-running execution policy/ledger section")
                 ok = False
             else:
-                messages.append("[PASS] M3S01: implementation doc includes long-running execution policy/ledger section")
+                messages.append("[PASS] M3S02: implementation doc includes long-running execution policy/ledger section")
 
         if not env_cfg.exists():
-            messages.append("[FAIL] M3S01: config/execution_env.yaml not found")
+            messages.append("[FAIL] M3S02: config/execution_env.yaml not found")
             ok = False
         else:
             try:
                 env_data = _load_yaml(env_cfg)
-                config_ok, config_msgs, execution_mode = _check_m3s01_execution_config(
+                config_ok, config_msgs, execution_mode = _check_m3s02_execution_config(
                     env_data,
-                    doc_text=m3s01_text,
+                    doc_text=m3s02_text,
                 )
                 messages.extend(config_msgs)
                 ok = ok and config_ok
             except Exception as exc:
-                messages.append(f"[FAIL] M3S01: execution_env.yaml unreadable: {exc}")
+                messages.append(f"[FAIL] M3S02: execution_env.yaml unreadable: {exc}")
                 ok = False
 
         sandbox_ok, sandbox_msgs = _check_experiment_sandbox_profile(root, env_data=env_data)
         messages.extend(sandbox_msgs)
         ok = ok and sandbox_ok
 
-        resource_ok, resource_msgs = _check_m3s01_resource_plan(
+        resource_ok, resource_msgs = _check_m3s02_resource_plan(
             root,
             env_data=env_data,
-            doc_text=m3s01_text,
+            doc_text=m3s02_text,
         )
         messages.extend(resource_msgs)
         ok = ok and resource_ok
 
         if not req_lock.exists() and not req_txt.exists():
-            messages.append("[FAIL] M3S01: requirements.lock / requirements.txt not found")
+            messages.append("[FAIL] M3S02: requirements.lock / requirements.txt not found")
             ok = False
         elif req_lock.exists():
-            messages.append("[PASS] M3S01: requirements.lock exists")
+            messages.append("[PASS] M3S02: requirements.lock exists")
         else:
-            messages.append("[WARN] M3S01: requirements.lock missing, requirements.txt used as fallback")
+            messages.append("[WARN] M3S02: requirements.lock missing, requirements.txt used as fallback")
 
-        dataset_pending = root / "knowledge" / "M3" / "M3S01_dataset_pending.md"
+        dataset_pending = root / "knowledge" / "M3" / "M3S02_dataset_pending.md"
         if dataset_pending.exists():
-            messages.append("[FAIL] M3S01: dataset pending report exists; data acquisition is not complete")
+            messages.append("[FAIL] M3S02: dataset pending report exists; data acquisition is not complete")
             ok = False
 
         if not data_dir.exists():
-            messages.append("[FAIL] M3S01: experiments/data/ not found")
+            messages.append("[FAIL] M3S02: experiments/data/ not found")
             ok = False
         else:
             dataset_entries = [p for p in data_dir.iterdir() if p.exists()]
             if len(dataset_entries) == 0:
-                messages.append("[FAIL] M3S01: experiments/data/ is empty")
+                messages.append("[FAIL] M3S02: experiments/data/ is empty")
                 ok = False
             else:
-                messages.append(f"[PASS] M3S01: dataset directory prepared ({len(dataset_entries)} entries)")
+                messages.append(f"[PASS] M3S02: dataset directory prepared ({len(dataset_entries)} entries)")
 
         code_files = list(experiments.rglob("*.py"))
         if len(code_files) < 1:
-            messages.append("[FAIL] M3S01: No Python code files found in experiments/")
+            messages.append("[FAIL] M3S02: No Python code files found in experiments/")
             ok = False
         else:
             total_lines = sum(len(f.read_text(encoding="utf-8").splitlines()) for f in code_files)
             if total_lines < 20:
-                messages.append(f"[FAIL] M3S01: Total code lines < 20 ({total_lines})")
+                messages.append(f"[FAIL] M3S02: Total code lines < 20 ({total_lines})")
                 ok = False
             else:
-                messages.append(f"[PASS] M3S01: {len(code_files)} code files, {total_lines} lines")
+                messages.append(f"[PASS] M3S02: {len(code_files)} code files, {total_lines} lines")
 
-        longrun_ok, longrun_msgs = _check_m3s01_longrun_ledger(root, execution_mode)
+        longrun_ok, longrun_msgs = _check_m3s02_longrun_ledger(root, execution_mode)
         messages.extend(longrun_msgs)
         ok = ok and longrun_ok
 
@@ -4365,43 +4409,43 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
         messages.extend(review_msgs)
         ok = ok and review_ok
 
-    # M3S02: Baseline Result Review
-    if stage == "M3S02":
-        baseline_doc = root / "knowledge" / "M3" / "M3S02_baseline_lock.md"
+    # M3S03: Baseline Result Review
+    if stage == "M3S03":
+        baseline_doc = root / "knowledge" / "M3" / "M3S03_baseline_lock.md"
         baseline_contracts = list((root / "experiments" / "baselines").rglob("metric_contract.yaml")) if (root / "experiments" / "baselines").exists() else []
         if not baseline_doc.exists():
-            messages.append("[FAIL] M3S02: M3S02_baseline_lock.md not found")
+            messages.append("[FAIL] M3S03: M3S03_baseline_lock.md not found")
             ok = False
         else:
             text = baseline_doc.read_text(encoding="utf-8")
             if "baseline" not in text.lower() and "基线" not in text:
-                messages.append("[FAIL] M3S02: baseline document missing baseline-result review cues")
+                messages.append("[FAIL] M3S03: baseline document missing baseline-result review cues")
                 ok = False
             else:
-                messages.append("[PASS] M3S02: baseline result review document found")
+                messages.append("[PASS] M3S03: baseline result review document found")
             if not any(term in text for term in ["### Baseline 1", "Baseline 1:", "### Baseline-1", "Baseline-1"]):
-                messages.append("[FAIL] M3S02: baseline review missing at least one baseline subsection")
+                messages.append("[FAIL] M3S03: baseline review missing at least one baseline subsection")
                 ok = False
             else:
-                messages.append("[PASS] M3S02: baseline subsection found")
+                messages.append("[PASS] M3S03: baseline subsection found")
             if not any(token in text for token in ["attach", "import", "verify-local-existing", "reproduce", "repair"]):
-                messages.append("[FAIL] M3S02: baseline verification path not recorded")
+                messages.append("[FAIL] M3S03: baseline verification path not recorded")
                 ok = False
             else:
-                messages.append("[PASS] M3S02: baseline verification path recorded")
+                messages.append("[PASS] M3S03: baseline verification path recorded")
             if "Smoke Test" not in text and "smoke" not in text.lower():
-                messages.append("[FAIL] M3S02: smoke test section not found")
+                messages.append("[FAIL] M3S03: smoke test section not found")
                 ok = False
             else:
-                messages.append("[PASS] M3S02: smoke test section found")
+                messages.append("[PASS] M3S03: smoke test section found")
         if len(baseline_contracts) < 1:
-            messages.append("[FAIL] M3S02: No baseline metric_contract.yaml found")
+            messages.append("[FAIL] M3S03: No baseline metric_contract.yaml found")
             ok = False
         else:
             verified = 0
             registry_ok, registry_msgs, protocols_by_id = _load_m2_metric_protocol_registry(root)
             messages.extend(
-                f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S02 contract upstream: {msg.split('] ', 1)[1]}"
+                f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S03 contract upstream: {msg.split('] ', 1)[1]}"
                 if msg.startswith("[") and "] " in msg
                 else msg
                 for msg in registry_msgs
@@ -4411,18 +4455,18 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 try:
                     data = _load_yaml(contract)
                 except Exception as exc:
-                    messages.append(f"[FAIL] M3S02: unreadable contract {contract}: {exc}")
+                    messages.append(f"[FAIL] M3S03: unreadable contract {contract}: {exc}")
                     ok = False
                     continue
                 verdict = str(data.get("verification_verdict", "")).lower()
                 primary = data.get("metrics", {}).get("primary", {})
                 if not primary.get("key") or primary.get("value") is None:
-                    messages.append(f"[FAIL] M3S02: incomplete primary metric in {contract}")
+                    messages.append(f"[FAIL] M3S03: incomplete primary metric in {contract}")
                     ok = False
                     continue
-                metric_ok, metric_msgs = _check_m3s02_metric_protocol_alignment(
+                metric_ok, metric_msgs = _check_m3s03_metric_protocol_alignment(
                     root,
-                    f"M3S02 metric_contract[{contract.relative_to(root)}]",
+                    f"M3S03 metric_contract[{contract.relative_to(root)}]",
                     data,
                     protocols_by_id,
                     eligible=True,
@@ -4433,17 +4477,17 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 if verdict in {"verified_match", "verified_close", "trusted_with_caveats"}:
                     verified += 1
                 elif verdict == "diverged":
-                    messages.append(f"[FAIL] M3S02: diverged baseline contract: {contract}")
+                    messages.append(f"[FAIL] M3S03: diverged baseline contract: {contract}")
                     ok = False
                 else:
-                    messages.append(f"[WARN] M3S02: unknown verification verdict in {contract}: {verdict or 'unset'}")
+                    messages.append(f"[WARN] M3S03: unknown verification verdict in {contract}: {verdict or 'unset'}")
             if verified < 1:
-                messages.append("[FAIL] M3S02: No verified baseline contract found")
+                messages.append("[FAIL] M3S03: No verified baseline contract found")
                 ok = False
             else:
-                messages.append(f"[PASS] M3S02: {verified} verified baseline contract(s) found")
+                messages.append(f"[PASS] M3S03: {verified} verified baseline contract(s) found")
 
-        lock_ok, lock_msgs = _check_m3s02_baseline_lock_manifest(root, baseline_contracts)
+        lock_ok, lock_msgs = _check_m3s03_baseline_lock_manifest(root, baseline_contracts)
         messages.extend(lock_msgs)
         ok = ok and lock_ok
 
@@ -4451,13 +4495,13 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
         messages.extend(review_msgs)
         ok = ok and review_ok
 
-    # M3S03: Main Experiment Result Review
-    if stage == "M3S03":
-        main_doc = root / "knowledge" / "M3" / "M3S03_main_experiment.md"
+    # M3S04: Main Experiment Result Review
+    if stage == "M3S04":
+        main_doc = root / "knowledge" / "M3" / "M3S04_main_experiment.md"
         results = root / "experiments" / "results.tsv"
         runs_dir = root / "experiments" / "runs"
         if not main_doc.exists():
-            messages.append("[FAIL] M3S03: M3S03_main_experiment.md not found")
+            messages.append("[FAIL] M3S04: M3S04_main_experiment.md not found")
             ok = False
         else:
             text = main_doc.read_text(encoding="utf-8")
@@ -4469,41 +4513,41 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
             ]
             for marker in required_sections:
                 if marker not in text:
-                    messages.append(f"[FAIL] M3S03: main experiment doc missing section marker: {marker}")
+                    messages.append(f"[FAIL] M3S04: main experiment doc missing section marker: {marker}")
                     ok = False
                 else:
-                    messages.append(f"[PASS] M3S03: main experiment doc includes {marker}")
+                    messages.append(f"[PASS] M3S04: main experiment doc includes {marker}")
 
-            resource_ok, resource_msgs = _check_m3s03_resource_execution(root, doc_text=text)
+            resource_ok, resource_msgs = _check_m3s04_resource_execution(root, doc_text=text)
             messages.extend(resource_msgs)
             ok = ok and resource_ok
 
-            watchdog_ok, watchdog_msgs = _check_m3s03_runtime_watchdog(root, doc_text=text)
+            watchdog_ok, watchdog_msgs = _check_m3s04_runtime_watchdog(root, doc_text=text)
             messages.extend(watchdog_msgs)
             ok = ok and watchdog_ok
 
-            trained_ok, trained_msgs = _check_m3s03_trained_weight_evidence(root, doc_text=text)
+            trained_ok, trained_msgs = _check_m3s04_trained_weight_evidence(root, doc_text=text)
             messages.extend(trained_msgs)
             ok = ok and trained_ok
 
         if not runs_dir.exists():
-            messages.append("[FAIL] M3S03: experiments/runs/ not found")
+            messages.append("[FAIL] M3S04: experiments/runs/ not found")
             ok = False
         else:
             run_entries = [p for p in runs_dir.iterdir() if p.exists()]
             if len(run_entries) < 1:
-                messages.append("[FAIL] M3S03: experiments/runs/ is empty")
+                messages.append("[FAIL] M3S04: experiments/runs/ is empty")
                 ok = False
             else:
-                messages.append(f"[PASS] M3S03: experiments/runs/ contains {len(run_entries)} entries")
+                messages.append(f"[PASS] M3S04: experiments/runs/ contains {len(run_entries)} entries")
 
         if not results.exists():
-            messages.append("[FAIL] M3S03: experiments/results.tsv not found")
+            messages.append("[FAIL] M3S04: experiments/results.tsv not found")
             ok = False
         else:
             lines = [line for line in results.read_text(encoding="utf-8").splitlines() if line.strip()]
             if len(lines) < 2:
-                messages.append("[FAIL] M3S03: results.tsv has no data rows")
+                messages.append("[FAIL] M3S04: results.tsv has no data rows")
                 ok = False
             else:
                 try:
@@ -4512,7 +4556,7 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                     rows = list(csv.DictReader(lines, delimiter="\t"))
                     seed_keys = [key for key in (rows[0].keys() if rows else []) if str(key).lower() in {"seed", "random_seed", "rng_seed"}]
                     if not seed_keys:
-                        messages.append("[FAIL] M3S03: results.tsv missing seed column")
+                        messages.append("[FAIL] M3S04: results.tsv missing seed column")
                         ok = False
                     else:
                         seed_key = seed_keys[0]
@@ -4523,10 +4567,10 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                         }
                         seed_values = {s for s in seed_values if s.lower() not in {"mean", "std", "mean±std", "mean/std"}}
                         if "42" not in seed_values:
-                            messages.append("[FAIL] M3S03: results.tsv must use fixed seed 42")
+                            messages.append("[FAIL] M3S04: results.tsv must use fixed seed 42")
                             ok = False
                         else:
-                            messages.append("[PASS] M3S03: results.tsv records fixed seed 42")
+                            messages.append("[PASS] M3S04: results.tsv records fixed seed 42")
                     plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
                     if plan_path.exists():
                         try:
@@ -4541,32 +4585,32 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                             missing_resource_headers = sorted(resource_headers - headers)
                             if missing_resource_headers:
                                 messages.append(
-                                    "[FAIL] M3S03: multi-resource results.tsv missing columns: "
+                                    "[FAIL] M3S04: multi-resource results.tsv missing columns: "
                                     + ", ".join(missing_resource_headers)
                                 )
                                 ok = False
                             else:
-                                messages.append("[PASS] M3S03: results.tsv includes multi-resource columns")
+                                messages.append("[PASS] M3S04: results.tsv includes multi-resource columns")
                 except Exception as exc:
-                    messages.append(f"[FAIL] M3S03: results.tsv seed parsing failed: {exc}")
+                    messages.append(f"[FAIL] M3S04: results.tsv seed parsing failed: {exc}")
                     ok = False
                 text = "\n".join(lines).lower()
                 if "baseline" not in text:
-                    messages.append("[FAIL] M3S03: results.tsv missing baseline comparison rows")
+                    messages.append("[FAIL] M3S04: results.tsv missing baseline comparison rows")
                     ok = False
                 else:
-                    messages.append("[PASS] M3S03: baseline comparison rows found")
+                    messages.append("[PASS] M3S04: baseline comparison rows found")
                 if "ours" not in text and "proposed" not in text:
-                    messages.append("[FAIL] M3S03: results.tsv missing our-method row")
+                    messages.append("[FAIL] M3S04: results.tsv missing our-method row")
                     ok = False
                 else:
-                    messages.append("[PASS] M3S03: our-method row found")
+                    messages.append("[PASS] M3S04: our-method row found")
                 if "42" not in text:
-                    messages.append("[FAIL] M3S03: results.tsv missing fixed seed 42 evidence")
+                    messages.append("[FAIL] M3S04: results.tsv missing fixed seed 42 evidence")
                     ok = False
                 else:
-                    messages.append("[PASS] M3S03: fixed seed 42 evidence found")
-                messages.append("[PASS] M3S03: results.tsv exists")
+                    messages.append("[PASS] M3S04: fixed seed 42 evidence found")
+                messages.append("[PASS] M3S04: results.tsv exists")
 
         review_ok, review_msgs = _check_stage_reviews(root, stage)
         messages.extend(review_msgs)
@@ -4731,7 +4775,7 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 "how target": ("how", "怎么", "机制如何", "如何"),
                 "where target": ("where", "哪里", "条件", "场景", "边界"),
                 "why target": ("why", "为什么", "原因", "mechanism"),
-                "upstream M2/M3 basis": ("M2", "M2S05", "M2S06", "M3", "M3S04", "handoff_M3_M4"),
+                "upstream M2/M3 basis": ("M2", "M2S05", "M3S01", "M3", "M3S05", "handoff_M3_M4"),
                 "comparison target": ("comparison_target", "比较对象", "comparison target"),
                 "expected pattern": ("expected_pattern", "预期模式", "expected pattern"),
                 "claim links": ("claim_links", "Claim", "claim"),
@@ -4896,11 +4940,14 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
         messages.extend(review_msgs)
         ok = ok and review_ok
 
-    # M3S04: Result Validation
-    if stage == "M3S04":
-        m3s04_ok, m3s04_msgs = _check_m3s04_result_validation(root)
-        messages.extend(m3s04_msgs)
-        ok = ok and m3s04_ok
+    # M3S05: Result Validation
+    if stage == "M3S05":
+        m3s05_ok, m3s05_msgs = _check_m3s05_result_validation(root)
+        messages.extend(m3s05_msgs)
+        ok = ok and m3s05_ok
+        review_ok, review_msgs = _check_stage_reviews(root, stage)
+        messages.extend(review_msgs)
+        ok = ok and review_ok
 
     # M4S04: Analysis Results Integration
     if stage == "M4S04":

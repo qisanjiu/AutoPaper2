@@ -78,7 +78,7 @@ python scripts/ssh_manager.py sync pull --project <project>
 1. 使用 `lease alloc-pool` 分配多个 active lease。
 2. `--apply` 必须写入项目 `execution.resource_optimization.resource_pool.resources`，并生成 `{project}/state/ssh_resource_pool.yaml`。
 3. 默认 `include_local: true`，除非用户明确要求 remote-only。
-4. SSH Ops 只准备资源池和同步能力；M3S03/M4S03 的 task queue、task allocation、实验运行和结果判断必须由 Experiment Agent 完成。
+4. SSH Ops 只准备资源池和同步能力；M3S04/M4S03 的 task queue、task allocation、实验运行和结果判断必须由 Experiment Agent 完成。
 5. 返回结果必须列出所有 `server_id`、`lease_id`、workspace、dataset_path、GPU/CPU capacity 和需要同步的路径。
 
 ### 3.2 健康检查
@@ -107,7 +107,7 @@ python scripts/ssh_manager.py sync pull --project <project>
 - 禁止把密码、私钥内容、API key、token 写入 registry、lease、event log 或 stage 文档。
 - 密码只允许作为 `bootstrap-key` 的一次性输入，用于 `ssh-copy-id` 推送公钥；完成后必须丢弃。
 - 禁止直接修改 `knowledge/M*/`、`drafts/`、`knowledge/reviews/`、`artifacts/paper.*`。
-- 禁止用 SSH Agent 的成功结果替代 M3S01/M3S03 的实验执行证据。
+- 禁止用 SSH Agent 的成功结果替代 M3S02/M3S04 的实验执行证据。
 - 禁止在服务器未分配租约时让项目直接占用远程 workspace。
 - 禁止租约过期后继续推进 M3/M4 远程实验。
 

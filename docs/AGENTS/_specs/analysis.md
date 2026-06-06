@@ -1,7 +1,7 @@
 # Analysis Agent Compact Spec
 
 ## Stages
-- `M3S04 Result Validation`: verify result integrity, seed limitations, data quality, stopping reason, evidence level, and final decision `KEEP|FIX|BACKTRACK` with repair fields when needed.
+- `M3S05 Result Validation`: verify result integrity, seed limitations, data quality, stopping reason, evidence level, and final decision `KEEP|FIX|BACKTRACK` with repair fields when needed.
 - `M4S01 Findings Audit`: consolidate main results, negative/partial findings, unexpected observations, claim candidates, and analysis campaign draft.
 - `M4S02 Deep Analysis Design`: design ablation, mechanism, robustness/boundary, failure, and efficiency slices. Each claim-carrying slice needs baseline inclusion or explicit waiver and literature/database basis. Also write `experiments/configs/m4_task_queue.yaml` so M4S03 can execute the plan without redesign.
 - `M4S04 Analysis Results`: integrate M4S03 evidence into claim ledger, insight articulation, evidence usability, limitations, and downstream writing guidance.

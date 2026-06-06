@@ -36,7 +36,7 @@
 |------|---------|--------|
 | M1 | `knowledge/M1/M1S02_literature_deepdive.md` | 文献调研完整 |
 | M2 | `knowledge/M2/M2S03_method_architecture.md`, `M2S04_algorithm_theory.md` | 方法设计完整 |
-| M3 | `knowledge/M3/M3S03_main_experiment.md`, `M3S04_result_validation.md` | 实验完整 |
+| M3 | `knowledge/M3/M3S04_main_experiment.md`, `M3S05_result_validation.md` | 实验完整 |
 | M4 | `knowledge/M4/M4S04_analysis_results.md` | 分析完整 |
 | M5 | `artifacts/paper.pdf`, `artifacts/paper.tex`, `artifacts/refs.bib` | 论文完整 |
 | Handoff | `knowledge/handoff_M5_completion.md` | 交接文档完整 |

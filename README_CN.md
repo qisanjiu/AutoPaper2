@@ -109,18 +109,20 @@ AutoPaper2 是一个结构化、Agent 辅助的论文生产框架。它不是把
 | `M2S03` | 方法架构设计。 |
 | `M2S04` | 算法与理论设计。 |
 | `M2S05` | 实验设置设计：数据集、指标、基线、公平对比规则。 |
-| `M2S06` | 完整实验计划与 M2 到 M3 handoff。 |
 
-**Gate G2** 检查逻辑、方法可靠性、新颖性和实验计划可执行性。
+**Gate G2** 检查逻辑、方法可靠性、新颖性和实验设置可执行性。
 
 ### M3 - 实验实现与执行
 
 | Stage | 说明 |
 |-------|------|
-| `M3S01` | 数据集与环境搭建。 |
-| `M3S02` | 基线锁定与 smoke tests。 |
-| `M3S03` | 主实验执行。 |
-| `M3S04` | 结果验证、证据打包与 M3 到 M4 handoff。 |
+| `M3S01` | 主实验设计：数据集、指标、baseline 参考数值和同条件实验协议。 |
+| `M3S02` | 数据集与环境搭建。 |
+| `M3S03` | 基线锁定与 smoke tests。 |
+| `M3S04` | 主实验执行。 |
+| `M3S05` | 结果验证、证据打包与 M3 到 M4 handoff。 |
+
+M3 每个 stage 都有独立的针对性 Stage Reviewer：`m3_main_experiment_design_review`、`m3_dataset_env_review`、`m3_baseline_result_review` 与 `m3_baseline_lock_audit`、`m3_main_result_review`、`m3_result_validation_review`。M3 不允许依赖统一泛化 reviewer 推进。
 
 **Gate G3** 检查方法实现、基线公平性、结果有效性和证据充分性。
 
@@ -230,10 +232,10 @@ python scripts/orchestrator_guard.py projects/<project> <target_path>
 结构化回溯示例：
 
 ```bash
-python scripts/state_manager.py backtrack M3S04 M3S02 \
+python scripts/state_manager.py backtrack M3S05 M3S03 \
   "baseline protocol mismatch" \
   --required-fix "Re-lock baselines using the M2S05 metric contract" \
-  --success-criteria "M3S02 reports runnable baselines, seeds, metrics, and artifact paths" \
+  --success-criteria "M3S03 reports runnable baselines, seeds, metrics, and artifact paths" \
   --rebuild-mode full_regenerate \
   --evidence-paths knowledge/M2/M2S05_experiment_setup.md,experiments/results.tsv
 ```

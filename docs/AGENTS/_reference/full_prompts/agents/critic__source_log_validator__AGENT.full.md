@@ -197,7 +197,7 @@ gap_solution_map:
 
 ## 5. 与 Stage Gate 的协作
 
-Source Log Validator 是 `check_stage()` 在 M1S02 / M2S06 时自动调用的子检查之一：
+Source Log Validator 是 `check_stage()` 在 M1S02 / M3S01 时自动调用的子检查之一：
 
 ```
 advance M1S02

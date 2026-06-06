@@ -16,7 +16,7 @@
 - 执行结果是否与 M4S02 的设计一致
 - 负面结果和失败是否被诚实记录
 - 结果数据是否完整、可追溯到原始日志
-- 每个分析 slice 是否在 M3S01 建立的 sandbox/container profile 下运行，且没有越界写文件、联网或泄露凭证
+- 每个分析 slice 是否在 M3S02 建立的 sandbox/container profile 下运行，且没有越界写文件、联网或泄露凭证
 
 ---
 
@@ -89,7 +89,7 @@
 
 ### 说明
 - `stage_in_fix`: 执行侧可修复，通常是日志、参数、路径、artifact、漏跑或轻微脚本问题。
-- `stage_out_backtrack`: 设计或上游结果有根本问题，需要回溯到 M4S02 / M4S01 / M3S03 / M3S02。
+- `stage_out_backtrack`: 设计或上游结果有根本问题，需要回溯到 M4S02 / M4S01 / M3S04 / M3S03。
 - `continue`: 结果可接受，且没有新的结构性异常。
 
 ## 执行覆盖检查
@@ -158,4 +158,4 @@ PASS / REVISE / BACKTRACK
 ## 5. 回溯建议质量要求
 - 如果只是运行日志、artifact 路径或少量结果缺失，优先 M4S03 内修复。
 - 如果执行结果与设计不一致，且问题来自设计本身或 baseline/metric contract 错误，应回溯到 M4S02。
-- 如果异常显示上游主实验或 baseline 本身就不可信，应把证据链写出来，再决定是否回溯到 M3S03 / M3S02。
+- 如果异常显示上游主实验或 baseline 本身就不可信，应把证据链写出来，再决定是否回溯到 M3S04 / M3S03。

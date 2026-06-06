@@ -26,10 +26,11 @@ STAGE_CHECKERS = {
     "M2S03": ["m2_design_review"],
     "M2S04": ["m2_design_review"],
     "M2S05": ["m2_experiment_design_review"],
-    "M2S06": ["m2_experiment_plan_review"],
-    "M3S01": ["m3_dataset_env_review"],
-    "M3S02": ["m3_baseline_result_review", "m3_baseline_lock_audit"],
-    "M3S03": ["m3_main_result_review"],
+    "M3S01": ["m3_main_experiment_design_review"],
+    "M3S02": ["m3_dataset_env_review"],
+    "M3S03": ["m3_baseline_result_review", "m3_baseline_lock_audit"],
+    "M3S04": ["m3_main_result_review"],
+    "M3S05": ["m3_result_validation_review"],
     # M4: stage-level reviews
     "M4S01": ["m4_findings_audit"],
     "M4S02": ["m4_analysis_design_review", "m4_execution_readiness_review"],
@@ -219,12 +220,13 @@ class Conductor:
             "m2_migration": "critic/m2_migration/AGENT.md",
             "m2_design_review": "critic/m2_design_review/AGENT.md",
             "m2_experiment_design_review": "critic/m2_experiment_design_review/AGENT.md",
-            "m2_experiment_plan_review": "critic/m2_experiment_plan_review/AGENT.md",
             # M3 stage-level reviews
+            "m3_main_experiment_design_review": "critic/m3_main_experiment_design_review/AGENT.md",
             "m3_dataset_env_review": "critic/m3_dataset_env_review/AGENT.md",
             "m3_baseline_result_review": "critic/m3_baseline_result_review/AGENT.md",
             "m3_baseline_lock_audit": "critic/m3_baseline_lock_audit/AGENT.md",
             "m3_main_result_review": "critic/m3_main_result_review/AGENT.md",
+            "m3_result_validation_review": "critic/m3_result_validation_review/AGENT.md",
             # M4 stage-level reviews
             "m4_findings_audit": "critic/m4_findings_audit/AGENT.md",
             "m4_analysis_design_review": "critic/m4_analysis_design_review/AGENT.md",
@@ -734,7 +736,7 @@ class Conductor:
                     gate_num = int(gate_id[1:])
                     mod = f"M{gate_num}"
                     if gate_id == "G3":
-                        target = "M3S02"
+                        target = "M3S03"
                     else:
                         target = self.get_first_stage_of_module(mod) or "M1S01"
                 result = self.backtrack(

@@ -52,7 +52,7 @@ class TestM3StageGate(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def _write_m3s01_files(
+    def _write_m3s02_files(
         self,
         *,
         include_ledger: bool = True,
@@ -86,15 +86,15 @@ class TestM3StageGate(unittest.TestCase):
             env_sentence = "`config/execution_env.yaml` uses local mode with an isolated venv.\n\n"
             sandbox_mode = "venv"
 
-        (self.root / "knowledge" / "M3" / "M3S01_implementation.md").write_text(
-            "# M3S01 Implementation\n\n"
+        (self.root / "knowledge" / "M3" / "M3S02_implementation.md").write_text(
+            "# M3S02 Implementation\n\n"
             "## Dataset Review\n"
             "The real dataset is linked under `experiments/data/demo`.\n\n"
             "## 环境 Review\n"
             f"{env_sentence}"
             "## Long-running execution policy\n"
             "Long-running downloads and smoke runs are recorded in "
-            "`experiments/logs/m3s01_longrun_ledger.md` with patience, permission, and resume evidence.\n\n"
+            "`experiments/logs/m3s02_longrun_ledger.md` with patience, permission, and resume evidence.\n\n"
             "## Resource utilization plan\n"
             "`experiments/configs/resource_plan.yaml` records local/ssh hardware allocation, "
             "DDP or task_parallel strategy, dataloader workers, launch command, and utilization thresholds.\n",
@@ -248,8 +248,8 @@ class TestM3StageGate(unittest.TestCase):
         (self.root / "experiments" / "requirements.lock").write_text("numpy==1.26.4\n", encoding="utf-8")
         (self.root / "experiments" / "data" / "demo" / "values.txt").write_text("1\n2\n3\n", encoding="utf-8")
         (self.root / "experiments" / "src" / "train.py").write_text(_code_with_enough_lines(), encoding="utf-8")
-        (self.root / "knowledge" / "reviews" / "M3S01_dataset_env_review.md").write_text(
-            "# M3S01 Dataset & Environment Review\n\nVerdict: PASS\n",
+        (self.root / "knowledge" / "reviews" / "M3S02_dataset_env_review.md").write_text(
+            "# M3S02 Dataset & Environment Review\n\nVerdict: PASS\n",
             encoding="utf-8",
         )
         if include_ledger:
@@ -263,8 +263,8 @@ class TestM3StageGate(unittest.TestCase):
                     "| dataset: demo | local | `wget -c https://example.test/demo.zip` | completed | `experiments/logs/demo_download.log` | timeout=12h; poll_interval=30m; last_checked=2026-05-23T10:00:00 | `wget -c https://example.test/demo.zip` | none | checksum passed |\n"
                     "| smoke: import | local | `python experiments/src/train.py` | completed | `experiments/logs/import_smoke.log` | timeout=30m; poll_interval=5m | `python experiments/src/train.py` | none | import test passed |\n"
                 )
-            (self.root / "experiments" / "logs" / "m3s01_longrun_ledger.md").write_text(
-                "# M3S01 Long-Running Execution Ledger\n\n"
+            (self.root / "experiments" / "logs" / "m3s02_longrun_ledger.md").write_text(
+                "# M3S02 Long-Running Execution Ledger\n\n"
                 "| Item | Execution mode | Command | Status | Log path | Patience / polling | Resume command | Permission / approval | Completion criteria |\n"
                 "|------|----------------|---------|--------|----------|--------------------|----------------|-----------------------|--------------------|\n"
                 f"{ledger_rows}",
@@ -289,11 +289,11 @@ class TestM3StageGate(unittest.TestCase):
                     encoding="utf-8",
                 )
 
-    def _write_m3s02_files(
+    def _write_m3s03_files(
         self,
         *,
         include_lock: bool = True,
-        m3s03_eligible: bool = True,
+        m3s04_eligible: bool = True,
         source: str = "verify-local-existing",
         comparator_type: str = "external_prior_work",
         ablation_of_ours: bool = False,
@@ -370,8 +370,8 @@ class TestM3StageGate(unittest.TestCase):
             else (local_value - paper_value) / abs(paper_value if abs(paper_value) > 1e-12 else 1.0)
         )
 
-        (self.root / "knowledge" / "M3" / "M3S02_baseline_lock.md").write_text(
-            "# M3S02 Baseline Lock\n\n"
+        (self.root / "knowledge" / "M3" / "M3S03_baseline_lock.md").write_text(
+            "# M3S03 Baseline Lock\n\n"
             "### Baseline 1\n"
             f"Verification path: {source}.\n"
             f"verification_verdict: {verification_verdict}.\n"
@@ -462,7 +462,7 @@ class TestM3StageGate(unittest.TestCase):
                 f"      status: {metric_validation_status}\n"
                 "      evidence_path: experiments/baselines/baseline_1/logs/metric_sanity.log\n"
                 f"    verification_verdict: {verification_verdict}\n"
-                f"    m3s03_eligible: {'true' if m3s03_eligible else 'false'}\n"
+                f"    m3s04_eligible: {'true' if m3s04_eligible else 'false'}\n"
                 f"    caveat_waiver_reason: \"{caveat_waiver_reason}\"\n"
                 f"    comparison_scope_limit: \"{comparison_scope_limit}\"\n"
                 "    checkpoint:\n"
@@ -475,7 +475,7 @@ class TestM3StageGate(unittest.TestCase):
                 "      search_attempts:\n"
                 f"        - official_release: {'attempted' if checkpoint_required else 'not_applicable'}\n"
                 f"        - huggingface: {'attempted' if checkpoint_required else 'not_applicable'}\n"
-                "m3s03_contract:\n"
+                "m3s04_contract:\n"
                 "  primary_baseline_id: baseline_1\n"
                 "  metric_contract: experiments/baselines/baseline_1/metric_contract.yaml\n"
                 "  dataset: demo\n"
@@ -485,22 +485,22 @@ class TestM3StageGate(unittest.TestCase):
                 f"  metric_protocol_id: {metric_protocol_id}\n",
                 encoding="utf-8",
             )
-        (self.root / "knowledge" / "reviews" / "M3S02_baseline_result_review.md").write_text(
-            "# M3S02 Baseline Result Review\n\nVerdict: PASS\n",
+        (self.root / "knowledge" / "reviews" / "M3S03_baseline_result_review.md").write_text(
+            "# M3S03 Baseline Result Review\n\nVerdict: PASS\n",
             encoding="utf-8",
         )
-        (self.root / "knowledge" / "reviews" / "M3S02_baseline_lock_audit.md").write_text(
-            "# M3S02 Baseline Lock Audit\n\nVerdict: PASS\n",
+        (self.root / "knowledge" / "reviews" / "M3S03_baseline_lock_audit.md").write_text(
+            "# M3S03 Baseline Lock Audit\n\nVerdict: PASS\n",
             encoding="utf-8",
         )
 
-    def _write_m3s04_report(self, *, decision: str = "KEEP", complete: bool = True) -> None:
+    def _write_m3s05_report(self, *, decision: str = "KEEP", complete: bool = True) -> None:
         (self.root / "knowledge" / "M3").mkdir(parents=True, exist_ok=True)
         if not complete:
-            text = f"# M3S04 Result Validation\n\nDecision: {decision}\n"
+            text = f"# M3S05 Result Validation\n\nDecision: {decision}\n"
         else:
             text = (
-                "# M3S04 Result Validation\n\n"
+                "# M3S05 Result Validation\n\n"
                 "## 实验停止原因\n"
                 "停止条件: budget complete. 当前 best 指标: accuracy=0.803. Evidence Ladder: solid.\n\n"
                 "## 数据质量检查\n"
@@ -526,9 +526,16 @@ class TestM3StageGate(unittest.TestCase):
                 "## 传递给下游的信息\n"
                 "M4 analysis direction: 消融 ablation, 鲁棒 robustness, 机制 mechanism; handoff required.\n"
             )
-        (self.root / "knowledge" / "M3" / "M3S04_result_validation.md").write_text(text, encoding="utf-8")
+        (self.root / "knowledge" / "M3" / "M3S05_result_validation.md").write_text(text, encoding="utf-8")
 
-    def _write_m3s03_files(
+    def _write_m3s05_review(self, *, verdict: str = "PASS") -> None:
+        (self.root / "knowledge" / "reviews").mkdir(parents=True, exist_ok=True)
+        (self.root / "knowledge" / "reviews" / "M3S05_result_validation_review.md").write_text(
+            f"# M3S05 Result Validation Review\n\nVerdict: {verdict}\n",
+            encoding="utf-8",
+        )
+
+    def _write_m3s04_files(
         self,
         *,
         include_monitor: bool = True,
@@ -546,8 +553,8 @@ class TestM3StageGate(unittest.TestCase):
             (self.root / rel).mkdir(parents=True, exist_ok=True)
 
         strategy_text = "DDP torchrun" if multi_gpu else "cpu_parallel task_parallel"
-        (self.root / "knowledge" / "M3" / "M3S03_main_experiment.md").write_text(
-            "# M3S03 Main Experiment\n\n"
+        (self.root / "knowledge" / "M3" / "M3S04_main_experiment.md").write_text(
+            "# M3S04 Main Experiment\n\n"
             "## Run Contract\n"
             "Resource Plan: `experiments/configs/resource_plan.yaml`.\n\n"
             "## 实验环境\n"
@@ -642,10 +649,10 @@ class TestM3StageGate(unittest.TestCase):
             )
         if include_watchdog:
             watchdog_event = (
-                '{"timestamp":"2026-05-29T12:00:00","stage":"M3S03","event_type":"watchdog_check",'
+                '{"timestamp":"2026-05-29T12:00:00","stage":"M3S04","event_type":"watchdog_check",'
                 '"run_id":"run_001","severity":"info","decision_required":false,'
                 '"agent_action_policy":"record_alert_only_agent_decides_continue_fix_or_stop","signals":[]}\n'
-                '{"timestamp":"2026-05-29T12:30:00","stage":"M3S03","event_type":"training_completed",'
+                '{"timestamp":"2026-05-29T12:30:00","stage":"M3S04","event_type":"training_completed",'
                 '"run_id":"run_001","status":"completed","checkpoint_path":"experiments/runs/run_001/checkpoints/best.pt"}\n'
             )
             (self.root / "experiments" / "logs" / "runtime_events.jsonl").write_text(
@@ -656,12 +663,12 @@ class TestM3StageGate(unittest.TestCase):
                 watchdog_event,
                 encoding="utf-8",
             )
-        (self.root / "knowledge" / "reviews" / "M3S03_main_result_review.md").write_text(
-            "# M3S03 Main Result Review\n\nVerdict: PASS\n",
+        (self.root / "knowledge" / "reviews" / "M3S04_main_result_review.md").write_text(
+            "# M3S04 Main Result Review\n\nVerdict: PASS\n",
             encoding="utf-8",
         )
 
-    def _write_m3s04_artifacts(self) -> None:
+    def _write_m3s05_artifacts(self) -> None:
         artifacts = self.root / "experiments" / "artifacts" / "main_experiment"
         artifacts.mkdir(parents=True, exist_ok=True)
         (self.root / "experiments" / "runs" / "run_001" / "checkpoints").mkdir(parents=True, exist_ok=True)
@@ -671,7 +678,7 @@ class TestM3StageGate(unittest.TestCase):
         )
         (self.root / "experiments" / "logs").mkdir(parents=True, exist_ok=True)
         (self.root / "experiments" / "logs" / "runtime_events.jsonl").write_text(
-            '{"timestamp":"2026-05-29T12:30:00","stage":"M3S03","event_type":"training_completed",'
+            '{"timestamp":"2026-05-29T12:30:00","stage":"M3S04","event_type":"training_completed",'
             '"run_id":"run_001","status":"completed","checkpoint_path":"experiments/runs/run_001/checkpoints/best.pt"}\n',
             encoding="utf-8",
         )
@@ -717,11 +724,11 @@ class TestM3StageGate(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def _write_m3s04_handoff(self) -> None:
+    def _write_m3s05_handoff(self) -> None:
         (self.root / "knowledge").mkdir(parents=True, exist_ok=True)
         (self.root / "knowledge" / "handoff_M3_M4.md").write_text(
             "# Handoff M3 to M4\n\n"
-            "Decision: KEEP; validated by M3S04 result validation.\n\n"
+            "Decision: KEEP; validated by M3S05 result validation.\n\n"
             "## Claims and Evidence\n"
             "claim C1: ours improves accuracy; evidence: experiments/artifacts/main_experiment/manifest.yaml and comparison_table.csv.\n\n"
             "## M4 Analysis\n"
@@ -729,49 +736,49 @@ class TestM3StageGate(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def test_m3s01_stage_gate_accepts_longrun_ledger(self) -> None:
-        self._write_m3s01_files(include_ledger=True)
+    def test_m3s02_stage_gate_accepts_longrun_ledger(self) -> None:
+        self._write_m3s02_files(include_ledger=True)
 
-        ok, messages = check_stage(self.root, "M3S01")
+        ok, messages = check_stage(self.root, "M3S02")
 
         self.assertTrue(ok, "\n".join(messages))
         self.assertTrue(any("long-running ledger includes" in message for message in messages))
 
-    def test_m3s01_stage_gate_requires_longrun_ledger(self) -> None:
-        self._write_m3s01_files(include_ledger=False)
+    def test_m3s02_stage_gate_requires_longrun_ledger(self) -> None:
+        self._write_m3s02_files(include_ledger=False)
 
-        ok, messages = check_stage(self.root, "M3S01")
+        ok, messages = check_stage(self.root, "M3S02")
 
         self.assertFalse(ok)
         self.assertTrue(any("long-running execution ledger missing" in message for message in messages))
 
-    def test_m3s01_stage_gate_requires_sandbox_profile(self) -> None:
-        self._write_m3s01_files(include_ledger=True, include_sandbox=False)
+    def test_m3s02_stage_gate_requires_sandbox_profile(self) -> None:
+        self._write_m3s02_files(include_ledger=True, include_sandbox=False)
 
-        ok, messages = check_stage(self.root, "M3S01")
+        ok, messages = check_stage(self.root, "M3S02")
 
         self.assertFalse(ok)
         self.assertTrue(any("execution.sandbox profile missing" in message for message in messages))
         self.assertTrue(any("sandbox_profile.yaml not found" in message for message in messages))
 
-    def test_m3s01_stage_gate_requires_resource_plan(self) -> None:
-        self._write_m3s01_files(include_ledger=True, include_resource_plan=False)
+    def test_m3s02_stage_gate_requires_resource_plan(self) -> None:
+        self._write_m3s02_files(include_ledger=True, include_resource_plan=False)
 
-        ok, messages = check_stage(self.root, "M3S01")
+        ok, messages = check_stage(self.root, "M3S02")
 
         self.assertFalse(ok)
         self.assertTrue(any("resource_plan.yaml not found" in message for message in messages), messages)
 
-    def test_m3s01_stage_gate_requires_local_or_ssh_mode(self) -> None:
-        self._write_m3s01_files(include_ledger=True, execution_mode="cluster")
+    def test_m3s02_stage_gate_requires_local_or_ssh_mode(self) -> None:
+        self._write_m3s02_files(include_ledger=True, execution_mode="cluster")
 
-        ok, messages = check_stage(self.root, "M3S01")
+        ok, messages = check_stage(self.root, "M3S02")
 
         self.assertFalse(ok)
         self.assertTrue(any("execution.mode must be explicitly local or ssh" in message for message in messages), messages)
 
-    def test_m3s03_stage_gate_accepts_multi_resource_allocation(self) -> None:
-        self._write_m3s03_files(include_monitor=True, include_watchdog=True)
+    def test_m3s04_stage_gate_accepts_multi_resource_allocation(self) -> None:
+        self._write_m3s04_files(include_monitor=True, include_watchdog=True)
         (self.root / "experiments" / "runs" / "run_002").mkdir(parents=True, exist_ok=True)
         (self.root / "experiments" / "runs" / "run_002" / "checkpoints").mkdir(parents=True, exist_ok=True)
         (self.root / "experiments" / "runs" / "run_002" / "checkpoints" / "best.pt").write_text(
@@ -783,8 +790,8 @@ class TestM3StageGate(unittest.TestCase):
             "2026-05-29T12:00:00,124,70,16000,0,80,8000,24576\n",
             encoding="utf-8",
         )
-        (self.root / "knowledge" / "M3" / "M3S03_main_experiment.md").write_text(
-            "# M3S03 Main Experiment\n\n"
+        (self.root / "knowledge" / "M3" / "M3S04_main_experiment.md").write_text(
+            "# M3S04 Main Experiment\n\n"
             "## Run Contract\nResource Plan: `experiments/configs/resource_plan.yaml`; "
             "multi-resource allocation: `experiments/configs/m3_task_allocation.yaml`.\n\n"
             "## 实验环境\nresource_id/local and ssh:lab-a server_id lab-a are used with sync push/pull evidence.\n\n"
@@ -874,36 +881,36 @@ class TestM3StageGate(unittest.TestCase):
         )
         (self.root / "experiments" / "logs" / "runtime_events.jsonl").write_text(
             (self.root / "experiments" / "logs" / "runtime_events.jsonl").read_text(encoding="utf-8")
-            + '{"timestamp":"2026-05-29T13:00:00","stage":"M3S03","event_type":"training_completed",'
+            + '{"timestamp":"2026-05-29T13:00:00","stage":"M3S04","event_type":"training_completed",'
             '"run_id":"run_002","status":"completed","checkpoint_path":"experiments/runs/run_002/checkpoints/best.pt"}\n',
             encoding="utf-8",
         )
 
-        ok, messages = check_stage(self.root, "M3S03")
+        ok, messages = check_stage(self.root, "M3S04")
 
         self.assertTrue(ok, "\n".join(messages))
         self.assertTrue(any("multi-resource pool enabled" in message for message in messages), messages)
 
-    def test_m3s01_stage_gate_requires_local_env_fields(self) -> None:
-        self._write_m3s01_files(include_ledger=True, local_env_manager="")
+    def test_m3s02_stage_gate_requires_local_env_fields(self) -> None:
+        self._write_m3s02_files(include_ledger=True, local_env_manager="")
 
-        ok, messages = check_stage(self.root, "M3S01")
+        ok, messages = check_stage(self.root, "M3S02")
 
         self.assertFalse(ok)
         self.assertTrue(any("local env_manager must be conda/venv/uv/docker" in message for message in messages), messages)
 
-    def test_m3s01_stage_gate_requires_ssh_connection_fields(self) -> None:
-        self._write_m3s01_files(include_ledger=True, execution_mode="ssh")
+    def test_m3s02_stage_gate_requires_ssh_connection_fields(self) -> None:
+        self._write_m3s02_files(include_ledger=True, execution_mode="ssh")
 
-        ok, messages = check_stage(self.root, "M3S01")
+        ok, messages = check_stage(self.root, "M3S02")
 
         self.assertFalse(ok)
         self.assertTrue(any("ssh host missing" in message for message in messages), messages)
         self.assertTrue(any("ssh user missing" in message for message in messages), messages)
         self.assertTrue(any("ssh workspace_path missing" in message for message in messages), messages)
 
-    def test_m3s01_stage_gate_accepts_ssh_execution_config(self) -> None:
-        self._write_m3s01_files(
+    def test_m3s02_stage_gate_accepts_ssh_execution_config(self) -> None:
+        self._write_m3s02_files(
             include_ledger=True,
             execution_mode="ssh",
             ssh_host="gpu.example",
@@ -911,93 +918,93 @@ class TestM3StageGate(unittest.TestCase):
             ssh_workspace_path="~/AutoPaper2/projects/demo",
         )
 
-        ok, messages = check_stage(self.root, "M3S01")
+        ok, messages = check_stage(self.root, "M3S02")
 
         self.assertTrue(ok, "\n".join(messages))
         self.assertTrue(any("implementation doc records ssh/remote execution mode" in message for message in messages), messages)
         self.assertTrue(any("SSH mode ledger includes remote execution/rsync evidence" in message for message in messages), messages)
 
-    def test_m3s01_stage_gate_blocks_incomplete_dataset_download(self) -> None:
-        self._write_m3s01_files()
-        ledger = self.root / "experiments" / "logs" / "m3s01_longrun_ledger.md"
+    def test_m3s02_stage_gate_blocks_incomplete_dataset_download(self) -> None:
+        self._write_m3s02_files()
+        ledger = self.root / "experiments" / "logs" / "m3s02_longrun_ledger.md"
         text = ledger.read_text(encoding="utf-8")
         text = text.replace("| completed | `experiments/logs/demo_download.log`", "| blocked_user_action | `experiments/logs/demo_download.log`", 1)
         ledger.write_text(text, encoding="utf-8")
 
-        ok, messages = check_stage(self.root, "M3S01")
+        ok, messages = check_stage(self.root, "M3S02")
 
         self.assertFalse(ok)
         self.assertTrue(any("acquisition task dataset: demo is not completed" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_accepts_baseline_lock_manifest(self) -> None:
-        self._write_m3s02_files()
+    def test_m3s03_stage_gate_accepts_baseline_lock_manifest(self) -> None:
+        self._write_m3s03_files()
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertTrue(ok, "\n".join(messages))
-        self.assertTrue(any("primary baseline(s) eligible for M3S03" in message for message in messages), messages)
+        self.assertTrue(any("primary baseline(s) eligible for M3S04" in message for message in messages), messages)
         self.assertTrue(any("stage review m3_baseline_lock_audit PASS" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_rejects_alternate_review_copy(self) -> None:
-        self._write_m3s02_files()
-        (self.root / "knowledge" / "reviews" / "M3S02_baseline_result_review_revised.md").write_text(
-            "# M3S02 Baseline Result Review\n\nVerdict: PASS\n",
+    def test_m3s03_stage_gate_rejects_alternate_review_copy(self) -> None:
+        self._write_m3s03_files()
+        (self.root / "knowledge" / "reviews" / "M3S03_baseline_result_review_revised.md").write_text(
+            "# M3S03 Baseline Result Review\n\nVerdict: PASS\n",
             encoding="utf-8",
         )
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("alternate stage review file" in message for message in messages), messages)
 
     def test_stage_review_pass_cannot_contain_blocking_download_language(self) -> None:
-        self._write_m3s02_files()
-        (self.root / "knowledge" / "reviews" / "M3S02_baseline_result_review.md").write_text(
-            "# M3S02 Baseline Result Review\n\n"
+        self._write_m3s03_files()
+        (self.root / "knowledge" / "reviews" / "M3S03_baseline_result_review.md").write_text(
+            "# M3S03 Baseline Result Review\n\n"
             "Verdict: PASS\n\n"
             "Checkpoint download pending; should be okay to proceed.\n",
             encoding="utf-8",
         )
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("PASS verdict but contains blocking/ambiguous language" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_requires_baseline_lock_manifest(self) -> None:
-        self._write_m3s02_files(include_lock=False)
+    def test_m3s03_stage_gate_requires_baseline_lock_manifest(self) -> None:
+        self._write_m3s03_files(include_lock=False)
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("baseline_lock.yaml not found" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_requires_primary_eligible_baseline(self) -> None:
-        self._write_m3s02_files(m3s03_eligible=False)
+    def test_m3s03_stage_gate_requires_primary_eligible_baseline(self) -> None:
+        self._write_m3s03_files(m3s04_eligible=False)
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
-        self.assertTrue(any("primary baseline must set m3s03_eligible" in message for message in messages), messages)
+        self.assertTrue(any("primary baseline must set m3s04_eligible" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_requires_caveat_waiver_for_trusted_baseline(self) -> None:
-        self._write_m3s02_files(verification_verdict="trusted_with_caveats")
+    def test_m3s03_stage_gate_requires_caveat_waiver_for_trusted_baseline(self) -> None:
+        self._write_m3s03_files(verification_verdict="trusted_with_caveats")
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("trusted_with_caveats requires caveat_waiver_reason" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_requires_m2_metric_protocol(self) -> None:
-        self._write_m3s02_files(include_metric_protocol=False)
+    def test_m3s03_stage_gate_requires_m2_metric_protocol(self) -> None:
+        self._write_m3s03_files(include_metric_protocol=False)
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("metric protocol registry not found" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_rejects_metric_protocol_mismatch(self) -> None:
-        self._write_m3s02_files()
+    def test_m3s03_stage_gate_rejects_metric_protocol_mismatch(self) -> None:
+        self._write_m3s03_files()
         for rel in (
             "experiments/baselines/baseline_1/metric_contract.yaml",
             "experiments/baselines/baseline_lock.yaml",
@@ -1007,65 +1014,65 @@ class TestM3StageGate(unittest.TestCase):
             text = text.replace("scenario: classification", "scenario: regression")
             path.write_text(text, encoding="utf-8")
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("scenario=regression does not match M2 metric protocol classification" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_rejects_metric_validation_failure(self) -> None:
-        self._write_m3s02_files(metric_validation_status="fail")
+    def test_m3s03_stage_gate_rejects_metric_validation_failure(self) -> None:
+        self._write_m3s03_files(metric_validation_status="fail")
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("metric_validation status must be pass" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_requires_checkpoint_file_when_needed(self) -> None:
-        self._write_m3s02_files(
+    def test_m3s03_stage_gate_requires_checkpoint_file_when_needed(self) -> None:
+        self._write_m3s03_files(
             checkpoint_required=True,
             checkpoint_verified=True,
             checkpoint_file_exists=False,
         )
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("required checkpoint local_path missing or does not exist" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_rejects_weird_metric_value_without_triage(self) -> None:
-        self._write_m3s02_files(paper_value=0.99, local_value=0.99)
+    def test_m3s03_stage_gate_rejects_weird_metric_value_without_triage(self) -> None:
+        self._write_m3s03_files(paper_value=0.99, local_value=0.99)
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("outside normal_reference_range" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_rejects_ablation_as_baseline(self) -> None:
-        self._write_m3s02_files(ablation_of_ours=True, comparator_type="ablation")
+    def test_m3s03_stage_gate_rejects_ablation_as_baseline(self) -> None:
+        self._write_m3s03_files(ablation_of_ours=True, comparator_type="ablation")
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         self.assertTrue(any("cannot be an ablation" in message for message in messages), messages)
 
-    def test_m3s02_stage_gate_rejects_simplified_reimplementation(self) -> None:
-        self._write_m3s02_files(
+    def test_m3s03_stage_gate_rejects_simplified_reimplementation(self) -> None:
+        self._write_m3s03_files(
             source="reimplementation",
             implementation_fidelity="simplified",
             fidelity_evidence="experiments/baselines/baseline_1/fidelity_report.md",
         )
 
-        ok, messages = check_stage(self.root, "M3S02")
+        ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
         joined = "\n".join(messages)
         self.assertIn("simplified/toy/minimal baseline implementations are forbidden", joined)
         self.assertIn("reimplemented baselines must set implementation_fidelity", joined)
 
-    def test_m3s03_stage_gate_accepts_resource_monitor(self) -> None:
-        self._write_m3s03_files(include_monitor=True, multi_gpu=True)
+    def test_m3s04_stage_gate_accepts_resource_monitor(self) -> None:
+        self._write_m3s04_files(include_monitor=True, multi_gpu=True)
 
-        ok, messages = check_stage(self.root, "M3S03")
+        ok, messages = check_stage(self.root, "M3S04")
 
         self.assertTrue(ok, "\n".join(messages))
         self.assertTrue(any("resource monitor file" in message for message in messages), messages)
@@ -1073,26 +1080,26 @@ class TestM3StageGate(unittest.TestCase):
         self.assertTrue(any("runtime_events.jsonl has" in message for message in messages), messages)
         self.assertTrue(any("watchdog check file" in message for message in messages), messages)
 
-    def test_m3s03_stage_gate_requires_resource_monitor(self) -> None:
-        self._write_m3s03_files(include_monitor=False)
+    def test_m3s04_stage_gate_requires_resource_monitor(self) -> None:
+        self._write_m3s04_files(include_monitor=False)
 
-        ok, messages = check_stage(self.root, "M3S03")
+        ok, messages = check_stage(self.root, "M3S04")
 
         self.assertFalse(ok)
         self.assertTrue(any("no resource_monitor.csv found" in message for message in messages), messages)
 
-    def test_m3s03_stage_gate_requires_runtime_watchdog(self) -> None:
-        self._write_m3s03_files(include_watchdog=False)
+    def test_m3s04_stage_gate_requires_runtime_watchdog(self) -> None:
+        self._write_m3s04_files(include_watchdog=False)
 
-        ok, messages = check_stage(self.root, "M3S03")
+        ok, messages = check_stage(self.root, "M3S04")
 
         self.assertFalse(ok)
         joined = "\n".join(messages)
         self.assertIn("runtime_events.jsonl missing", joined)
         self.assertIn("no watchdog_checks.jsonl found", joined)
 
-    def test_m3s03_stage_gate_rejects_random_or_running_weights(self) -> None:
-        self._write_m3s03_files(include_monitor=True, include_watchdog=True)
+    def test_m3s04_stage_gate_rejects_random_or_running_weights(self) -> None:
+        self._write_m3s04_files(include_monitor=True, include_watchdog=True)
         (self.root / "experiments" / "results.tsv").write_text(
             "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
             "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
@@ -1100,28 +1107,30 @@ class TestM3StageGate(unittest.TestCase):
             encoding="utf-8",
         )
 
-        ok, messages = check_stage(self.root, "M3S03")
+        ok, messages = check_stage(self.root, "M3S04")
 
         self.assertFalse(ok)
         joined = "\n".join(messages)
         self.assertIn("run_status/training_status must be completed", joined)
         self.assertIn("no proposed/ours result row is backed by completed trained weights", joined)
 
-    def test_m3s04_stage_gate_accepts_keep_with_evidence_package(self) -> None:
-        self._write_m3s04_report()
-        self._write_m3s04_artifacts()
-        self._write_m3s04_handoff()
+    def test_m3s05_stage_gate_accepts_keep_with_evidence_package(self) -> None:
+        self._write_m3s05_report()
+        self._write_m3s05_artifacts()
+        self._write_m3s05_handoff()
+        self._write_m3s05_review()
 
-        ok, messages = check_stage(self.root, "M3S04")
+        ok, messages = check_stage(self.root, "M3S05")
 
         self.assertTrue(ok, "\n".join(messages))
         self.assertTrue(any("manifest.yaml records fixed seed 42" in message for message in messages))
         self.assertTrue(any("handoff_M3_M4.md includes M4 analysis direction" in message for message in messages))
 
-    def test_m3s04_stage_gate_blocks_keep_without_evidence_package(self) -> None:
-        self._write_m3s04_report()
+    def test_m3s05_stage_gate_blocks_keep_without_evidence_package(self) -> None:
+        self._write_m3s05_report()
+        self._write_m3s05_review()
 
-        ok, messages = check_stage(self.root, "M3S04")
+        ok, messages = check_stage(self.root, "M3S05")
 
         self.assertFalse(ok)
         joined = "\n".join(messages)
@@ -1130,12 +1139,13 @@ class TestM3StageGate(unittest.TestCase):
         self.assertIn("comparison table missing or empty", joined)
         self.assertIn("handoff_M3_M4.md missing or empty", joined)
 
-    def test_m3s04_stage_gate_blocks_incomplete_validation_report(self) -> None:
-        self._write_m3s04_report(complete=False)
-        self._write_m3s04_artifacts()
-        self._write_m3s04_handoff()
+    def test_m3s05_stage_gate_blocks_incomplete_validation_report(self) -> None:
+        self._write_m3s05_report(complete=False)
+        self._write_m3s05_artifacts()
+        self._write_m3s05_handoff()
+        self._write_m3s05_review()
 
-        ok, messages = check_stage(self.root, "M3S04")
+        ok, messages = check_stage(self.root, "M3S05")
 
         self.assertFalse(ok)
         joined = "\n".join(messages)
@@ -1143,24 +1153,35 @@ class TestM3StageGate(unittest.TestCase):
         self.assertIn("missing hypothesis mapping", joined)
         self.assertIn("missing data quality checks", joined)
 
-    def test_m3s04_stage_gate_blocks_fix_even_with_repair_advice(self) -> None:
-        self._write_m3s04_report(decision="FIX")
-        doc = self.root / "knowledge" / "M3" / "M3S04_result_validation.md"
+    def test_m3s05_stage_gate_blocks_fix_even_with_repair_advice(self) -> None:
+        self._write_m3s05_report(decision="FIX")
+        self._write_m3s05_review()
+        doc = self.root / "knowledge" / "M3" / "M3S05_result_validation.md"
         doc.write_text(
             doc.read_text(encoding="utf-8")
             + "\n## 回溯修改方向\n"
             "- blocking_reason: validation found unstable gains\n"
-            "- required_fix: rerun M3S03 with corrected fixed seed=42 configuration\n"
+            "- required_fix: rerun M3S04 with corrected fixed seed=42 configuration\n"
             "- success_criteria: stable fixed seed=42 result with matching config/logs\n"
             "- rebuild_mode: incremental_replay\n"
-            "- rerun_scope: M3S03-M3S04\n",
+            "- rerun_scope: M3S04-M3S05\n",
             encoding="utf-8",
         )
 
-        ok, messages = check_stage(self.root, "M3S04")
+        ok, messages = check_stage(self.root, "M3S05")
 
         self.assertFalse(ok)
         self.assertTrue(any("blocks advancement" in message for message in messages))
+
+    def test_m3s05_stage_gate_requires_result_validation_review(self) -> None:
+        self._write_m3s05_report()
+        self._write_m3s05_artifacts()
+        self._write_m3s05_handoff()
+
+        ok, messages = check_stage(self.root, "M3S05")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("M3S05_result_validation_review.md" in message and "missing" in message.lower() for message in messages), messages)
 
 
 if __name__ == "__main__":

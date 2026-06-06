@@ -35,12 +35,12 @@
 - [ ] `paper_protocol_adaptation`: 高水平论文 task/metric/baseline/protocol 的采用或拒绝理由
 - [ ] `comparison_target`: 与 full model、active baseline、随机基线或边界案例比较的对象
 - [ ] `expected_pattern`: 该 slice 预期应观察到的模式
-- [ ] `claim_links`: 对应 M4S01/M3S04 claim
+- [ ] `claim_links`: 对应 M4S01/M3S05 claim
 - [ ] 是否至少有 3 个具体 `Ana-*` slice ID
 - [ ] 是否覆盖 How / Where / Why：怎么 work、在哪里 work / 不 work、为什么 work
 - [ ] 是否包含 Component Claim Analysis Matrix，且每个核心组件/claim 都有 slice 或 waiver
 - [ ] 是否包含 Paper Protocol Adaptation Table，并明确 source id / reference paper、task setup、metric、baseline protocol 和 adoption decision
-- [ ] 是否说明上游依据来自 M2S05/M2S06、M3S04、`handoff_M3_M4.md` 或文献/数据库
+- [ ] 是否说明上游依据来自 M2S05/M3S01、M3S05、`handoff_M3_M4.md` 或文献/数据库
 - [ ] `evidence_criteria`: 什么算作可写入论文的证据
 
 可选但推荐的字段：

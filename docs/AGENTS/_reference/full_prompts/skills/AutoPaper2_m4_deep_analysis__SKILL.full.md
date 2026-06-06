@@ -97,7 +97,7 @@ python scripts/state_manager.py status
 - [ ] `state/pipeline_state.yaml` 可读
 - [ ] M3 状态为 `completed`（或 `module_completed`）
 - [ ] `knowledge/handoff_M3_M4.md` 存在且非空
-- [ ] `knowledge/M3/M3S04_result_validation.md` 存在且决策为 KEEP
+- [ ] `knowledge/M3/M3S05_result_validation.md` 存在且决策为 KEEP
 - [ ] 当前 stage 为 M4S01 或用户明确要求重新执行 M4
 - [ ] M4 螺旋计数 < 10（`spiral_count.M4 < 10`）
 
@@ -107,7 +107,7 @@ python scripts/state_manager.py status
 Phase 0: 进入 M4 前置检查
   → 检查 M3 状态是否为 completed
   → 读取 handoff_M3_M4.md
-  → 检查 M3S04 决策是否为 KEEP（非 KEEP 则拒绝启动 M4）
+  → 检查 M3S05 决策是否为 KEEP（非 KEEP 则拒绝启动 M4）
   → 加载 AGENT.md: docs/AGENTS/analysis/AGENT.md
   → 设置 pipeline_state: M4S01 in_progress
   → 标记 M4 模块状态为 in_progress
@@ -184,7 +184,7 @@ Phase 6: Handoff & 完成
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/analysis/AGENT.md`
 - 当前 stage（M4S01 / M4S02 / M4S04）
-- 上游输入文档路径（handoff_M3_M4.md, M3S03-M3S04 产出, M4S01-M4S03 下游产出）
+- 上游输入文档路径（handoff_M3_M4.md, M3S04-M3S05 产出, M4S01-M4S03 下游产出）
 - 产出路径
 - 如果是 M4S01，必须显式记录数据质量审计、意外发现、边界条件、负面结果，以及后续分析战役规划草案的文献/数据库依据、组件/Claim 分析矩阵、效率触发/豁免判断
 - 如果是 M4S02，必须强调 Slice Evidence Contract 的必填字段
@@ -212,7 +212,7 @@ Phase 6: Handoff & 完成
 - 每个 analysis slice 必须记录 sandbox/container mode、命令、working dir、allowed writes、network policy、resource limits、log path
 - 每个 analysis slice 必须记录 `resource_id`、`resource_kind`、GPU/CPU 分配、monitor path；若使用 SSH 资源，必须记录 server_id、lease_id、remote workspace、push/pull 同步证据；可并行的独立 slice 应按 `experiments/configs/m4_task_allocation.yaml` 分配到 local/ssh/GPU slot，存在未并行或未使用资源时必须写明依赖、显存、数据、baseline 公平性或配额原因。
 - `experiments/analysis_results.tsv` 必须包含 dataset/split/seed/config/run/artifact/resource 字段；若执行效率 slice，还必须记录参数量、时间、显存/内存、吞吐或 FLOPs/MACs 中的适用指标
-- M4S03 必须沿用 M3S01 的 `experiments/configs/sandbox_profile.yaml` 或说明兼容 profile；不得无隔离运行 LLM 生成的分析脚本
+- M4S03 必须沿用 M3S02 的 `experiments/configs/sandbox_profile.yaml` 或说明兼容 profile；不得无隔离运行 LLM 生成的分析脚本
 - M4S03 的输出必须包含执行侧的初步异常分流摘要，但不得自判最终 verdict；最终 verdict 由独立 reviewer subagent 写入 review 文件
 - 初步异常分流必须区分 `environment / setup / model / data / metric / method / unknown`
 - 一旦初步判断需要 stage-out backtrack，必须明确说明 target_stage 候选、缺失证据和建议 rebuild_mode
@@ -225,7 +225,7 @@ Phase 6: Handoff & 完成
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/critic/m4_findings_audit/AGENT.md`
 - M4S01 产出路径
-- M3S04 产出路径（辅助）
+- M3S05 产出路径（辅助）
 - 产出路径：`knowledge/reviews/M4S01_findings_audit_review.md`
 - reviewer 需要写出可执行的 backtrack advice：target_stage、blocking_reason、required_fix、success_criteria、evidence_paths、rebuild_mode、rerun_scope、handoff_updates
 
@@ -255,7 +255,7 @@ Phase 6: Handoff & 完成
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/critic/logic/AGENT.md`
 - M4S01-M4S04 全部产出路径
-- M3S03-M3S04 产出路径（辅助，验证假设链条）
+- M3S04-M3S05 产出路径（辅助，验证假设链条）
 - 产出路径：`knowledge/reviews/G4_logic_review.md`
 
 #### Evidence Critic
@@ -383,10 +383,10 @@ python scripts/state_manager.py auto-module M4
 
 ## Key Rules
 
-- **M3 必须先完成且 KEEP**：M4 的入口条件是 M3 已完成且 M3S04 决策为 KEEP。如果 M3S04 为 FIX/BACKTRACK，拒绝启动 M4，提示用户先完成 M3 修复。
+- **M3 必须先完成且 KEEP**：M4 的入口条件是 M3 已完成且 M3S05 决策为 KEEP。如果 M3S05 为 FIX/BACKTRACK，拒绝启动 M4，提示用户先完成 M3 修复。
 - **Analysis Agent 统一负责 M4S01/S02/S04**：深度分析是一个连贯的思维过程，不拆分到不同 Agent。
 - **Experiment Agent 只执行不设计**：M4S03 必须严格限定为执行 M4S02 已设计的实验，不得自行设计新 slice。
-- **M4S03 必须使用 sandbox/container profile**：所有深度分析脚本都必须在 M3S01 建立的 `experiments/configs/sandbox_profile.yaml` 边界内运行，并记录命令、网络、写入、资源和日志路径。
+- **M4S03 必须使用 sandbox/container profile**：所有深度分析脚本都必须在 M3S02 建立的 `experiments/configs/sandbox_profile.yaml` 边界内运行，并记录命令、网络、写入、资源和日志路径。
 - **Slice Evidence Contract 是 M4S02 的核心义务**：每个 claim-carrying slice 必须有完整的研究问题、干预、指标、claim_links。
 - **M4S02 必须为可比 slice 写明 baseline_inclusion**：只要该 slice 讨论性能、鲁棒性或泛化，就要说明 baseline 是否同跑。
 - **M4S02 必须为效率分析写明触发/豁免**：只要方法引入额外组件、额外计算路径、效率 claim 或参考论文惯例，就要设计效率 slice；不做时必须写明 waiver reason。

@@ -11,7 +11,7 @@
 （要验证的深层问题，如"为什么方法有效？""组件 A 的作用机制是什么？"）
 
 > 设计约束: 分析目标必须明确对应 ablation / mechanism / robustness / efficiency / failure 至少一类；若 slice 涉及性能优劣比较，必须说明是否纳入 baseline。
-> 必须显式覆盖 How / Where / Why：怎么 work、在哪里 work / 不 work、为什么 work。每个目标应连接到 M2S05/M2S06 实验设计、M3S04 KEEP 证据或 `handoff_M3_M4.md` 中的 claim。
+> 必须显式覆盖 How / Where / Why：怎么 work、在哪里 work / 不 work、为什么 work。每个目标应连接到 M2S05 指标/实验设置、M3S01 主实验设计、M3S05 KEEP 证据或 `handoff_M3_M4.md` 中的 claim。
 > 效率触发规则: 若方法引入额外模块/参数/计算路径、M3/M5 需要效率声明、或参考论文通常报告效率，则 `efficiency_required: yes`，必须设计效率 slice；否则写 `efficiency_required: no/waived` 和理由。
 
 ## 1.1 Component Claim Analysis Matrix
@@ -88,7 +88,7 @@
 ## 6. 文献/数据库依据
 - 对照的论文/领域做法: ...
 - 数据库条目或 source id: ...
-- 上游 M2/M3 依据: `knowledge/M2/M2S06_full_experiment_plan.md`, `knowledge/M3/M3S04_result_validation.md`, `knowledge/handoff_M3_M4.md`
+- 上游 M2/M3 依据: `knowledge/M2/M2S05_experiment_setup.md`, `knowledge/M3/M3S01_main_experiment_design.md`, `knowledge/M3/M3S05_result_validation.md`, `knowledge/handoff_M3_M4.md`
 - 为什么该分析方式适合当前 claim: ...
 
 ## 7. analysis_results.tsv Schema

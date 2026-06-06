@@ -324,7 +324,7 @@ M2S05 完成后必须由 `docs/AGENTS/critic/m2_experiment_design_review/AGENT.m
 
 ---
 
-### 3.7 M2S06: Full Experiment Plan（完整实验计划）
+### 3.7 M3S01: Main Experiment Design（完整实验计划）
 
 **目标**: 整合 M2S01-M2S05 的所有设计决策，制定可执行的完整实验计划。
 
@@ -335,11 +335,11 @@ M2S05 完成后必须由 `docs/AGENTS/critic/m2_experiment_design_review/AGENT.m
 - `knowledge/M2/M2S04_algorithm_theory.md`
 - `knowledge/M2/M2S05_experiment_setup.md`
 
-**输出** → `knowledge/M2/M2S06_full_experiment_plan.md`
+**输出** → `knowledge/M2/M3S01_main_experiment_design.md`
 
-**Stage Review** → `knowledge/reviews/M2S06_experiment_plan_review.md`
+**Stage Review** → `knowledge/reviews/M3S01_experiment_plan_review.md`
 
-M2S06 完成后必须由 `docs/AGENTS/critic/m2_experiment_plan_review/AGENT.md`
+M3S01 完成后必须由 `docs/AGENTS/critic/m3_main_experiment_design_review/AGENT.md`
 独立审查。未 PASS 时，Conductor 只能更新状态并重新委派 Method Agent；
 不得由主 agent 直接修改本 stage 产出。
 
@@ -538,5 +538,5 @@ Baseline Selection 应采用**多方法互补**策略，从多个渠道发现候
    - 文件路径：`state/pipeline_state.yaml`
 
 4. **读取最近的产出文档**
-   - 确认 M2S01-M2S06 的当前状态
+   - 确认 M2S01-M2S05 的当前状态
    - 确认当前的方法设计决策和实验协议

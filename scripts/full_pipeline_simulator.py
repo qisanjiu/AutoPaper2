@@ -487,8 +487,6 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "| 实验 ID | 目的 | 目标假设 | 验证内容 | 对照组/Baselines | 指标 | 必需/可选 |\n"
             "|---|---|---|---|---|---|---|\n"
             "| Exp-1 | 实验目标 main purpose | H1 | main comparison | baseline | accuracy metric | 必需 |\n"
-            "| Exp-2 | 实验目标 component purpose | H2 | component check | baseline | accuracy metric | 必需 |\n"
-            "| Exp-3 | 实验目标 robustness purpose | H3 | robustness | baseline | accuracy metric | 可选 |\n\n"
             "随机种子 seed: 42. 单次固定 seed 实验，不要求多 seed 统计检验。可复现 reproducibility requirements git commit.\n",
         )
         _write_yaml(
@@ -521,47 +519,38 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                 ],
             },
         )
-    elif stage == "M2S06":
-        _write(
-            out,
-            "# M2S06\n\n"
-            "## 1. 计划总览\n\n"
-            "| 阶段 | 实验 ID | 目的 | 预估时间 | 依赖 | 优先级 |\n"
-            "|---|---|---|---|---|---|\n"
-            "| 1 | Exp-1 | main purpose | 2h | none | P0 |\n"
-            "| 2 | Exp-2 | component purpose | 1h | Exp-1 | P0 |\n"
-            "| 3 | Exp-3 | robustness purpose | 1h | Exp-1 | P1 |\n\n"
-            "## 2. 执行顺序与分支逻辑\n"
-            "Phase 1 -> Phase 2. If failure, BACKTRACK 回溯 after 失败判定 and 诊断.\n\n"
-            "## 3. 成功/失败判定标准\n"
-            "成功标准 success criteria: significant improvement. failure diagnosis covers implementation design hypothesis data baseline.\n\n"
-            "## 4. 风险与应对\n"
-            "风险 risk control and 应对 measures.\n\n"
-            "## 5. 资源预算\n"
-            "资源 GPU storage 时间预算 budget.\n\n"
-            "## 7. 完整实验报告蓝图\n\n"
-            "### Exp-[N]: template\n"
-            "- 目的: ...\n"
-            "- 对应假设 / Gap: ...\n"
-            "- 参考相关工作实验设置: PaperX reference protocol 论文\n"
-            "- 数据集与划分: DemoSet dataset split\n"
-            "- Baselines / 对照组: baseline\n"
-            "- 评价指标: metric_protocol_id=mp_demo_accuracy accuracy metric\n"
-            "- 运行协议: seed=42 epoch hardware 超参\n"
-            "- 预期结果形态: table plot\n"
-            "- 成功标准: ...\n"
-            "- 失败时诊断路径: implementation / design / hypothesis / data / baseline\n"
-            "- 需要保存的证据: raw logs, config, checkpoint, results.tsv, plot script\n",
-        )
-        _write(root / "knowledge" / "handoff_M2_M3.md", "# Handoff M2 to M3\n\nImplementation plan.\n")
+        _write(root / "knowledge" / "handoff_M2_M3.md", "# Handoff M2 to M3\n\nM3S01 should design the main experiment from M2S05 metric protocols.\n")
     elif stage == "M3S01":
         _write(
             out,
-            "# M3S01 Implementation\n\n"
+            "# M3S01 Main Experiment Design\n\n"
+            "## Scope Boundary\n"
+            "Main experiment only. Not include ablation, robustness, mechanism, or M4 analysis design; those are M4-only.\n\n"
+            "## Dataset And Metric Protocol\n\n"
+            "| experiment_id | dataset | scenario/task | split | metric_protocol_id | primary_metric | direction | normal_reference_range | source |\n"
+            "|---|---|---|---|---|---|---|---|---|\n"
+            "| Exp-1 | demo | classification | test | mp_demo_accuracy | accuracy | higher_is_better | 0.5-0.95 | M2S05_metric_protocol.yaml |\n\n"
+            "## Baseline Reference Values\n\n"
+            "| baseline | comparator_type | dataset | scenario | split | metric_protocol_id | metric | reference_value | value_source | table_or_section | expected_tolerance | acquisition_plan |\n"
+            "|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+            "| baseline_1 | external_prior_work | demo | classification | test | mp_demo_accuracy | accuracy | 0.75 | paper | Table 1 | 0.02 | verify-local-existing |\n\n"
+            "## Proposed Method Same-Condition Protocol\n\n"
+            "| 条件 | Baseline | Proposed method | 是否一致 | 差异说明 |\n"
+            "|---|---|---|---|---|\n"
+            "| dataset | demo | demo | yes | same condition |\n"
+            "| split | test | test | yes | same split |\n"
+            "| primary metric | accuracy | accuracy | yes | same metric |\n"
+            "| seed | 42 | 42 | yes | fixed seed single run |\n\n"
+            "Fairness 公平 constraints use same split and same metric. Ours/proposed 所提方法 runs under same condition.\n",
+        )
+    elif stage == "M3S02":
+        _write(
+            out,
+            "# M3S02 Implementation\n\n"
             "## Dataset Review\nReal dataset under experiments/data/demo.\n\n"
             "## 环境 Review\nconfig/execution_env.yaml uses local mode.\n\n"
             "## Long-running execution policy\n"
-            "Long-running jobs are recorded in experiments/logs/m3s01_longrun_ledger.md with 权限, patience, and resume evidence.\n\n"
+            "Long-running jobs are recorded in experiments/logs/m3s02_longrun_ledger.md with 权限, patience, and resume evidence.\n\n"
             "## Resource utilization plan\n"
             "experiments/configs/resource_plan.yaml records CPU allocation, cpu_parallel strategy, dataloader workers, launch command, and utilization thresholds.\n",
         )
@@ -664,17 +653,17 @@ def _write_stage_output(root: Path, stage: str) -> Path:
         _write(root / "experiments" / "data" / "demo" / "values.txt", "1\n2\n3\n")
         _write(root / "experiments" / "src" / "train.py", _code_with_enough_lines())
         _write(
-            root / "experiments" / "logs" / "m3s01_longrun_ledger.md",
-            "# M3S01 Long-Running Execution Ledger\n\n"
+            root / "experiments" / "logs" / "m3s02_longrun_ledger.md",
+            "# M3S02 Long-Running Execution Ledger\n\n"
             "| Item | Execution mode | Command | Status | Log path | Patience / polling | Resume command | Permission / approval | Completion criteria |\n"
             "|---|---|---|---|---|---|---|---|---|\n"
             "| dataset | local | `wget -c https://example.test/demo.zip` | completed | `experiments/logs/download.log` | timeout=12h; poll_interval=30m | `wget -c https://example.test/demo.zip` | none | checksum passed |\n",
         )
         _write(root / "experiments" / "logs" / "download.log", "download completed; checksum passed\n")
-    elif stage == "M3S02":
+    elif stage == "M3S03":
         _write(
             out,
-            "# M3S02 Baseline Lock\n\n"
+            "# M3S03 Baseline Lock\n\n"
             "### Baseline 1\n"
             "Verification path: verify-local-existing.\n"
             "Checkpoint verified loadable: not_applicable.\n"
@@ -683,7 +672,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "verification_verdict: verified_match.\n\n"
             "## Smoke Test\nsmoke passed.\n\n"
             "## Baseline Lock Manifest\n"
-            "`experiments/baselines/baseline_lock.yaml` declares baseline_1 as primary and m3s03_eligible.\n",
+            "`experiments/baselines/baseline_lock.yaml` declares baseline_1 as primary and m3s04_eligible.\n",
         )
         _write(
             root / "experiments" / "baselines" / "baseline_1" / "logs" / "metric_sanity.log",
@@ -769,7 +758,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                             "evidence_path": "experiments/baselines/baseline_1/logs/metric_sanity.log",
                         },
                         "verification_verdict": "verified_match",
-                        "m3s03_eligible": True,
+                        "m3s04_eligible": True,
                         "checkpoint": {
                             "required": False,
                             "status": "not_applicable",
@@ -777,7 +766,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                         },
                     }
                 ],
-                "m3s03_contract": {
+                "m3s04_contract": {
                     "primary_baseline_id": "baseline_1",
                     "metric_contract": "experiments/baselines/baseline_1/metric_contract.yaml",
                     "dataset": "demo",
@@ -788,10 +777,10 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                 },
             },
         )
-    elif stage == "M3S03":
+    elif stage == "M3S04":
         _write(
             out,
-            "# M3S03 Main Experiment\n\n"
+            "# M3S04 Main Experiment\n\n"
             "## Run Contract\ncontract. Resource Plan: experiments/configs/resource_plan.yaml.\n\n"
             "## 资源利用率执行记录\n"
             "Run run1 uses cpu_parallel task_parallel and records experiments/runs/run1/resource_monitor.csv; average CPU utilization 72%; low utilization none.\n\n"
@@ -812,10 +801,10 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "2026-05-29T12:00:00,123,72,8000,,,,\n",
         )
         watchdog_event = (
-            '{"timestamp":"2026-05-29T12:00:00","stage":"M3S03","event_type":"watchdog_check",'
+            '{"timestamp":"2026-05-29T12:00:00","stage":"M3S04","event_type":"watchdog_check",'
             '"run_id":"run1","severity":"info","decision_required":false,'
             '"agent_action_policy":"record_alert_only_agent_decides_continue_fix_or_stop","signals":[]}\n'
-            '{"timestamp":"2026-05-29T12:30:00","stage":"M3S03","event_type":"training_completed",'
+            '{"timestamp":"2026-05-29T12:30:00","stage":"M3S04","event_type":"training_completed",'
             '"run_id":"run1","status":"completed","checkpoint_path":"experiments/runs/run1/checkpoints/best.pt"}\n'
         )
         _write(root / "experiments" / "logs" / "runtime_events.jsonl", watchdog_event)
@@ -826,10 +815,10 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "baseline\tbaseline_run\t42\t0.75\tcompleted\tnot_applicable\t\t0\texperiments/runs/run1/resource_monitor.csv\n"
             "ours\trun1\t42\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run1/checkpoints/best.pt\t120\texperiments/runs/run1/resource_monitor.csv\n",
         )
-    elif stage == "M3S04":
+    elif stage == "M3S05":
         _write(
             out,
-            "# M3S04 Result Validation\n\n"
+            "# M3S05 Result Validation\n\n"
             "## 实验停止原因\n"
             "停止条件: budget complete. 当前 best 指标: accuracy=0.803 vs baseline=0.753. Evidence Ladder: solid.\n\n"
             "## 数据质量检查\n"
@@ -888,7 +877,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
         _write(
             root / "knowledge" / "handoff_M3_M4.md",
             "# Handoff M3 to M4\n\n"
-            "Decision: KEEP, validation passed in M3S04 result validation.\n\n"
+            "Decision: KEEP, validation passed in M3S05 result validation.\n\n"
             "## Claims and Evidence\n"
             "claim C1: ours improves accuracy; evidence: experiments/artifacts/main_experiment/manifest.yaml and comparison_table.csv.\n\n"
             "## Artifact Path\n"
@@ -921,7 +910,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "# M4S02\n\n"
             "## 分析目标\n"
             "How: test the contribution mechanism. Where: test mild-noise and boundary scenarios. "
-            "Why: probe the mechanism behind the gain. Upstream basis: M2S06 plan, M3S04 KEEP validation, and handoff_M3_M4.\n\n"
+            "Why: probe the mechanism behind the gain. Upstream basis: M3S01 main experiment design, M3S05 KEEP validation, and handoff_M3_M4.\n\n"
             "## Component Claim Analysis Matrix\n"
             "| Component / Claim | Required Evidence | Planned Slice IDs | Missing Evidence / Waiver |\n"
             "|---|---|---|---|\n"
@@ -1109,11 +1098,11 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "All required upstream documents are complete: M1S02_literature_deepdive.md, "
             "M1_source_log.yaml, M1S03_research_question.md, M1S04_hypothesis_generation.md, "
             "M2S03_method_architecture.md, M2S04_algorithm_theory.md, M2S05_experiment_setup.md, "
-            "M2S06_full_experiment_plan.md, M3S03_main_experiment.md, M3S04_result_validation.md, "
+            "M3S01_main_experiment_design.md, M3S04_main_experiment.md, M3S05_result_validation.md, "
             "M4S03_analysis_experiment.md, M4S04_analysis_results.md, handoff_M4_M5.md.\n\n"
             "## 核心贡献点\n"
             "Contribution Contrib-1: bounded method improvement. 支撑证据 paths: "
-            "knowledge/M3/M3S04_result_validation.md and knowledge/M4/M4S04_analysis_results.md. "
+            "knowledge/M3/M3S05_result_validation.md and knowledge/M4/M4S04_analysis_results.md. "
             "证据状态: fully_supported. Paper section: Introduction / Experiments.\n\n"
             "## Gap 识别\n"
             "Evidence Gap 证据缺口: Low | block: no | handled in limitations.\n"
@@ -1124,8 +1113,8 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "paragraph function, figure/table density, and layout constraints only; do not copy 不复制 "
             "source sentences or unique figure designs.\n\n"
             "## 数据一致性检查\n"
-            "Main metric 主指标 is consistent 一致 between M3S03 and M3S04. Baseline 基线 is consistent "
-            "between M2S05 and M3S02. Dataset 数据集 is consistent between M2S05 and M3S01. "
+            "Main metric 主指标 is consistent 一致 between M3S04 and M3S05. Baseline 基线 is consistent "
+            "between M2S05/M3S01 and M3S03. Dataset 数据集 is consistent between M3S01 and M3S02. "
             "Method name 方法名称 is consistent between M2S03 and M2S04.\n\n"
             "## 审计结论\n"
             "Writing readiness: yes\n"

@@ -5,8 +5,8 @@
 1. Survey Agent (M1S01-02) 与 Survey Review Agent **不得由同一模型实例执行**
 2. Ideation Agent (M1S03-05) 与 Logic/Novelty Critic **不得由同一模型实例执行**
 3. Method Agent (M2S01-05) 与 Method Critic (G2) **不得由同一模型实例执行**
-4. Experiment Agent (M3S01-03) 与 M3 Stage Review Agents **不得由同一模型实例执行**
-5. Analysis Agent (M3S04) 与 Gate G3 Critics（Method / Evidence）**不得由同一模型实例执行**
+4. Experiment Agent (M3S01-M3S04) 与 M3 Stage Review Agents **不得由同一模型实例执行**
+5. Analysis Agent (M3S05) 与 `m3_result_validation_review` / Gate G3 Critics（Method / Evidence）**不得由同一模型实例执行**
 
 ## 信息传递规则
 
@@ -50,5 +50,5 @@
 - M1S02 Round Review: Survey Review Agent 必须独立读取 M1S02_literature_deepdive.md 和 M1_source_log.yaml
 - Gate G1: Coverage + Logic + Novelty 三个 Critic 应尽可能分配给不同模型实例
 - Gate G2: Method Critic 应独立验证 M2S03 的伪代码与 M2S04 的实验设计
-- M3S01-M3S03 Stage Review: Reviewer 必须独立读取对应 M3 产出、配置和结果文件
+- M3S01-M3S05 Stage Review: Reviewer 必须独立读取对应 M3 产出、配置和结果文件
 - Gate G3: Method Critic 与 Evidence Critic 应尽可能分配给不同模型实例

@@ -146,7 +146,7 @@ python scripts/state_manager.py create \
 - **本地有 GPU** → `--env-mode local`
 - **本地无 GPU，需远程服务器** → `--env-mode ssh`
 - **已有 SSH 密钥** → `--ssh-auth-method key`（无需密码）
-- **只有密码，无密钥** → `--ssh-auth-method password --ssh-password "xxx"`（M3S01 自动部署密钥后切换为 key）
+- **只有密码，无密钥** → `--ssh-auth-method password --ssh-password "xxx"`（M3S02 自动部署密钥后切换为 key）
 
 ### 5. 其他选项
 
@@ -189,7 +189,7 @@ python scripts/state_manager.py create \
   --python-version 3.10 \
   --cuda-version 12.1
 
-# 完整配置（SSH 远程，只有密码 → M3S01 自动部署密钥）
+# 完整配置（SSH 远程，只有密码 → M3S02 自动部署密钥）
 python scripts/state_manager.py create \
   "Semantic Communication for Images" \
   "SemCom-Image-RL" \

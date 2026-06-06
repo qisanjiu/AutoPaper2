@@ -151,7 +151,7 @@ result = conductor.backtrack(
         "required_fix": "...",
         "success_criteria": "...",
         "rebuild_mode": "full_regenerate",
-        "rerun_scope": "重新执行 M2S03-M2S06 及 M4S01-M4S04",
+        "rerun_scope": "重新执行 M2S03-M2S05/M3S01 及 M4S01-M4S04",
         "evidence_paths": ["knowledge/M4/M4S02_analysis_experiment_design.md"],
         "handoff_updates": ["更新 handoff_M2_M3 中的消融设计摘要"],
     }

@@ -57,7 +57,7 @@ If not PASS:
 - success_criteria: ...
 - evidence_paths: ...
 - rebuild_mode: incremental_replay / full_regenerate
-- rerun_scope: M2S05 -> M2S06
+- rerun_scope: M2S05 -> M3S01
 ```
 
 PASS is valid only if the experiment setup can be handed to M3 without guessing

@@ -26,7 +26,7 @@ The framework should let a user provide a research topic and configuration, then
 | Subagent dispatch is durable | Satisfied structurally + simulated end-to-end | `spiral/dispatch.py` writes packets under `state/dispatch/`; packets include input paths, output paths, agent docs, and boundaries. `scripts/full_pipeline_simulator.py` now builds/writes dispatch packets while simulating all stages. |
 | Backtracking is stateful and delegated | Improved | `Conductor.backtrack()` records advice, stale stages, spiral count, gate re-review; human review uses `Conductor.backtrack()`. The no-LLM simulation now exercises a stage-review REVISE → backtrack → re-execute path. Full real multi-agent execution still depends on the runtime Agent tool. |
 | Repetitive work scripted | Improved | Existing scripts cover state, dispatch, health, submission/email, env probe. Added `scripts/m6_action_router.py`, `spiral/revision_router.py`, and `scripts/full_pipeline_simulator.py` for deterministic full-pipeline orchestration checks. |
-| User M1-M6 requirements | Improved + traceable | M1 now enforces search provenance/screening evidence, STORM-style perspective coverage, deep-reading fields, and large/middle/small gap-chain gates; M2 now enforces auditable cross-domain search statistics, query ledger, candidate discovery provenance, Gap→solution mapping, M2S05/M2S06 experiment design gates, and independent reviewers; M3 now enforces concrete local/ssh execution configuration, sandbox/profile matching, long-run permission/patience ledger, and M3S04 result-validation evidence package; M4 now enforces how/where/why analysis-design provenance, baseline-aware M4S02 slices, sandboxed analysis execution, and deep-analysis evidence packaging; M5 now enforces pre-write upstream completeness, fully-supported contribution evidence, data consistency/readiness decisions, style-layout reference distillation, figure policy, and final paper package validation; M6 internal review threshold plus item-level external-review resolution and G1-G6 evidence rubrics are now explicit in templates/docs/gates. `config/user_requirement_trace.yaml` maps each user requirement to evidence paths and tests, and `scripts/requirement_trace_check.py` validates the trace. Actual research quality still depends on project-specific execution evidence. |
+| User M1-M6 requirements | Improved + traceable | M1 now enforces search provenance/screening evidence, STORM-style perspective coverage, deep-reading fields, and large/middle/small gap-chain gates; M2 now enforces auditable cross-domain search statistics, query ledger, candidate discovery provenance, Gap→solution mapping, M2S05 experiment setup/metric-protocol gates, and independent reviewers; M3 now enforces M3S01 main-experiment design with concrete baseline reference values, concrete local/ssh execution configuration, sandbox/profile matching, long-run permission/patience ledger, and M3S05 result-validation evidence package; M4 now enforces how/where/why analysis-design provenance, baseline-aware M4S02 slices, sandboxed analysis execution, and deep-analysis evidence packaging; M5 now enforces pre-write upstream completeness, fully-supported contribution evidence, data consistency/readiness decisions, style-layout reference distillation, figure policy, and final paper package validation; M6 internal review threshold plus item-level external-review resolution and G1-G6 evidence rubrics are now explicit in templates/docs/gates. `config/user_requirement_trace.yaml` maps each user requirement to evidence paths and tests, and `scripts/requirement_trace_check.py` validates the trace. Actual research quality still depends on project-specific execution evidence. |
 | Complete publishable paper guarantee | Not provable from code alone | The framework enforces many quality gates, but publishability requires actual topic-specific research, data access, experiments, reviewer outcomes, and venue compliance. |
 
 ## Tests Run
@@ -111,27 +111,27 @@ The warning-as-error public DB run covers threaded SQLite connections and survey
   - every M2 candidate source must record search_dimension, target_gap, source_domain, core_mechanism, adaptation_potential, discovery_source, and discovery_query
   - `gap_solution_map` is now blocking rather than advisory, so every M2 search package must map M1 gaps to candidate solutions
   - M2S01 stage gate now invokes `source_log_validator.validate(module="M2")`; Method Agent, M2S01 template, M2 Search Quality Reviewer, simulator, and regression tests use the same contract
-- Hardened M2S05/M2S06 experiment-design closure:
+- Hardened M2S05/M3S01 experiment-design closure:
   - M2S05 now blocks advancement unless dataset acquisition, baseline fairness, metrics/statistics, related-work protocol, seeds, reproducibility, and per-experiment purpose/hypothesis fields are present
-  - M2S06 now blocks advancement unless execution order, branch/backtrack logic, risk/resource budget, per-experiment report blueprint, run protocol, and required evidence contract are present
-  - `m2_experiment_design_review` and `m2_experiment_plan_review` are now mandatory independent stage reviews with canonical dispatch outputs and non-bypass state-manager handling
+  - M3S01 now blocks advancement unless the main experiment has dataset/scenario/split, metric_protocol_id, baseline reference values with sources, and proposed-method same-condition protocol
+  - `m2_experiment_design_review` and `m3_main_experiment_design_review` are mandatory independent stage reviews with canonical dispatch outputs and non-bypass state-manager handling
 - Promoted M1 deep-reading fields from guidance to enforced validation for academic sources in `utils/source_log_validator.py`.
-- Hardened M3S01 execution evidence:
-  - Experiment Agent and M3S01 template now require `experiments/logs/m3s01_longrun_ledger.md`
-  - Stage gate blocks M3S01 if the ledger is missing, incomplete, or records invalid size/time-based skips
-  - Review dispatch includes the ledger, execution config, and requirements files for independent M3S01 review
-- Hardened M3S01 local/ssh execution configuration:
-  - M3S01 now fails unless `execution.mode` is explicitly `local` or `ssh`
+- Hardened M3S02 execution evidence:
+  - Experiment Agent and M3S02 template now require `experiments/logs/m3s02_longrun_ledger.md`
+  - Stage gate blocks M3S02 if the ledger is missing, incomplete, or records invalid size/time-based skips
+  - Review dispatch includes the ledger, execution config, and requirements files for independent M3S02 review
+- Hardened M3S02 local/ssh execution configuration:
+  - M3S02 now fails unless `execution.mode` is explicitly `local` or `ssh`
   - local mode requires `execution.local.env_manager` (`conda` / `venv` / `uv` / `docker`) and `execution.local.python_version`
   - ssh mode requires `execution.ssh.host`, `user`, `workspace_path`, `env_manager`, `python_version`, and `sync.method` (`rsync` / `scp`)
   - sandbox mode must match execution mode: `ssh` requires `ssh_remote`, while `local` cannot use `ssh_remote`
-  - M3S01 implementation docs and the long-run ledger must match the configured mode; the ledger now also requires permission/approval evidence in addition to patience/polling and resume commands
-  - Experiment Agent, M3S01 template, M3 Dataset/Environment Reviewer, and regression tests now document the same local/ssh contract
-- Hardened M3S04 result-validation closure:
-  - M3S04 now blocks shallow KEEP reports that omit data-quality checks, statistical validation, hypothesis mapping, root-cause analysis, negative results, limitations, artifact packaging, or downstream M4 handoff content
+  - M3S02 implementation docs and the long-run ledger must match the configured mode; the ledger now also requires permission/approval evidence in addition to patience/polling and resume commands
+  - Experiment Agent, M3S02 template, M3 Dataset/Environment Reviewer, and regression tests now document the same local/ssh contract
+- Hardened M3S05 result-validation closure:
+  - M3S05 now blocks shallow KEEP reports that omit data-quality checks, statistical validation, hypothesis mapping, root-cause analysis, negative results, limitations, artifact packaging, or downstream M4 handoff content
   - KEEP requires `experiments/artifacts/main_experiment/manifest.yaml`, `metric_contract.yaml`, `comparison_table.csv`, `reproduction.md`, and `knowledge/handoff_M3_M4.md`
   - FIX/BACKTRACK decisions remain non-advancing even when structured repair advice is present, forcing the requested rerun before M4
-  - the no-LLM full-pipeline simulator now emits a gate-valid M3S04 evidence package
+  - the no-LLM full-pipeline simulator now emits a gate-valid M3S05 evidence package
 - Hardened M4S04 deep-analysis closure:
   - M4S04 now blocks analysis integration unless it answers how/where/why, covers ablation, mechanism, robustness, and failure/negative analysis, and records baseline-aware comparisons
   - `experiments/analysis_results.tsv` must include structured slice/type/method/metric/value rows with baseline and ours/proposed comparisons
@@ -140,17 +140,17 @@ The warning-as-error public DB run covers threaded SQLite connections and survey
 - Hardened M4S02 deep-analysis design closure:
   - M4S02 now blocks shallow analysis designs that do not explicitly map how/where/why analysis targets
   - claim-carrying slices must include `comparison_target`, `expected_pattern`, `claim_links`, `baseline_inclusion`, `literature_basis`, and `evidence_criteria`
-  - the design must cite upstream M2/M3 basis such as M2S05/M2S06, M3S04, or `handoff_M3_M4.md`, plus literature/database analysis basis
+  - the design must cite upstream M2/M3 basis such as M2S05, M3S01, M3S05, or `handoff_M3_M4.md`, plus literature/database analysis basis
   - at least 3 concrete `Ana-*` slice IDs are required before M4S03 can execute
   - Analysis Agent, M4S02 template, M4 Analysis Design Reviewer, simulator, and regression tests now document the same design contract
 - Aligned M4/M5 subagent boundaries:
   - Conductor docs now route `M5S01` to Analysis Agent and `M5S02-M5S08/M5S09` to Writing Agent, matching `spiral/project.py`
   - Analysis Agent docs no longer present M4S03 as an Analysis-owned output; they explicitly defer M4S03 execution to Experiment Agent
   - Experiment Agent docs now define M4S03 responsibilities for running `Ana-*` slices, producing `experiments/analysis_results.tsv`, sandbox execution records, artifacts, and execution-side anomaly routing
-  - M4S02/M4S03 dispatch input resolution now passes `handoff_M3_M4.md`, M2S06/M3S04 evidence, and analysis-design files to the responsible subagents; dispatch tests cover those paths
+  - M4S02/M4S03 dispatch input resolution now passes `handoff_M3_M4.md`, M3S01/M3S05 evidence, and analysis-design files to the responsible subagents; dispatch tests cover those paths
 - Added M3/M4 sandbox/container execution profile:
   - `config/execution_env.yaml` and `scripts/env_probe.py` now include `execution.sandbox`
-  - M3S01 requires `experiments/configs/sandbox_profile.yaml` with network, filesystem, secrets, resource, and reproducibility policies
+  - M3S02 requires `experiments/configs/sandbox_profile.yaml` with network, filesystem, secrets, resource, and reproducibility policies
   - M4S03 requires a sandbox/container execution record for analysis slices
   - Stage gates now block missing/disabled sandbox profiles or M4S03 execution without sandbox evidence
 - Added PaperBench-style Gate rubrics:

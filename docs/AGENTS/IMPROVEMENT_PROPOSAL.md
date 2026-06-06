@@ -128,7 +128,7 @@ Experiment integrity: executor 不得评判自己的 eval 代码
 - Experiment Agent 的 AGENT.md 建议使用 git commit 保存实验，但**非强制**
 - 未规定 shell 执行必须通过统一接口（如 bash_exec），Agent 可能直接调用本地 shell
 - 长运行实验缺乏 detach/monitor/await 生命周期管理
-- M3S02 的 "不做保留/回退决策" 是好的，但缺乏具体的证据记录格式
+- M3S03 的 "不做保留/回退决策" 是好的，但缺乏具体的证据记录格式
 
 **对标**: DeepScientist `system.md:11.3` 的 bash_exec 纪律 + autoresearch 的 git 协议
 

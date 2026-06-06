@@ -132,7 +132,7 @@ class TestM4StageGate(unittest.TestCase):
                 "# M4S02 Deep Analysis Experiment Design\n\n"
                 "## 分析目标\n"
                 "How: test how the component drives the gain. Where: test scenario boundaries and where it works. "
-                "Why: test why the mechanism explains the improvement. Upstream basis: M2S06, M3S04, handoff_M3_M4.\n\n"
+                "Why: test why the mechanism explains the improvement. Upstream basis: M3S01, M3S05, handoff_M3_M4.\n\n"
                 "## Component Claim Analysis Matrix\n"
                 "| Component / Claim | Required Evidence | Planned Slice IDs | Missing Evidence / Waiver |\n"
                 "|---|---|---|---|\n"
@@ -147,7 +147,7 @@ class TestM4StageGate(unittest.TestCase):
                 "- comparison_target: full model and active baseline\n"
                 "- baseline_inclusion: required\n"
                 "- efficiency_required: no\n"
-                "- literature_basis: PaperX / M2S06 diagnostic protocol\n"
+                "- literature_basis: PaperX / M3S01 main experiment protocol\n"
                 "- paper_protocol_adaptation: PaperX task_setup metric baseline_protocol adopted for Ana-1\n"
                 "- expected_pattern: full > w/o component\n"
                 "- evidence_criteria: 3 seeds, effect size, confidence interval\n"
@@ -635,9 +635,9 @@ class TestM5StageGate(unittest.TestCase):
             "knowledge/M2/M2S03_method_architecture.md": "# M2S03\n",
             "knowledge/M2/M2S04_algorithm_theory.md": "# M2S04\n",
             "knowledge/M2/M2S05_experiment_setup.md": "# M2S05\n",
-            "knowledge/M2/M2S06_full_experiment_plan.md": "# M2S06\n",
-            "knowledge/M3/M3S03_main_experiment.md": "# M3S03\n",
-            "knowledge/M3/M3S04_result_validation.md": "# M3S04\n",
+            "knowledge/M3/M3S01_main_experiment_design.md": "# M3S01\n",
+            "knowledge/M3/M3S04_main_experiment.md": "# M3S04\n",
+            "knowledge/M3/M3S05_result_validation.md": "# M3S05\n",
             "knowledge/M4/M4S03_analysis_experiment.md": "# M4S03\n",
             "knowledge/M4/M4S04_analysis_results.md": "# M4S04\n",
             "knowledge/handoff_M4_M5.md": "# handoff\n",
@@ -668,10 +668,10 @@ class TestM5StageGate(unittest.TestCase):
         (root / "knowledge" / "M5" / "M5S01_pre_write_audit.md").write_text(
             "# M5S01 Pre-Write Audit\n\n"
             "## 上游文档完整性检查\n"
-            "upstream completeness complete for M1S02, M1_source_log, M1S03, M1S04, M2S03-M2S06, "
-            "M3S03-M3S04, M4S03-M4S04, handoff_M4_M5.\n\n"
+            "upstream completeness complete for M1S02, M1_source_log, M1S03, M1S04, M2S03-M2S05, M3S01, "
+            "M3S04-M3S05, M4S03-M4S04, handoff_M4_M5.\n\n"
             "## 核心贡献点\n"
-            "Contribution Contrib-1 has 支撑证据 evidence path knowledge/M3/M3S04_result_validation.md "
+            "Contribution Contrib-1 has 支撑证据 evidence path knowledge/M3/M3S05_result_validation.md "
             "and knowledge/M4/M4S04_analysis_results.md. 证据状态: fully_supported.\n\n"
             "## Gap 识别\n"
             f"{gap}\n"

@@ -1,8 +1,8 @@
 # M3 Main Result Review Agent
 
 > **角色**: 主实验结果审查专家
-> **目标**: 审查 M3S03 的主实验结果是否完整、可信，并判断是否超过 baseline
-> **触发时机**: M3S03 完成后（stage-level review）
+> **目标**: 审查 M3S04 的主实验结果是否完整、可信，并判断是否超过 baseline
+> **触发时机**: M3S04 完成后（stage-level review）
 > **绝不**: 改代码、重跑实验、替代统计分析
 
 ---
@@ -47,20 +47,20 @@
 - [ ] 未达标原因是否明确
 
 ### 2.5 资源利用率与公平性
-- [ ] `experiments/configs/resource_plan.yaml` 存在并被 M3S03 引用
+- [ ] `experiments/configs/resource_plan.yaml` 存在并被 M3S04 引用
 - [ ] 每个 claim-carrying run 都有 `experiments/runs/<run_id>/resource_monitor.csv` 或等价监控日志
-- [ ] 多 GPU 可见时，M3S03 使用 DDP 或 seed/config task_parallel；未使用时有合理说明
+- [ ] 多 GPU 可见时，M3S04 使用 DDP 或 seed/config task_parallel；未使用时有合理说明
 - [ ] CPU/GPU 低利用率已触发优化 pass 或记录不可优化原因
 - [ ] baseline 与 ours 的资源策略公平；资源差异已在结果表中标注
-- [ ] 若 `resource_pool.enabled == true` 或资源池 resources > 1，M3S03 存在 `m3_task_queue.yaml` 和 `m3_task_allocation.yaml`，且 assignments/waves 合理利用可并行任务
+- [ ] 若 `resource_pool.enabled == true` 或资源池 resources > 1，M3S04 存在 `m3_task_queue.yaml` 和 `m3_task_allocation.yaml`，且 assignments/waves 合理利用可并行任务
 - [ ] 每个正式 run 在正文和 `experiments/results.tsv` 中记录 `resource_id`、`resource_kind`、`server_id`（如适用）、`resource_monitor`
 - [ ] 远程 run 有 push/pull 同步证据，metrics/logs/resource_monitor/watchdog/artifacts 已回收到本地项目
 - [ ] allocation 中 blocked_tasks 或未使用资源有明确原因：依赖、DDP 不兼容、显存、数据同步、fairness、配额或远程不可达
 
 ### 2.6 长跑监督、告警与 Agent 决策
-- [ ] `experiments/logs/runtime_events.jsonl` 存在，且包含 M3S03/watchdog 巡检事件
+- [ ] `experiments/logs/runtime_events.jsonl` 存在，且包含 M3S04/watchdog 巡检事件
 - [ ] 每个预计超过 2 小时的正式 run 都有 `experiments/runs/<run_id>/watchdog_checks.jsonl` 或等价巡检日志
-- [ ] 若出现 `watchdog_alerts.jsonl`，M3S03 正文必须记录告警类型、原始证据路径、Agent 决策和理由
+- [ ] 若出现 `watchdog_alerts.jsonl`，M3S04 正文必须记录告警类型、原始证据路径、Agent 决策和理由
 - [ ] Watchdog/报警机制没有自动结束训练；停止、继续、修复或回溯由 Experiment Agent 根据日志、metric 曲线、checkpoint 和资源监控判断
 - [ ] NaN/Inf、不收敛、OOM、异常退出、早停候选等运行状态没有被忽略或只在最终结果中事后带过
 
@@ -68,13 +68,13 @@
 
 ## 3. 审查输出
 
-产出：`knowledge/reviews/M3S03_main_result_review.md`
+产出：`knowledge/reviews/M3S04_main_result_review.md`
 
 ```markdown
-# Main Result Review — M3S03
+# Main Result Review — M3S04
 
 ## 审查对象
-- `knowledge/M3/M3S03_main_experiment.md`
+- `knowledge/M3/M3S04_main_experiment.md`
 - `experiments/results.tsv`
 - `experiments/runs/`
 - `experiments/configs/resource_plan.yaml`
@@ -106,7 +106,7 @@
 ...
 
 ### 如果 REVISE / BACKTRACK
-- `target_stage`: M3S03 / M3S02 / M3S01 / M2S05 / M1S04
+- `target_stage`: M3S04 / M3S03 / M3S02 / M2S05 / M1S04
 - `blocking_reason`: ...
 - `required_fix`: ...
 - `success_criteria`: ...
@@ -133,14 +133,14 @@
 本 Agent 必须遵守 `docs/AGENTS/critic/cross_model_protocol.md`。
 
 ### 5.1 强制隔离
-- 不得与执行 M3S03 的 Experiment Agent 使用同一模型实例
+- 不得与执行 M3S04 的 Experiment Agent 使用同一模型实例
 - 不得依赖 Experiment Agent 提供的摘要、解释或精选片段
 - 输入只能是 Conductor 提供的文件路径
 
 ### 5.2 必须独立读取的原始对象
-- `knowledge/M3/M3S03_main_experiment.md`
-- `knowledge/M3/M3S02_baseline_lock.md`
-- `knowledge/M3/M3S01_implementation.md`
+- `knowledge/M3/M3S04_main_experiment.md`
+- `knowledge/M3/M3S03_baseline_lock.md`
+- `knowledge/M3/M3S02_implementation.md`
 - `knowledge/M1/M1S04_hypothesis_generation.md`
 - `experiments/results.tsv`
 - `experiments/runs/`
@@ -149,7 +149,7 @@
 - baseline metric contracts
 
 ### 5.3 输出与推进规则
-- 必须写入：`knowledge/reviews/M3S03_main_result_review.md`
+- 必须写入：`knowledge/reviews/M3S04_main_result_review.md`
 - 必须包含明确行：`Verdict: PASS` / `Verdict: REVISE` / `Verdict: BACKTRACK`
 - 若 verdict 不是 PASS，必须写明：
   - `target_stage`
@@ -160,4 +160,4 @@
   - `rebuild_mode`
   - `rerun_scope`
   - `handoff_updates`
-- Conductor 只有在本 review 文件存在且 `Verdict: PASS` 时才能推进到 M3S04
+- Conductor 只有在本 review 文件存在且 `Verdict: PASS` 时才能推进到 M3S05

@@ -29,7 +29,7 @@ skill_role: utility
 - "手动导入 source log"
 
 **不触发**的情况：
-- 用户说的是项目内部的数据处理（如 "M3S01 加载数据集"）— 那是 Experiment Agent 的职责
+- 用户说的是项目内部的数据处理（如 "M3S02 加载数据集"）— 那是 Experiment Agent 的职责
 - 用户说的是自动搜索文献 — 应路由到 Survey Agent
 
 ---

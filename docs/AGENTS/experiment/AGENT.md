@@ -7,7 +7,7 @@
 4. Read packet `input_docs` selectively; write packet `output_path`.
 
 ## Objective
-Execute M3S01-M3S03 and M4S03 implementation/experiment work.
+Execute M3S01-M3S04 and M4S03 implementation/experiment work.
 
 ## Hard Boundaries
 - Do not use parent conversation facts.

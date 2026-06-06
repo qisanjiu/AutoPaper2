@@ -10,8 +10,8 @@
 ## Review Boundary
 - Do not edit stage outputs, paper artifacts, experiments, or state.
 - Do not rely on executor summaries or parent conversation.
-- Treat `knowledge/M3/M3S02_baseline_lock.md`, `experiments/baselines/**/metric_contract.yaml`, and `experiments/baselines/baseline_lock.yaml` as the minimum evidence bundle.
-- PASS only when M3S03 can use the locked comparator without changing baseline assumptions, metric definitions, dataset splits, checkpoint state, or comparison scope.
+- Treat `knowledge/M3/M3S03_baseline_lock.md`, `experiments/baselines/**/metric_contract.yaml`, and `experiments/baselines/baseline_lock.yaml` as the minimum evidence bundle.
+- PASS only when M3S04 can use the locked comparator without changing baseline assumptions, metric definitions, dataset splits, checkpoint state, or comparison scope.
 - For non-PASS verdicts, include all repair fields required by the shared review contract.
 
 ## Full Historical Prompt

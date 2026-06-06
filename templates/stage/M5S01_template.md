@@ -28,9 +28,9 @@
 | M2 | M2S03_method_architecture.md | ☐ | |
 | M2 | M2S04_algorithm_theory.md | ☐ | |
 | M2 | M2S05_experiment_setup.md | ☐ | |
-| M2 | M2S06_full_experiment_plan.md | ☐ | |
-| M3 | M3S03_main_experiment.md | ☐ | |
-| M3 | M3S04_result_validation.md | ☐ | |
+| M3 | M3S01_main_experiment_design.md | ☐ | |
+| M3 | M3S04_main_experiment.md | ☐ | |
+| M3 | M3S05_result_validation.md | ☐ | |
 | M4 | M4S03_analysis_experiment.md | ☐ | |
 | M4 | M4S04_analysis_results.md | ☐ | |
 | Handoff | handoff_M4_M5.md | ☐ | |
@@ -92,9 +92,9 @@
 
 | 检查项 | 来源 A | 来源 B | 是否一致 | 备注 |
 |--------|--------|--------|---------|------|
-| 主指标数值 | M3S03 | M3S04 | 是/否 | |
-| 基线名称 | M2S05 | M3S02 | 是/否 | |
-| 数据集名称 | M2S05 | M3S01 | 是/否 | |
+| 主指标数值 | M3S04 | M3S05 | 是/否 | |
+| 基线名称 | M2S05 | M3S03 | 是/否 | |
+| 数据集名称 | M2S05 | M3S02 | 是/否 | |
 | 方法名称 | M2S03 | M2S04 | 是/否 | |
 
 ---

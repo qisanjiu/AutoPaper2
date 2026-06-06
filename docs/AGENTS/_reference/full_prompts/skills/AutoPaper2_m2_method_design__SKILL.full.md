@@ -5,7 +5,7 @@ description: >
   当用户需要进入方法设计阶段时触发，包括：
   前置检查 (M1 完成状态) → M2S01 Cross-Domain Search → M2S02 Migration Analysis
   → M2S03 Method Architecture Design → M2S04 Algorithm & Theory Design
-  → M2S05 Experiment Setup → M2S06 Full Experiment Plan
+  → M2S05 Experiment Setup → M3S01 Main Experiment Design
   → Gate G2（Logic + Method + Novelty Critic）→ Handoff M2→M3。
   仅在用户明确指定进入 M2 或 M1 完成后建议进入 M2 时触发。
 argument-hint: [现有项目路径或项目名称]
@@ -185,19 +185,19 @@ Phase 5: M2S05 Experiment Setup
   → 产出: knowledge/M2/M2S05_baseline_discovery_supplement.md（如使用了间接发现，记录候选基线与评估结果）
   → Stage-level Review: m2_experiment_design_review 审查
      → verdict: REVISE/BACKTRACK → **重新调用 Method Agent subagent 修正 M2S05；主 agent 禁止直接修改**
-  → Conductor advance: M2S05 → M2S06
+  → Conductor advance: M2S05 → M3S01
 
-Phase 6: M2S06 Full Experiment Plan
+Phase 6: M3S01 Main Experiment Design
   → Method Agent 执行
   → 计划总览、执行顺序与分支逻辑
   → 成功/失败判定标准
   → 风险评估与应对
   → 资源预算
   → 消融实验仅做调度预留
-  → 产出: knowledge/M2/M2S06_full_experiment_plan.md
-  → Stage-level Review: m2_experiment_plan_review 审查
-     → verdict: REVISE/BACKTRACK → **重新调用 Method Agent subagent 修正 M2S06；主 agent 禁止直接修改**
-  → Conductor advance: M2S06 → Gate G2
+  → 产出: knowledge/M2/M3S01_main_experiment_design.md
+  → Stage-level Review: m3_main_experiment_design_review 审查
+     → verdict: REVISE/BACKTRACK → **重新调用 Method Agent subagent 修正 M3S01；主 agent 禁止直接修改**
+  → Conductor advance: M3S01 → Gate G2
 
 Phase 7: Gate G2 审查
   → Logic Critic 审查 → G2_logic_review.md
@@ -220,7 +220,7 @@ Phase 8: Handoff & 完成
 
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/method/AGENT.md`
-- 当前 stage（M2S01-M2S06）
+- 当前 stage（M2S01-M2S05）
 - 上游输入文档路径
 - 产出路径
 - 如果是 M2S01，必须强调跨领域/弱相关搜索义务
@@ -273,14 +273,14 @@ Phase 8: Handoff & 完成
 - M1 假设/Gap 相关路径（辅助，验证每个实验目的）
 - 产出路径：`knowledge/reviews/M2S05_experiment_design_review.md`
 
-#### m2_experiment_plan_review（M2S06 审查）
+#### m3_main_experiment_design_review（M3S01 审查）
 
 使用 subagent 执行，prompt 必须包含：
-- 完整读取 `docs/AGENTS/critic/m2_experiment_plan_review/AGENT.md`
-- M2S06 产出路径
+- 完整读取 `docs/AGENTS/critic/m3_main_experiment_design_review/AGENT.md`
+- M3S01 产出路径
 - M2S05 实验设置路径
 - M2S03/M2S04 方法设计产出路径（辅助，验证执行计划与方法一致）
-- 产出路径：`knowledge/reviews/M2S06_experiment_plan_review.md`
+- 产出路径：`knowledge/reviews/M3S01_experiment_plan_review.md`
 
 ### Gate G2 Critics（Phase 7，并行执行）
 
@@ -288,7 +288,7 @@ Phase 8: Handoff & 完成
 
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/critic/logic/AGENT.md`
-- M2S01-M2S06 全部产出路径
+- M2S01-M2S05 全部产出路径
 - M1S03-M1S04 产出路径（辅助，验证假设链条）
 - 产出路径：`knowledge/reviews/G2_logic_review.md`
 
@@ -296,14 +296,14 @@ Phase 8: Handoff & 完成
 
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/critic/method/AGENT.md`
-- M2S01-M2S06 全部产出路径
+- M2S01-M2S05 全部产出路径
 - 产出路径：`knowledge/reviews/G2_method_review.md`
 
 #### Novelty Critic
 
 使用 subagent 执行，prompt 必须包含：
 - 完整读取 `docs/AGENTS/critic/novelty/AGENT.md`
-- M2S01-M2S06 全部产出路径
+- M2S01-M2S05 全部产出路径
 - M1S02 产出路径（辅助，检查 M1 遗漏）
 - 产出路径：`knowledge/reviews/G2_novelty_review.md`
 
@@ -342,7 +342,7 @@ state.save()
 | M2S03 完成后 | 产出文件非空、有形式化描述、组件接口明确、与 M2S02 对应 | REVISE → M2S03 |
 | M2S04 完成后 | 算法流程与架构一致、复杂度与伪代码一致、理论不自相矛盾 | REVISE → M2S04 |
 | M2S05 完成后 | 数据集可获取、**外部基线≥5个且覆盖≥4个维度**、**基线发现过程有记录**（使用了哪些发现方法、评估维度、最终选择理由）、**代码可用性经三重验证**、baseline 公平、超参数有依据、固定随机种子=42、逐实验目的/假设/指标完整、m2_experiment_design_review PASS | BACKTRACK → M2S05 |
-| M2S06 完成后 | 执行顺序清晰、成功/失败标准明确、风险有应对、完整实验报告蓝图覆盖每个实验、证据保存协议明确、m2_experiment_plan_review PASS | BACKTRACK → M2S06 |
+| M3S01 完成后 | 执行顺序清晰、成功/失败标准明确、风险有应对、完整实验报告蓝图覆盖每个实验、证据保存协议明确、m3_main_experiment_design_review PASS | BACKTRACK → M3S01 |
 | Gate G2 | Logic ≥7.0 AND Method ≥7.0 AND Novelty ≥7.0 | BACKTRACK 或 REVISE |
 | Handoff 前 | 所有 M2 产出文件存在 | 阻止完成 |
 
@@ -374,13 +374,13 @@ M2 核心产出清单：
 - `knowledge/M2/M2S03_method_architecture.md`
 - `knowledge/M2/M2S04_algorithm_theory.md`
 - `knowledge/M2/M2S05_experiment_setup.md`
-- `knowledge/M2/M2S06_full_experiment_plan.md`
+- `knowledge/M2/M3S01_main_experiment_design.md`
 - `knowledge/reviews/M2S01_search_quality_review.md`（如触发审查）
 - `knowledge/reviews/M2S02_migration_review.md`（如触发审查）
 - `knowledge/reviews/M2S03_design_review.md`（如触发审查）
 - `knowledge/reviews/M2S04_design_review.md`（如触发审查）
 - `knowledge/reviews/M2S05_experiment_design_review.md`
-- `knowledge/reviews/M2S06_experiment_plan_review.md`
+- `knowledge/reviews/M3S01_experiment_plan_review.md`
 - `knowledge/reviews/G2_logic_review.md`
 - `knowledge/reviews/G2_method_review.md`
 - `knowledge/reviews/G2_novelty_review.md`
@@ -415,7 +415,7 @@ python scripts/state_manager.py auto-module M2
 - **跨领域搜索是 M2S01 的核心义务**：必须基于 M1 的 Gap 主动搜索弱相关领域，不能只引用 M1 的方案库。
 - **Stage-level Reviewer 必须独立**：每个 Stage 审查由独立的 Reviewer subagent 执行，不得与 Method Agent 同实例。
 - **Gate G2 必须三 Critic**：Logic + Method + Novelty 三个 Critic 都通过才算 Gate 通过。
-- **消融实验仅做调度预留**：M2S06 不设计消融细节，详细消融设计留给 M4。
+- **消融实验仅做调度预留**：M3S01 不设计消融细节，详细消融设计留给 M4。
 - **Handoff 文件必须生成**：M2 完成后必须产出 `knowledge/handoff_M2_M3.md`。
 - **跨模型隔离必须遵守**：Method Agent 与 Method Critic 不得由同一模型实例执行（参见 `docs/AGENTS/critic/cross_model_protocol.md`）。
 - **螺旋上限为 10**：M2 模块最多允许 10 次回溯，超过则 HALT，需人工介入。

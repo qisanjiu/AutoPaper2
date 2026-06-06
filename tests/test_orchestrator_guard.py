@@ -110,7 +110,7 @@ class TestOrchestratorGuardForbidden:
         assert "FORBIDDEN" in out
 
     def test_experiment_log(self, fake_project: Path) -> None:
-        code, out = _run_guard(fake_project, "experiments/logs/m3s01_longrun_ledger.md")
+        code, out = _run_guard(fake_project, "experiments/logs/m3s02_longrun_ledger.md")
         assert code == 1, out
         assert "FORBIDDEN" in out
 
