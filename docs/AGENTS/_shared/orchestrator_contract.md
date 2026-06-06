@@ -19,7 +19,7 @@ The main agent is conductor only.
 - When project auto-run is active, enable `auto_advance_modules` and do not pause at module boundaries.
 - `REVISE`, `REWORK`, `FIX`, and `BACKTRACK` are normal loop states, not user questions. Apply structured backtrack advice, regenerate dispatch for the target stage, and continue.
 - Backtracking may target any responsible upstream stage, including dataset acquisition, baseline lock, implementation, training, experiment design, method design, or hypothesis stages. Do not reduce repair to hyperparameter tuning when evidence points elsewhere.
-- Ask the user only for Gate HALT, spiral limit, explicit pause/stop, secrets, license/terms approval, paid/quota approvals, unavailable storage/network access, or unsafe/destructive actions.
+- Ask the user only for Gate HALT, spiral limit, explicit pause/stop, secrets, paid/quota approvals, unavailable storage/network access, or unsafe/destructive actions.
 
 ## Forbidden Actions
 - Do not write `knowledge/M*/`, `drafts/`, `knowledge/reviews/*_review.md`, `artifacts/paper.*`, or stage evidence on behalf of subagents.

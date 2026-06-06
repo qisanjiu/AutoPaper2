@@ -10,6 +10,8 @@
 ## Review Boundary
 - Do not edit stage outputs, paper artifacts, or state.
 - Do not rely on executor summaries or parent conversation.
+- Treat packet `role` / checker name as binding. Select the matching M5 checklist from `## m5_stage_review`; do not issue a generic M5 PASS.
+- PASS is forbidden when the stage uses vague placeholders, invented evidence, unsupported numbers, untraceable figures/tables, or claims that exceed upstream evidence.
 - For non-PASS verdicts, include all repair fields required by the shared review contract.
 - For gate reviews, apply packet `gate_rubric` and include `Rubric Results`.
 

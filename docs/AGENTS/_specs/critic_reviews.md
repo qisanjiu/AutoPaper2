@@ -33,7 +33,7 @@ Check human subjects, sensitive data, privacy, bias/fairness, misuse/dual-use, l
 Review experiment code quality and reproducibility: runnable entrypoints, configs, hardcoded paths, dependency lock, logging, seeds, outputs, no secret leakage.
 
 ## data_checker
-Review dataset availability, licenses, checksums/splits, cache/symlink paths, longrun ledger acquisition status, and no hidden unavailable data dependency. PASS is forbidden if `M3S02_dataset_pending.md` exists or any dataset/model-asset acquisition ledger row is failed, running, queued, blocked_user_action, missing log evidence, or waiting for human action.
+Review dataset availability, completeness, checksums/splits/counts, cache/symlink paths, longrun ledger acquisition status, and no hidden unavailable data dependency. PASS is forbidden if `M3S02_dataset_pending.md` exists, `experiments/data/dataset_manifest.yaml` is missing/incomplete, any required split/file is absent or zero-count, smoke-load evidence is missing, or any dataset/model-asset acquisition ledger row is failed, running, queued, blocked_user_action, missing log evidence, or waiting for human action.
 
 ## m2_search_quality
 Check M2S01 search dimensions, source diversity, M1 cross-check, candidate novelty/difference, query ledger, and `M2_source_log.yaml` completeness.
@@ -51,7 +51,7 @@ Check M2S05 dataset/baseline/metric/split/seed/fairness/resource design, relatio
 Check M3S01 main-experiment-only design: dataset/scenario/split, metric_protocol_id references from M2S05, external/prior-work baseline list, concrete baseline reference values on the same dataset/scenario/split/metric, value source/table/section, proposed-method same-condition protocol, seed=42, fairness/resource constraints, and explicit blockers. PASS is forbidden if baseline values are TBD/missing/not source-located, if baselines are ablations of the proposed method, if metric protocol IDs are missing or inconsistent with M2S05, or if the document designs ablation/robustness/mechanism/M4 analysis work instead of only the main experiment.
 
 ## m3_dataset_env_review
-Check M3S02 dataset first, env lock, sandbox profile, resource plan, hardware probe, multi-resource queue/allocation where needed, SSH evidence, longrun ledger, smoke run, no secrets.
+Check M3S02 dataset first, env lock, sandbox profile, resource plan, hardware probe, multi-resource queue/allocation where needed, SSH evidence, longrun ledger, smoke run, no secrets. Dataset review must validate `experiments/data/dataset_manifest.yaml`: every required main-experiment dataset has a complete/verified status, project-local path, required files, explicit splits, positive actual counts, expected-count match when declared, checksum verification when declared, and smoke-load log. PASS is forbidden for partial datasets, residual placeholder files, pending downloads, hidden data dependencies, or any dataset/baseline/model-asset acquisition still failed/running/queued/blocked.
 
 ## m3_baseline_result_review
 Check M3S03 baseline verification, checkpoint acquisition/loadability, metric contract, smoke run, fairness, paper/history deviation, metric_protocol_id alignment with M2S05, metric implementation sanity-check evidence, full reproduction fidelity for self-implemented comparators, no simplified/toy baselines, no ablation-as-baseline misuse, and locked comparator immutability. REVISE/BACKTRACK if a metric is wrong for the dataset/scenario, if the value is outside the M2 normal reference range without triage, if a large deviation is hidden behind `verified_match`/`verified_close`, or if required baseline code/weights/checkpoints are not downloaded, checksumed, and verified loadable.
@@ -78,13 +78,28 @@ Audit whether M4S02 can be executed by M4S03 without redesign. Require `experime
 Check M4S03 executed planned slices, `analysis_results.tsv`, baseline rows, resource monitor, sandbox/container record, artifacts, abnormal triage, no hidden negative results or secret leakage.
 
 ## m5_stage_review
-Use checker name/stage to review M5 output. Always check upstream evidence grounding, no invented numbers/citations/components, figure provenance, style-profile use, LaTeX/build impact, and stage-specific completeness.
+Use checker name/stage to review M5 output. Always check upstream evidence grounding, no invented numbers/citations/components, figure provenance, style-profile use, LaTeX/build impact, and stage-specific completeness. Generic PASS is forbidden; choose the checklist matching packet `role`/checker:
+- `m5_prewrite_review`: verify M5S01 maps final claims to G3/G4 evidence, flags weak/negative results, preserves limitations, and blocks unsupported contribution inflation.
+- `m5_outline_style_review`: verify M5S02 section plan, figure/table plan, terminology, citation slots, claim budget, and paper style profile before drafting.
+- `m5_intro_relatedwork_review`: verify M5S03 motivation, gap framing, related-work positioning, citation grounding, and no novelty overclaim beyond M1/M2.
+- `m5_method_figure_review`: verify M5S04 method description matches M2/M3 implementation, equations/algorithms are consistent, and figures have traceable source/provenance.
+- `m5_experiments_results_review`: verify M5S05 numbers exactly match validated M3/M4 artifacts, baseline fairness is preserved, tables cite artifact paths, and no unresolved anomaly is hidden.
+- `m5_analysis_discussion_review`: verify M5S06 analysis/discussion uses only M4-supported explanations, includes failures/limitations, and does not turn speculation into evidence.
+- `m5_abstract_conclusion_review`: verify M5S07 headline claims and numeric summaries match the body and evidence, with no broader task/dataset/generalization claims than supported.
+- `m5_final_compilation_review`: verify M5S08 assembled draft includes all required sections, references/figures/tables compile consistently, and build verifier issues are addressed.
+- `m5_full_polish_review`: verify M5S09 improves coherence without changing claims, numbers, citations, method details, or limitations unsupported by evidence.
 
 ## m6_internal_peer_review
 Simulate multiple strict reviewers for M6S01. Require aggregate score >= 8/10 and unresolved high-priority issues = 0 before external submission. Produce atomic high/medium issues for revision if not pass.
 
 ## m6_stage_review
-Check M6 stage-specific integrity: submission package readiness, external submission evidence, faithful review parsing, actionable rebuttal plan, routed revision execution, resolution validation.
+Check M6 stage-specific integrity. Generic PASS is forbidden; choose the checklist matching packet `role`/checker:
+- `m6_submission_audit`: verify M6S01 package readiness, final PDF/source/figures/supplement links, anonymization/ethics/data statements when relevant, and internal peer-review blockers resolved.
+- `m6_external_submission_review`: verify M6S02 external submission evidence is real, with submission log/status/receipt or a non-PASS blocker if the external service/account/network is unavailable.
+- `m6_review_parsing_review`: verify M6S03 faithfully parses all reviewer items into an atomic matrix without merging, dropping, softening, or inventing issues.
+- `m6_rebuttal_strategy_review`: verify M6S04 action plan routes each reviewer item to text, experiment, analysis, limitation, or backtrack with concrete owner/stage/evidence criteria.
+- `m6_revision_execution_review`: verify M6S05 executes routed revisions, records artifact/text deltas, reruns needed checks, and leaves unresolved external blockers as non-PASS.
+- `m6_revision_validation_review`: verify M6S06 closes every high/medium reviewer item with evidence, no G5 quality regression, and honest unresolved-item accounting before completion.
 
 ## resolution
 Check every reviewer item is addressed by evidence, text, experiment, or honest limitation; no quality regression against G5; unresolved medium/high items require REVISE/BACKTRACK.

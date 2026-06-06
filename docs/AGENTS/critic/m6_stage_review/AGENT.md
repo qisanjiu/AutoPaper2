@@ -10,6 +10,8 @@
 ## Review Boundary
 - Do not edit stage outputs, paper artifacts, or state.
 - Do not rely on executor summaries or parent conversation.
+- Treat packet `role` / checker name as binding. Select the matching M6 checklist from `## m6_stage_review`; do not issue a generic M6 PASS.
+- PASS is forbidden when submission/review/revision evidence is pending, externally blocked, unverifiable, softened, merged away, or represented only by a summary.
 - For non-PASS verdicts, include all repair fields required by the shared review contract.
 - For gate reviews, apply packet `gate_rubric` and include `Rubric Results`.
 

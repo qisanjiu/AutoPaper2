@@ -33,7 +33,7 @@ Analysis Agent: M4S01/M4S02/M4S04; Experiment Agent: M4S03; Gate: logic, evidenc
 ## M4 Autonomy Policy
 - M4 owns ablation, mechanism, robustness, failure, and efficiency analysis. Disabled-component or partial-method variants are analysis slices, not M3 baselines.
 - If an analysis slice fails or evidence is insufficient, repair the slice design/execution, rerun resources, or backtrack to M3/M2 as needed. Do not ask for ordinary reruns or tuning decisions.
-- Ask only for credentials, licenses, paid/quota approvals, unavailable storage/network access, unsafe/destructive actions, or spiral limit.
+- Ask only for credentials, paid/quota approvals, unavailable storage/network access, unsafe/destructive actions, or spiral limit.
 
 ## Forbidden Writes
 `knowledge/M*/`, `drafts/`, `knowledge/reviews/*_review.md`, `artifacts/paper.*` unless a delegated subagent owns the path.

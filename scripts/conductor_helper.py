@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from spiral.project import MODULE_STAGES
+from spiral.review_registry import STAGE_REVIEW_OUTPUTS
 
 # Cross-stage input mapping: stage -> list of required upstream docs
 # Filenames follow the canonical naming from utils.file_guard._get_canonical_name()
@@ -113,96 +114,6 @@ INPUT_ALIASES: dict[str, list[str]] = {
     ],
 }
 
-
-STAGE_REVIEW_OUTPUTS: dict[str, dict[str, str]] = {
-    "M2S01": {
-        "m2_search_quality": "knowledge/reviews/M2S01_search_quality_review.md",
-    },
-    "M2S02": {
-        "m2_migration": "knowledge/reviews/M2S02_migration_review.md",
-    },
-    "M2S03": {
-        "m2_design_review": "knowledge/reviews/M2S03_design_review.md",
-    },
-    "M2S04": {
-        "m2_design_review": "knowledge/reviews/M2S04_design_review.md",
-    },
-    "M2S05": {
-        "m2_experiment_design_review": "knowledge/reviews/M2S05_experiment_design_review.md",
-    },
-    "M3S01": {
-        "m3_main_experiment_design_review": "knowledge/reviews/M3S01_main_experiment_design_review.md",
-    },
-    "M3S02": {
-        "m3_dataset_env_review": "knowledge/reviews/M3S02_dataset_env_review.md",
-    },
-    "M3S03": {
-        "m3_baseline_result_review": "knowledge/reviews/M3S03_baseline_result_review.md",
-        "m3_baseline_lock_audit": "knowledge/reviews/M3S03_baseline_lock_audit.md",
-    },
-    "M3S04": {
-        "m3_main_result_review": "knowledge/reviews/M3S04_main_result_review.md",
-    },
-    "M3S05": {
-        "m3_result_validation_review": "knowledge/reviews/M3S05_result_validation_review.md",
-    },
-    "M4S01": {
-        "m4_findings_audit": "knowledge/reviews/M4S01_findings_audit_review.md",
-    },
-    "M4S02": {
-        "m4_analysis_design_review": "knowledge/reviews/M4S02_analysis_design_review.md",
-        "m4_execution_readiness_review": "knowledge/reviews/M4S02_execution_readiness_review.md",
-    },
-    "M4S03": {
-        "m4_analysis_execution_review": "knowledge/reviews/M4S03_analysis_execution_review.md",
-    },
-    "M5S01": {
-        "m5_prewrite_review": "knowledge/reviews/M5S01_prewrite_review.md",
-    },
-    "M5S02": {
-        "m5_outline_style_review": "knowledge/reviews/M5S02_outline_style_review.md",
-    },
-    "M5S03": {
-        "m5_intro_relatedwork_review": "knowledge/reviews/M5S03_intro_relatedwork_review.md",
-    },
-    "M5S04": {
-        "m5_method_figure_review": "knowledge/reviews/M5S04_method_figure_review.md",
-    },
-    "M5S05": {
-        "m5_experiments_results_review": "knowledge/reviews/M5S05_experiments_results_review.md",
-    },
-    "M5S06": {
-        "m5_analysis_discussion_review": "knowledge/reviews/M5S06_analysis_discussion_review.md",
-    },
-    "M5S07": {
-        "m5_abstract_conclusion_review": "knowledge/reviews/M5S07_abstract_conclusion_review.md",
-    },
-    "M5S09": {
-        "m5_full_polish_review": "knowledge/reviews/M5S09_full_polish_review.md",
-    },
-    "M5S08": {
-        "m5_final_compilation_review": "knowledge/reviews/M5S08_final_compilation_review.md",
-    },
-    "M6S01": {
-        "m6_internal_peer_review": "knowledge/reviews/M6S01_internal_peer_review.md",
-        "m6_submission_audit": "knowledge/reviews/M6S01_submission_audit_review.md",
-    },
-    "M6S02": {
-        "m6_external_submission_review": "knowledge/reviews/M6S02_external_submission_review.md",
-    },
-    "M6S03": {
-        "m6_review_parsing_review": "knowledge/reviews/M6S03_review_parsing_review.md",
-    },
-    "M6S04": {
-        "m6_rebuttal_strategy_review": "knowledge/reviews/M6S04_rebuttal_strategy_review.md",
-    },
-    "M6S05": {
-        "m6_revision_execution_review": "knowledge/reviews/M6S05_revision_execution_review.md",
-    },
-    "M6S06": {
-        "m6_revision_validation_review": "knowledge/reviews/M6S06_revision_validation_review.md",
-    },
-}
 
 ENTRY_BRIEF_RELATIVE_PATH = Path("state") / "research_brief.yaml"
 

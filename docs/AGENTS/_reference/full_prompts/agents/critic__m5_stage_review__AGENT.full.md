@@ -13,7 +13,8 @@
 2. 你必须独立读取原始产物，不依赖执行侧摘要。
 3. 你必须同时检查内容与图像/图表来源，尤其是 M5S04 / M5S05 / M5S06。
 4. 你必须给出明确 `Verdict: PASS / REVISE / BACKTRACK / HALT`。
-5. 若非 PASS，必须给出完整回溯字段，包含 `target_stage`、`blocking_reason`、`required_fix`、`success_criteria`、`evidence_paths`、`rebuild_mode`、`rerun_scope`、`handoff_updates`。
+5. 你必须根据 dispatch 的 stage/checker 使用对应 Stage-specific Focus；禁止用通用 M5 总结替代 stage-specific review。
+6. 若非 PASS，必须给出完整回溯字段，包含 `target_stage`、`blocking_reason`、`required_fix`、`success_criteria`、`evidence_paths`、`rebuild_mode`、`rerun_scope`、`handoff_updates`。
 
 ---
 

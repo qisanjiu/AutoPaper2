@@ -61,6 +61,23 @@ def _setup_g1_project(root: Path) -> None:
     _write_gate_critic_reviews(root, "G1")
 
 
+def _setup_g3_project(root: Path) -> Path:
+    for rel in ("state", "knowledge/M2", "knowledge/M3", "knowledge/reviews", "config", "experiments/configs", "experiments/logs", "experiments/baselines/baseline_1", "experiments/runs"):
+        (root / rel).mkdir(parents=True, exist_ok=True)
+    for item in get_gate_rubric("G3").get("items", []):
+        for rel in item.get("evidence_examples", []):
+            path = root / rel
+            if path.suffix:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# evidence\n", encoding="utf-8")
+            else:
+                path.mkdir(parents=True, exist_ok=True)
+    _write_gate_critic_reviews(root, "G3")
+    aggregate = root / "knowledge" / "reviews" / "G3_aggregate.md"
+    aggregate.write_text(_rubric_aggregate(root, "G3"), encoding="utf-8")
+    return aggregate
+
+
 def _write_gate_critic_reviews(root: Path, gate_id: str) -> None:
     for critic, path in gate_critic_review_paths(root, gate_id).items():
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -231,6 +248,52 @@ class TestGateRubricValidation(unittest.TestCase):
 
             self.assertIsNone(exit_code, output)
             self.assertIn("MODULE COMPLETE", output)
+
+    def test_g3_rubric_requires_m3s05_validation_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            root.mkdir()
+            aggregate = _setup_g3_project(root)
+
+            def fake_check_stage(_root: Path, stage: str) -> tuple[bool, list[str]]:
+                if stage == "M3S04":
+                    return True, ["[PASS] M3S04: evidence gate pass"]
+                if stage == "M3S05":
+                    return False, ["[FAIL] M3S05: result-validation review missing"]
+                raise AssertionError(stage)
+
+            with patch("utils.stage_gate.check_stage", side_effect=fake_check_stage):
+                ok, messages = validate_gate_rubric(root, "G3", aggregate)
+
+            self.assertFalse(ok, "\n".join(messages))
+            self.assertTrue(any("M3S05 validation gate is not currently PASS" in message for message in messages), messages)
+
+    def test_force_quality_bypass_disabled_without_debug_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            root.mkdir()
+            _setup_g1_project(root)
+            aggregate = root / "knowledge" / "reviews" / "G1_aggregate.md"
+            aggregate.write_text(_rubric_aggregate(root, "G1"), encoding="utf-8")
+
+            with patch.dict("os.environ", {"AUTOPAPER2_ALLOW_QUALITY_BYPASS": ""}, clear=False):
+                exit_code, output = _call_advance(str(root), "M1S05", "critic_team", str(aggregate), force=True)
+
+            self.assertEqual(exit_code, 1, output)
+            self.assertIn("--force quality bypass is disabled", output)
+
+    def test_skip_gates_bypass_disabled_for_stage_outputs_without_debug_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            root.mkdir()
+            _setup_g1_project(root)
+            output = root / "knowledge" / "M1" / "M1S05_novelty_feasibility.md"
+
+            with patch.dict("os.environ", {"AUTOPAPER2_ALLOW_QUALITY_BYPASS": ""}, clear=False):
+                exit_code, output_text = _call_advance(str(root), "M1S05", "ideation", str(output), skip_gates=True)
+
+            self.assertEqual(exit_code, 1, output_text)
+            self.assertIn("--skip-gates is disabled", output_text)
 
 
 if __name__ == "__main__":

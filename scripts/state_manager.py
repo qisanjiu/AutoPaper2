@@ -807,6 +807,10 @@ def _check_module_prerequisites(data: dict, target_module: str) -> tuple[bool, s
     return True, f"{prev_module} completed. Ready to start {target_module}."
 
 
+def _quality_bypass_allowed() -> bool:
+    return os.environ.get("AUTOPAPER2_ALLOW_QUALITY_BYPASS", "").strip().lower() in {"1", "true", "yes"}
+
+
 def cmd_advance(
     project_dir: str,
     stage: str,
@@ -829,6 +833,16 @@ def cmd_advance(
     is_gate = stage in GATE_STAGES
     gate_num = [k for k, v in _GATE_STAGES_MAP.items() if v == stage][0] if is_gate else None
     is_gate_aggregate = _is_gate_aggregate_output(project_dir, stage, output_file)
+    bypass_allowed = _quality_bypass_allowed()
+
+    if force and not bypass_allowed:
+        print("[BLOCKED] --force quality bypass is disabled in normal AutoPaper2 operation.")
+        print("  Set AUTOPAPER2_ALLOW_QUALITY_BYPASS=1 only for local debug, never for formal auto-run.")
+        sys.exit(1)
+    if skip_gates and not is_gate_aggregate and not bypass_allowed:
+        print("[BLOCKED] --skip-gates is disabled in normal AutoPaper2 operation.")
+        print("  Set AUTOPAPER2_ALLOW_QUALITY_BYPASS=1 only for local debug, never for formal auto-run.")
+        sys.exit(1)
 
     if is_gate_aggregate:
         fg_ok, fg_msg = validate_gate_review(project_dir, gate_num, output_file)
@@ -843,7 +857,7 @@ def cmd_advance(
     if not fg_ok:
         print(fg_msg)
         if force:
-            print("  [WARN] --force used: bypassing file_guard checks.")
+            print("  [WARN] Debug bypass enabled: --force used to bypass file_guard checks.")
         else:
             print("  [BLOCKED] Fix the issue or use --force.")
             sys.exit(1)
@@ -878,7 +892,7 @@ def cmd_advance(
             print(m)
         if not rounds_ok:
             if force:
-                print("  [WARN] --force used: bypassing M1S02 3-Round checks.")
+                print("  [WARN] Debug bypass enabled: --force used to bypass M1S02 3-Round checks.")
             else:
                 print("  [BLOCKED] M1S02 round/review validation failed.")
                 sys.exit(1)
@@ -888,7 +902,7 @@ def cmd_advance(
             print(m)
         if not sl_ok:
             if force:
-                print("  [WARN] --force used: bypassing source_log checks.")
+                print("  [WARN] Debug bypass enabled: --force used to bypass source_log checks.")
             else:
                 print("  [BLOCKED] Source log validation failed.")
                 sys.exit(1)
@@ -968,7 +982,7 @@ def cmd_advance(
                     print("  [BLOCKED] M2/M3/M4/M5/M6 stage review cannot be bypassed with --force.")
                 sys.exit(1)
             if force:
-                print("  [WARN] --force used: bypassing stage_gate checks.")
+                print("  [WARN] Debug bypass enabled: --force used to bypass stage_gate checks.")
             else:
                 print("  [BLOCKED] Stage quality checks failed.")
                 sys.exit(1)

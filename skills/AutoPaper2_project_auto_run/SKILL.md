@@ -34,7 +34,7 @@ Use dispatch next for each action; never paste parent context into subagents.
 - M3/M4 must keep working until the configured evidence target is reached or a hard blocker occurs. Slow training, long downloads, waiting for checkpoints, or poor first results are not hard blockers.
 - Agents should actively download datasets, checkpoints, baseline weights, and official code; train or resume when needed; and use SSH/resource planning when configured.
 - A failed/unavailable dataset, baseline, checkpoint, model asset, or external review artifact must not be summarized as PASS. Continue acquisition through alternate sources/caches/SSH when possible; if a true external blocker remains, require non-PASS/HALT and human action instead of advancing.
-- Ask the user only for secrets, licenses, paid/quota approvals, unavailable storage/network access, unsafe/destructive actions, spiral limit, or explicit pause/stop instructions.
+- Ask the user only for secrets, paid/quota approvals, unavailable storage/network access, unsafe/destructive actions, spiral limit, or explicit pause/stop instructions.
 
 ## Forbidden Writes
 `knowledge/M*/`, `drafts/`, `knowledge/reviews/*_review.md`, `artifacts/paper.*` unless a delegated subagent owns the path.

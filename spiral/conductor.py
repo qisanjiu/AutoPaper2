@@ -8,6 +8,7 @@ from typing import Optional, Any
 from .state import PipelineState
 from .project import MODULE_STAGES, AGENT_FOR_STAGE, GATE_STAGES
 from .verdict_parser import VerdictParser
+from .review_registry import CHECKER_AGENT_PATHS, STAGE_CHECKERS
 
 GATE_CRITICS = {
     "G1": ["logic", "coverage"],
@@ -16,43 +17,6 @@ GATE_CRITICS = {
     "G4": ["logic", "evidence", "novelty"],
     "G5": ["logic", "writing", "evidence", "novelty", "ethics"],
     "G6": ["logic", "evidence", "writing", "resolution"],
-}
-
-STAGE_CHECKERS = {
-    "M1S02": ["source_log_validator", "survey_review"],
-    # M2: stage-level reviews (承上启下审查)
-    "M2S01": ["m2_search_quality"],
-    "M2S02": ["m2_migration"],
-    "M2S03": ["m2_design_review"],
-    "M2S04": ["m2_design_review"],
-    "M2S05": ["m2_experiment_design_review"],
-    "M3S01": ["m3_main_experiment_design_review"],
-    "M3S02": ["m3_dataset_env_review"],
-    "M3S03": ["m3_baseline_result_review", "m3_baseline_lock_audit"],
-    "M3S04": ["m3_main_result_review"],
-    "M3S05": ["m3_result_validation_review"],
-    # M4: stage-level reviews
-    "M4S01": ["m4_findings_audit"],
-    "M4S02": ["m4_analysis_design_review", "m4_execution_readiness_review"],
-    "M4S03": ["m4_analysis_execution_review"],
-    # M5: content + figure/table stage reviews
-    "M5S01": ["m5_prewrite_review"],
-    "M5S02": ["m5_outline_style_review"],
-    "M5S03": ["m5_intro_relatedwork_review"],
-    "M5S04": ["m5_method_figure_review"],
-    "M5S05": ["m5_experiments_results_review"],
-    "M5S06": ["m5_analysis_discussion_review"],
-    "M5S07": ["m5_abstract_conclusion_review"],
-    "M5S09": ["m5_full_polish_review"],
-    # M5: build verification runs after full draft assembly, not after abstract/conclusion.
-    "M5S08": ["build_verifier", "m5_final_compilation_review"],
-    # M6: internal review, submission + rebuttal stage reviews
-    "M6S01": ["m6_internal_peer_review", "m6_submission_audit"],
-    "M6S02": ["m6_external_submission_review"],
-    "M6S03": ["m6_review_parsing_review"],
-    "M6S04": ["m6_rebuttal_strategy_review"],
-    "M6S05": ["m6_revision_execution_review"],
-    "M6S06": ["m6_revision_validation_review"],
 }
 
 ALL_MODULES = list(MODULE_STAGES.keys())
@@ -202,12 +166,6 @@ class Conductor:
 
     def get_checker_md_path(self, checker: str) -> Path:
         checker_paths = {
-            "source_log_validator": "critic/source_log_validator/AGENT.md",
-            "code_review": "critic/code_review/AGENT.md",
-            "data_checker": "critic/data_checker/AGENT.md",
-            "evidence": "critic/evidence/AGENT.md",
-            "build_verifier": "build_verifier/AGENT.md",
-            "survey_review": "critic/survey_review/AGENT.md",
             # Gate critics
             "logic": "critic/logic/AGENT.md",
             "method": "critic/method/AGENT.md",
@@ -215,44 +173,10 @@ class Conductor:
             "coverage": "critic/coverage/AGENT.md",
             "writing": "critic/writing/AGENT.md",
             "ethics": "critic/ethics/AGENT.md",
-            # M2 stage-level reviews
-            "m2_search_quality": "critic/m2_search_quality/AGENT.md",
-            "m2_migration": "critic/m2_migration/AGENT.md",
-            "m2_design_review": "critic/m2_design_review/AGENT.md",
-            "m2_experiment_design_review": "critic/m2_experiment_design_review/AGENT.md",
-            # M3 stage-level reviews
-            "m3_main_experiment_design_review": "critic/m3_main_experiment_design_review/AGENT.md",
-            "m3_dataset_env_review": "critic/m3_dataset_env_review/AGENT.md",
-            "m3_baseline_result_review": "critic/m3_baseline_result_review/AGENT.md",
-            "m3_baseline_lock_audit": "critic/m3_baseline_lock_audit/AGENT.md",
-            "m3_main_result_review": "critic/m3_main_result_review/AGENT.md",
-            "m3_result_validation_review": "critic/m3_result_validation_review/AGENT.md",
-            # M4 stage-level reviews
-            "m4_findings_audit": "critic/m4_findings_audit/AGENT.md",
-            "m4_analysis_design_review": "critic/m4_analysis_design_review/AGENT.md",
-            "m4_execution_readiness_review": "critic/m4_execution_readiness_review/AGENT.md",
-            "m4_analysis_execution_review": "critic/m4_analysis_execution_review/AGENT.md",
-            # M5 stage-level reviews (same AGENT, stage-specific checker names)
-            "m5_prewrite_review": "critic/m5_stage_review/AGENT.md",
-            "m5_outline_style_review": "critic/m5_stage_review/AGENT.md",
-            "m5_intro_relatedwork_review": "critic/m5_stage_review/AGENT.md",
-            "m5_method_figure_review": "critic/m5_stage_review/AGENT.md",
-            "m5_experiments_results_review": "critic/m5_stage_review/AGENT.md",
-            "m5_analysis_discussion_review": "critic/m5_stage_review/AGENT.md",
-            "m5_abstract_conclusion_review": "critic/m5_stage_review/AGENT.md",
-            "m5_full_polish_review": "critic/m5_stage_review/AGENT.md",
-            "m5_final_compilation_review": "critic/m5_stage_review/AGENT.md",
-            # M6 stage-level reviews
-            "m6_internal_peer_review": "critic/m6_internal_peer_review/AGENT.md",
-            "m6_submission_audit": "critic/m6_stage_review/AGENT.md",
-            "m6_external_submission_review": "critic/m6_stage_review/AGENT.md",
-            "m6_review_parsing_review": "critic/m6_stage_review/AGENT.md",
-            "m6_rebuttal_strategy_review": "critic/m6_stage_review/AGENT.md",
-            "m6_revision_execution_review": "critic/m6_stage_review/AGENT.md",
-            "m6_revision_validation_review": "critic/m6_stage_review/AGENT.md",
             # G6 critic
             "resolution": "critic/g6_resolution/AGENT.md",
         }
+        checker_paths.update(CHECKER_AGENT_PATHS)
         subpath = checker_paths.get(checker, checker)
         return self.agent_docs / subpath
 

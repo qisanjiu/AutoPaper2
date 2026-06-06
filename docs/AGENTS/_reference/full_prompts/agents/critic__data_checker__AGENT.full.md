@@ -26,7 +26,7 @@
 ### 2.1 数据可获取性与公共缓存检查
 - [ ] 数据集已下载且可访问
 - [ ] 数据量与 M2S05 描述一致
-- [ ] 许可证合规
+- [ ] `experiments/data/dataset_manifest.yaml` 完整：required_files、splits、actual_count、checksum（如声明）和 smoke-load 证据可验证
 - [ ] **公共缓存路径正确**: 数据集是否位于 `data/datasets/<id>/` 或项目软链接是否正确指向公共缓存
 - [ ] **项目级软链接有效**: `experiments/data/<id>/` 是否为有效链接，指向真实数据
 

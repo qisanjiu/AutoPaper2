@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import io
 import json
 import sys
@@ -650,7 +651,36 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             },
         )
         _write(root / "experiments" / "requirements.lock", "numpy==1.26.4\n")
-        _write(root / "experiments" / "data" / "demo" / "values.txt", "1\n2\n3\n")
+        values_path = root / "experiments" / "data" / "demo" / "values.txt"
+        _write(values_path, "1\n2\n3\n")
+        _write(root / "experiments" / "data" / "demo" / "splits" / "train.txt", "1\n2\n")
+        _write(root / "experiments" / "data" / "demo" / "splits" / "test.txt", "3\n")
+        _write_yaml(
+            root / "experiments" / "data" / "dataset_manifest.yaml",
+            {
+                "datasets": [
+                    {
+                        "dataset_id": "demo",
+                        "status": "complete",
+                        "path": "experiments/data/demo",
+                        "required_files": ["values.txt", "splits/train.txt", "splits/test.txt"],
+                        "splits": {
+                            "train": {"path": "splits/train.txt", "expected_count": 2, "actual_count": 2},
+                            "test": {"path": "splits/test.txt", "expected_count": 1, "actual_count": 1},
+                        },
+                        "checksum": {
+                            "algorithm": "sha256",
+                            "file": "values.txt",
+                            "value": hashlib.sha256(values_path.read_bytes()).hexdigest(),
+                        },
+                        "smoke_load": {
+                            "status": "passed",
+                            "log_path": "experiments/logs/import_smoke.log",
+                        },
+                    }
+                ]
+            },
+        )
         _write(root / "experiments" / "src" / "train.py", _code_with_enough_lines())
         _write(
             root / "experiments" / "logs" / "m3s02_longrun_ledger.md",
@@ -660,6 +690,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "| dataset | local | `wget -c https://example.test/demo.zip` | completed | `experiments/logs/download.log` | timeout=12h; poll_interval=30m | `wget -c https://example.test/demo.zip` | none | checksum passed |\n",
         )
         _write(root / "experiments" / "logs" / "download.log", "download completed; checksum passed\n")
+        _write(root / "experiments" / "logs" / "import_smoke.log", "dataset smoke load passed\n")
     elif stage == "M3S03":
         _write(
             out,

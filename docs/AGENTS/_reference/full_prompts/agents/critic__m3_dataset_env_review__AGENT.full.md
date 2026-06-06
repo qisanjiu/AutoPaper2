@@ -13,6 +13,7 @@
 
 你关注：
 - 数据集是否可访问、路径是否正确、软链接是否有效
+- `experiments/data/dataset_manifest.yaml` 是否证明数据集完整，而不是只有非空目录或占位文件
 - `config/execution_env.yaml` 是否完整且可执行
 - `experiments/requirements.lock` 或等价依赖锁定是否存在
 - 本地或 SSH 执行信息是否明确
@@ -29,10 +30,16 @@
 ### 2.1 数据集审查
 - [ ] 数据集清单完整
 - [ ] **使用的是真实数据集，而非仿真/合成/随机生成数据（红线检查）**
+- [ ] `experiments/data/dataset_manifest.yaml` 存在且列出 M3S01 主实验所需每个数据集
+- [ ] 每个数据集 status 为 complete/verified/ready，路径为项目内真实存在路径
+- [ ] required_files 全部存在，splits 明确，actual_count 为正且不低于声明的 expected_count
+- [ ] 官方或注册表提供 checksum 时，checksum 已验证；未提供时有 required_files + split count + smoke-load 证据兜底
+- [ ] smoke-load 命令真实读取数据集并写入日志，不能只是 `ls` 或目录非空
 - [ ] 公共缓存路径正确
 - [ ] 项目级软链接有效
 - [ ] 数据集完整性/校验信息记录充分
 - [ ] 对于 SSH 模式：远程数据集路径有效，传输方式已记录
+- [ ] 不存在 partial/pending/downloaded_only 残留、隐藏依赖、占位文件或下载仍在进行的主实验数据集
 
 ### 2.2 环境审查
 - [ ] `execution_env.yaml` 存在且可读
@@ -94,6 +101,7 @@
 - `experiments/configs/sandbox_profile.yaml`
 - `experiments/configs/resource_plan.yaml`
 - `experiments/logs/m3s02_longrun_ledger.md`
+- `experiments/data/dataset_manifest.yaml`
 - `experiments/data/`
 
 ## 评分
@@ -135,10 +143,12 @@
 
 ## 4. Verdict 规则
 
-- **PASS**: 数据集真实可用、环境、依赖、硬件信息、sandbox profile、resource plan、长任务 ledger 完整，多资源池（如有）可执行且同步/公平性策略完整，无 critical 问题
+- **PASS**: 数据集真实且完整可用，`dataset_manifest.yaml` 的 required_files/splits/counts/checksum/smoke-load 证据可验证，环境、依赖、硬件信息、sandbox profile、resource plan、长任务 ledger 完整，多资源池（如有）可执行且同步/公平性策略完整，无 critical 问题
 - **REVISE**: 有可修复缺口，如路径/锁文件/环境字段缺失、sandbox profile 字段不足、resource plan 字段不足、长任务 ledger 字段不足；或数据集获取方式需要补充
 - **BACKTRACK**:
   - 数据集不可获取且 Agent 未执行阻塞等待流程
+  - `dataset_manifest.yaml` 缺失、不完整、路径不存在、split 缺失、样本数为 0、checksum 不匹配或 smoke-load 缺失
+  - 数据集、baseline 权重、checkpoint 或 model asset 获取仍为 failed/running/queued/blocked_user_action/waiting_user
   - **使用仿真/合成/随机数据替代真实数据（绝对红线）**
   - 因"太大/太慢/需要等"跳过真实数据、checkpoint、远程上传或必要 smoke run，且没有阻塞报告
   - `execution.sandbox.enabled != true`、`sandbox.mode=none`、缺少凭证/文件/网络/资源边界，或实验脚本可写出项目目录/读取密钥
@@ -166,6 +176,7 @@
 - `experiments/configs/sandbox_profile.yaml`
 - `experiments/configs/resource_plan.yaml`
 - `experiments/logs/m3s02_longrun_ledger.md`
+- `experiments/data/dataset_manifest.yaml`
 - `experiments/data/`
 - `experiments/src/`
 - `experiments/configs/`
@@ -183,8 +194,14 @@ Reviewer 必须验证以下红线：
    - 检查是否记录了数据集获取的完整尝试过程
    - 如果数据集未自动获取，检查是否生成了 `M3S02_dataset_pending.md` 并阻塞等待用户
    - **禁止**：未尝试获取就直接使用替代数据
+   - 如果获取仍在运行、失败、排队、等待凭证/配额/存储/受限网络处理，review 必须 non-PASS/HALT，不得以“已说明原因”推进
 
-3. **SSH 模式数据集检查**（如 `execution_env.yaml` 中 `mode == ssh`）：
+3. **数据集完整性 manifest 检查**：
+   - 独立读取 `experiments/data/dataset_manifest.yaml`
+   - 对每个 dataset 检查 status、path、required_files、splits、actual_count/expected_count、checksum（如声明）、smoke_load log
+   - 任何主实验数据集缺少上述证据，或只验证目录非空，必须 REVISE/BACKTRACK
+
+4. **SSH 模式数据集检查**（如 `execution_env.yaml` 中 `mode == ssh`）：
    - 检查远程数据集路径是否已配置
    - 检查是否记录了远程数据集准备方式（下载/上传/已有缓存）
    - 检查 long-running ledger 是否记录了 SSH/rsync 命令、日志路径、断点续传/恢复命令和轮询状态

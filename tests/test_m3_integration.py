@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+import hashlib
 from pathlib import Path
 
 _project_root = Path(__file__).parent.parent.resolve()
@@ -72,6 +73,7 @@ class TestM3StageGate(unittest.TestCase):
             "experiments/src",
             "experiments/configs",
             "experiments/data/demo",
+            "experiments/data/demo/splits",
             "experiments/logs",
         ):
             (self.root / rel).mkdir(parents=True, exist_ok=True)
@@ -246,10 +248,45 @@ class TestM3StageGate(unittest.TestCase):
                 encoding="utf-8",
             )
         (self.root / "experiments" / "requirements.lock").write_text("numpy==1.26.4\n", encoding="utf-8")
-        (self.root / "experiments" / "data" / "demo" / "values.txt").write_text("1\n2\n3\n", encoding="utf-8")
+        values_path = self.root / "experiments" / "data" / "demo" / "values.txt"
+        values_path.write_text("1\n2\n3\n", encoding="utf-8")
+        (self.root / "experiments" / "data" / "demo" / "splits" / "train.txt").write_text("1\n2\n", encoding="utf-8")
+        (self.root / "experiments" / "data" / "demo" / "splits" / "test.txt").write_text("3\n", encoding="utf-8")
+        values_sha = hashlib.sha256(values_path.read_bytes()).hexdigest()
+        (self.root / "experiments" / "data" / "dataset_manifest.yaml").write_text(
+            "datasets:\n"
+            "  - dataset_id: demo\n"
+            "    status: complete\n"
+            "    path: experiments/data/demo\n"
+            "    required_files:\n"
+            "      - values.txt\n"
+            "      - splits/train.txt\n"
+            "      - splits/test.txt\n"
+            "    splits:\n"
+            "      train:\n"
+            "        path: splits/train.txt\n"
+            "        expected_count: 2\n"
+            "        actual_count: 2\n"
+            "      test:\n"
+            "        path: splits/test.txt\n"
+            "        expected_count: 1\n"
+            "        actual_count: 1\n"
+            "    checksum:\n"
+            "      algorithm: sha256\n"
+            "      file: values.txt\n"
+            f"      value: {values_sha}\n"
+            "    smoke_load:\n"
+            "      status: passed\n"
+            "      log_path: experiments/logs/import_smoke.log\n",
+            encoding="utf-8",
+        )
         (self.root / "experiments" / "src" / "train.py").write_text(_code_with_enough_lines(), encoding="utf-8")
         (self.root / "knowledge" / "reviews" / "M3S02_dataset_env_review.md").write_text(
             "# M3S02 Dataset & Environment Review\n\nVerdict: PASS\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "logs" / "import_smoke.log").write_text(
+            "dataset smoke load passed\n",
             encoding="utf-8",
         )
         if include_ledger:
@@ -768,6 +805,27 @@ class TestM3StageGate(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertTrue(any("resource_plan.yaml not found" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_requires_dataset_manifest(self) -> None:
+        self._write_m3s02_files(include_ledger=True)
+        (self.root / "experiments" / "data" / "dataset_manifest.yaml").unlink()
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("dataset_manifest.yaml not found" in message for message in messages), messages)
+
+    def test_m3s02_stage_gate_rejects_incomplete_dataset_manifest(self) -> None:
+        self._write_m3s02_files(include_ledger=True)
+        manifest = self.root / "experiments" / "data" / "dataset_manifest.yaml"
+        text = manifest.read_text(encoding="utf-8")
+        text = text.replace("actual_count: 1", "actual_count: 0", 1)
+        manifest.write_text(text, encoding="utf-8")
+
+        ok, messages = check_stage(self.root, "M3S02")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("actual_count/count must be > 0" in message for message in messages), messages)
 
     def test_m3s02_stage_gate_requires_local_or_ssh_mode(self) -> None:
         self._write_m3s02_files(include_ledger=True, execution_mode="cluster")

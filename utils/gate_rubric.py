@@ -292,13 +292,20 @@ def validate_gate_rubric(
     if gate_id == "G3":
         from utils.stage_gate import check_stage
 
-        m3_ok, m3_messages = check_stage(root, "M3S04")
-        if not m3_ok:
+        m3s04_ok, m3s04_messages = check_stage(root, "M3S04")
+        if not m3s04_ok:
             messages.append("[FAIL] Gate G3: M3S04 evidence gate is not currently PASS; aggregate review cannot advance.")
-            messages.extend(message for message in m3_messages if message.startswith("[FAIL] M3S04"))
+            messages.extend(message for message in m3s04_messages if message.startswith("[FAIL] M3S04"))
             ok = False
         else:
             messages.append("[PASS] Gate G3: M3S04 evidence gate PASS, including trained-weight checks")
+        m3s05_ok, m3s05_messages = check_stage(root, "M3S05")
+        if not m3s05_ok:
+            messages.append("[FAIL] Gate G3: M3S05 validation gate is not currently PASS; aggregate review cannot advance.")
+            messages.extend(message for message in m3s05_messages if message.startswith("[FAIL] M3S05"))
+            ok = False
+        else:
+            messages.append("[PASS] Gate G3: M3S05 validation gate PASS, including result-validation review")
 
     if not aggregate.exists():
         return False, [f"[FAIL] Gate {gate_id}: aggregate review missing: {aggregate}"]

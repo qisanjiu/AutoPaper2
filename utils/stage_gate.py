@@ -22,96 +22,7 @@ from spiral.verdict_parser import (
 )
 from utils.file_guard import find_alternate_outputs
 from utils.review_integrity import find_pass_integrity_issues
-
-_STAGE_REVIEW_REQUIREMENTS: dict[str, dict[str, str]] = {
-    "M2S01": {
-        "m2_search_quality": "knowledge/reviews/M2S01_search_quality_review.md",
-    },
-    "M2S02": {
-        "m2_migration": "knowledge/reviews/M2S02_migration_review.md",
-    },
-    "M2S03": {
-        "m2_design_review": "knowledge/reviews/M2S03_design_review.md",
-    },
-    "M2S04": {
-        "m2_design_review": "knowledge/reviews/M2S04_design_review.md",
-    },
-    "M2S05": {
-        "m2_experiment_design_review": "knowledge/reviews/M2S05_experiment_design_review.md",
-    },
-    "M3S01": {
-        "m3_main_experiment_design_review": "knowledge/reviews/M3S01_main_experiment_design_review.md",
-    },
-    "M3S02": {
-        "m3_dataset_env_review": "knowledge/reviews/M3S02_dataset_env_review.md",
-    },
-    "M3S03": {
-        "m3_baseline_result_review": "knowledge/reviews/M3S03_baseline_result_review.md",
-        "m3_baseline_lock_audit": "knowledge/reviews/M3S03_baseline_lock_audit.md",
-    },
-    "M3S04": {
-        "m3_main_result_review": "knowledge/reviews/M3S04_main_result_review.md",
-    },
-    "M3S05": {
-        "m3_result_validation_review": "knowledge/reviews/M3S05_result_validation_review.md",
-    },
-    "M4S01": {
-        "m4_findings_audit": "knowledge/reviews/M4S01_findings_audit_review.md",
-    },
-    "M4S02": {
-        "m4_analysis_design_review": "knowledge/reviews/M4S02_analysis_design_review.md",
-        "m4_execution_readiness_review": "knowledge/reviews/M4S02_execution_readiness_review.md",
-    },
-    "M4S03": {
-        "m4_analysis_execution_review": "knowledge/reviews/M4S03_analysis_execution_review.md",
-    },
-    "M5S01": {
-        "m5_prewrite_review": "knowledge/reviews/M5S01_prewrite_review.md",
-    },
-    "M5S02": {
-        "m5_outline_style_review": "knowledge/reviews/M5S02_outline_style_review.md",
-    },
-    "M5S03": {
-        "m5_intro_relatedwork_review": "knowledge/reviews/M5S03_intro_relatedwork_review.md",
-    },
-    "M5S04": {
-        "m5_method_figure_review": "knowledge/reviews/M5S04_method_figure_review.md",
-    },
-    "M5S05": {
-        "m5_experiments_results_review": "knowledge/reviews/M5S05_experiments_results_review.md",
-    },
-    "M5S06": {
-        "m5_analysis_discussion_review": "knowledge/reviews/M5S06_analysis_discussion_review.md",
-    },
-    "M5S07": {
-        "m5_abstract_conclusion_review": "knowledge/reviews/M5S07_abstract_conclusion_review.md",
-    },
-    "M5S09": {
-        "m5_full_polish_review": "knowledge/reviews/M5S09_full_polish_review.md",
-    },
-    "M5S08": {
-        "m5_final_compilation_review": "knowledge/reviews/M5S08_final_compilation_review.md",
-    },
-    "M6S01": {
-        "m6_internal_peer_review": "knowledge/reviews/M6S01_internal_peer_review.md",
-        "m6_submission_audit": "knowledge/reviews/M6S01_submission_audit_review.md",
-    },
-    "M6S02": {
-        "m6_external_submission_review": "knowledge/reviews/M6S02_external_submission_review.md",
-    },
-    "M6S03": {
-        "m6_review_parsing_review": "knowledge/reviews/M6S03_review_parsing_review.md",
-    },
-    "M6S04": {
-        "m6_rebuttal_strategy_review": "knowledge/reviews/M6S04_rebuttal_strategy_review.md",
-    },
-    "M6S05": {
-        "m6_revision_execution_review": "knowledge/reviews/M6S05_revision_execution_review.md",
-    },
-    "M6S06": {
-        "m6_revision_validation_review": "knowledge/reviews/M6S06_revision_validation_review.md",
-    },
-}
+from spiral.review_registry import STAGE_REVIEW_OUTPUTS as _STAGE_REVIEW_REQUIREMENTS
 
 _M1S02_ROUND_REVIEW_REQUIREMENTS: dict[int, str] = {
     1: "knowledge/reviews/M1S02_round1_review.md",
@@ -3149,6 +3060,174 @@ def _check_m3s02_longrun_ledger(root: Path, execution_mode: str = "") -> tuple[b
     return ok, messages
 
 
+def _dataset_rel_path(root: Path, dataset_path: Path, value: Any) -> Path | None:
+    text = str(value or "").strip().strip("`'\"")
+    if not text or text.lower() in {"n/a", "na", "none", "null", "-"}:
+        return None
+    text = text.removeprefix("project:").lstrip("./")
+    candidate = Path(text)
+    if candidate.is_absolute():
+        resolved = candidate
+    elif text.startswith("experiments/") or text.startswith("knowledge/") or text.startswith("artifacts/"):
+        resolved = root / candidate
+    else:
+        resolved = dataset_path / candidate
+    try:
+        resolved.resolve().relative_to(root.resolve())
+    except ValueError:
+        return None
+    return resolved
+
+
+def _iter_dataset_splits(raw_splits: Any) -> list[tuple[str, dict[str, Any]]]:
+    if isinstance(raw_splits, dict):
+        out = []
+        for name, value in raw_splits.items():
+            if isinstance(value, dict):
+                out.append((str(name), value))
+            else:
+                out.append((str(name), {"path": value}))
+        return out
+    if isinstance(raw_splits, list):
+        out = []
+        for index, item in enumerate(raw_splits, start=1):
+            if isinstance(item, dict):
+                name = str(item.get("name") or item.get("split") or item.get("id") or f"split_{index}")
+                out.append((name, item))
+        return out
+    return []
+
+
+def _check_m3s02_dataset_manifest(root: Path) -> tuple[bool, list[str]]:
+    """Validate dataset completeness beyond a non-empty data directory."""
+    manifest_path = root / "experiments" / "data" / "dataset_manifest.yaml"
+    messages: list[str] = []
+    ok = True
+
+    if not manifest_path.exists():
+        return False, ["[FAIL] M3S02: experiments/data/dataset_manifest.yaml not found"]
+
+    try:
+        import yaml
+
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        return False, [f"[FAIL] M3S02: dataset_manifest.yaml unreadable: {exc}"]
+
+    datasets = manifest.get("datasets")
+    if not isinstance(datasets, list) or not datasets:
+        return False, ["[FAIL] M3S02: dataset_manifest.yaml missing nonempty datasets list"]
+
+    messages.append(f"[PASS] M3S02: dataset_manifest.yaml lists {len(datasets)} dataset(s)")
+
+    for index, raw in enumerate(datasets, start=1):
+        if not isinstance(raw, dict):
+            messages.append(f"[FAIL] M3S02 dataset[{index}]: entry must be a mapping")
+            ok = False
+            continue
+
+        dataset_id = str(raw.get("dataset_id") or raw.get("id") or raw.get("name") or f"dataset_{index}").strip()
+        label = f"M3S02 dataset[{dataset_id}]"
+        status = str(raw.get("status") or raw.get("completeness_status") or "").strip().lower()
+        if status not in {"complete", "completed", "verified", "ready", "完整", "已完成", "已验证"}:
+            messages.append(f"[FAIL] {label}: completeness status must be complete/verified (status={status or 'unset'})")
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: completeness status={status}")
+
+        dataset_path = _resolve_project_path(root, raw.get("path") or raw.get("dataset_path") or f"experiments/data/{dataset_id}")
+        if not dataset_path or not dataset_path.exists():
+            messages.append(f"[FAIL] {label}: dataset path missing or outside project")
+            ok = False
+            continue
+        messages.append(f"[PASS] {label}: dataset path exists")
+
+        required_files = raw.get("required_files") or raw.get("files")
+        if not isinstance(required_files, list) or not required_files:
+            messages.append(f"[FAIL] {label}: required_files must be nonempty")
+            ok = False
+        else:
+            missing_files: list[str] = []
+            for item in required_files:
+                file_ref = item.get("path") if isinstance(item, dict) else item
+                candidate = _dataset_rel_path(root, dataset_path, file_ref)
+                if not candidate or not candidate.exists():
+                    missing_files.append(str(file_ref))
+            if missing_files:
+                messages.append(f"[FAIL] {label}: missing required file(s): " + ", ".join(missing_files))
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: required files exist")
+
+        split_entries = _iter_dataset_splits(raw.get("splits"))
+        if not split_entries:
+            messages.append(f"[FAIL] {label}: splits must be nonempty and explicit")
+            ok = False
+        else:
+            for split_name, split in split_entries:
+                split_label = f"{label} split[{split_name}]"
+                split_path = _dataset_rel_path(root, dataset_path, split.get("path") or split.get("file"))
+                if not split_path or not split_path.exists():
+                    messages.append(f"[FAIL] {split_label}: split file/path missing")
+                    ok = False
+                else:
+                    messages.append(f"[PASS] {split_label}: split file/path exists")
+                actual_count = _parse_floatish(split.get("actual_count") or split.get("count") or split.get("num_samples"))
+                expected_count = _parse_floatish(split.get("expected_count") or split.get("expected_samples"))
+                if actual_count is None or actual_count <= 0:
+                    messages.append(f"[FAIL] {split_label}: actual_count/count must be > 0")
+                    ok = False
+                elif expected_count is not None and actual_count < expected_count:
+                    messages.append(
+                        f"[FAIL] {split_label}: actual_count {actual_count:g} is below expected_count {expected_count:g}"
+                    )
+                    ok = False
+                else:
+                    messages.append(f"[PASS] {split_label}: sample count verified")
+
+        checksum = raw.get("checksum") or raw.get("checksums")
+        if isinstance(checksum, dict) and checksum:
+            algorithm = str(checksum.get("algorithm") or checksum.get("algo") or "").strip().lower()
+            value = str(checksum.get("value") or checksum.get("sha256") or checksum.get("md5") or "").strip()
+            file_ref = checksum.get("file") or checksum.get("path")
+            if algorithm in {"sha256", "md5"} and value and file_ref:
+                candidate = _dataset_rel_path(root, dataset_path, file_ref)
+                if not candidate or not candidate.exists():
+                    messages.append(f"[FAIL] {label}: checksum target missing")
+                    ok = False
+                else:
+                    import hashlib
+
+                    digest = hashlib.new(algorithm)
+                    digest.update(candidate.read_bytes())
+                    observed = digest.hexdigest()
+                    if observed.lower() != value.lower():
+                        messages.append(f"[FAIL] {label}: {algorithm} checksum mismatch for {file_ref}")
+                        ok = False
+                    else:
+                        messages.append(f"[PASS] {label}: {algorithm} checksum verified")
+            else:
+                messages.append(f"[WARN] {label}: checksum mapping incomplete; relying on required files and split counts")
+
+        smoke = raw.get("smoke_load") or raw.get("smoke_test") or {}
+        if isinstance(smoke, dict) and smoke:
+            smoke_status = str(smoke.get("status") or smoke.get("verdict") or "").strip().lower()
+            smoke_log = smoke.get("log_path") or smoke.get("log")
+            if smoke_status not in {"pass", "passed", "success", "completed", "verified", "通过", "已通过"}:
+                messages.append(f"[FAIL] {label}: smoke_load status must be passed")
+                ok = False
+            elif smoke_log and not _project_path_exists(root, smoke_log):
+                messages.append(f"[FAIL] {label}: smoke_load log path missing")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: smoke_load verified")
+        else:
+            messages.append(f"[FAIL] {label}: smoke_load evidence missing")
+            ok = False
+
+    return ok, messages
+
+
 def _check_experiment_sandbox_profile(
     root: Path,
     *,
@@ -4388,6 +4467,10 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 ok = False
             else:
                 messages.append(f"[PASS] M3S02: dataset directory prepared ({len(dataset_entries)} entries)")
+
+        manifest_ok, manifest_msgs = _check_m3s02_dataset_manifest(root)
+        messages.extend(manifest_msgs)
+        ok = ok and manifest_ok
 
         code_files = list(experiments.rglob("*.py"))
         if len(code_files) < 1:
