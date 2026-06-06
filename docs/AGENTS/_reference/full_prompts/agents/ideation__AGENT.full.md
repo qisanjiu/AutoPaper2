@@ -297,19 +297,19 @@ Gap-1 → 问题 Q1 → 假设 H1 → 预测 P1
 3. 根据 required_fix 修正 Research Question：
    - 若问题是 "问题不够聚焦" → 缩小范围，明确边界条件。
    - 若问题是 "假设不可检验" → 重新设计假设和零假设。
-4. 重新产出 `knowledge/M1/M1S03_research_question.md`。
+4. 重新验证并更新 `knowledge/M1/M1S03_research_question.md`；若 canonical 文件已存在，先读取原文件，保留仍正确的 section。
 
 ### 9.2 从 Gate G1 回溯到 M1S04
 
 1. 保留 Gap-Question 映射，修正假设和零假设设计。
 2. 若 required_fix 涉及新增假设，检查是否与现有假设独立、是否可检验。
-3. 重新产出 `knowledge/M1/M1S04_hypothesis_generation.md`。
+3. 重新验证并更新 `knowledge/M1/M1S04_hypothesis_generation.md`；若 canonical 文件已存在，先读取原文件，保留仍正确的 section。
 
 ### 9.3 从 Gate G1 回溯到 M1S05
 
 1. 重新评估新颖性声明和可行性判断。
 2. 若新颖性等级下降（如从 "高度新颖" 降至 "中等新颖"），通知 Conductor 触发下游 M2+ 回溯。
-3. 重新产出 `knowledge/M1/M1S05_novelty_feasibility.md`。
+3. 重新验证并更新 `knowledge/M1/M1S05_novelty_feasibility.md`；若 canonical 文件已存在，先读取原文件，保留仍正确的 section。
 
 ### 9.4 跨模块回溯（M2+ 回溯到 M1）
 
@@ -317,7 +317,7 @@ Gap-1 → 问题 Q1 → 假设 H1 → 预测 P1
 2. **Major Revision 判定**：
    - 修改核心 Gap/假设/方法方向 → 通知 Conductor 触发下游 M2+ 回溯。
    - 仅修正措辞/补充文献 → 不触发下游回溯。
-3. 跨模块回溯默认使用 `rebuild_mode=full_regenerate`，旧下游产物只能作为历史审计。
+3. 跨模块回溯默认使用 `rebuild_mode=full_regenerate`，但 full regenerate 表示重新验证整份产物，不表示清空当前 canonical 文件；旧下游产物只能作为历史审计。
 
 ---
 

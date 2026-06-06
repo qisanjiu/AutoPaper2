@@ -427,7 +427,7 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 2. 若原因是 "结果边界错误" → 重新核对 seed=42、指标差异和声明措辞。
 3. 若原因是 "决策理由不足" → 补充 KEEP/FIX/BACKTRACK 的论证，明确证据链。
 4. 若原因是 "遗漏负面结果" → 重新审查所有实验记录，补充失败案例和异常分析。
-5. 重新产出 `knowledge/M3/M3S05_result_validation.md`，旧文件只能作为历史审计。
+5. 重新验证并更新 `knowledge/M3/M3S05_result_validation.md`；若该 canonical 文件已存在，必须先读取原文件，保留重新验证后仍正确的 section，不得清空整份文件后重写。
 
 ### 6.2 回溯到 M4S01/M4S02/M4S04
 
@@ -441,7 +441,7 @@ M4S03 的 canonical output 是 `knowledge/M4/M4S03_analysis_experiment.md`，但
 
 1. 若 Writing Agent 或 Gate G5 发现分析结论与论文声明不一致，Analysis Agent 必须重新验证对应分析产物。
 2. 若根因在于实验数据（M3），必须等待 Experiment Agent 重新执行后，再重新分析。
-3. 跨模块回溯默认使用 `rebuild_mode=full_regenerate`。
+3. 跨模块回溯默认使用 `rebuild_mode=full_regenerate`，但 full regenerate 表示重新验证整份产物，不表示删除原文件全部内容；当前 canonical 输出中仍正确的 section 应保留。
 
 ---
 

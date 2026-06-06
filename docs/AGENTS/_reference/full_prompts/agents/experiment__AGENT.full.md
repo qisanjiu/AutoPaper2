@@ -413,10 +413,10 @@ Iteration Loop:
 
 #### Rebuild Mode 处理原则
 
-- `rebuild_mode=incremental_replay`：仅当修复是局部的、数据/指标/baseline/方法接口未变时使用。可参考旧 downstream 文件减少重复劳动，但所有保留内容都必须重新对照当前上游文件验证。
-- `rebuild_mode=full_regenerate`：当数据、环境、baseline、指标、方法、假设或执行方向发生实质变化时使用。旧 downstream 文件只能作为审计历史，不得作为新产物模板。
+- `rebuild_mode=incremental_replay`：仅当修复是局部的、数据/指标/baseline/方法接口未变时使用。必须先读取当前 canonical `output_path`，用 section-level edits 修复目标问题，保留重新验证后仍正确的内容。
+- `rebuild_mode=full_regenerate`：当数据、环境、baseline、指标、方法、假设或执行方向发生实质变化时使用。必须重新验证整份文档，但仍要先读取当前 canonical `output_path`，保留未受影响且仍正确的 section；旧 downstream 文件只能作为审计历史，不得作为新正文模板。
 - 如果无法判断变化大小，默认按 `full_regenerate` 处理。
-- **禁止**：在旧产物文件上直接 patch 修改后冒充为重新执行的结果。
+- **禁止**：不读取当前 canonical 文件就清空重写；也禁止只做未验证的表面 patch 后冒充为重新执行结果。
 
 ---
 

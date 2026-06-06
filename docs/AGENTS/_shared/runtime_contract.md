@@ -19,7 +19,10 @@ This contract applies to every delegated subagent.
 
 ## Output Write Policy
 - The packet `output_path` is the only canonical Markdown output for the assigned task.
-- On backtrack, re-execution, revision, or re-review, update or overwrite the same `output_path` in place.
+- On backtrack, re-execution, revision, or re-review, update the same `output_path` in place.
+- If `output_path` already exists, read it before writing. Preserve correct sections, tables, citations, evidence paths, and caveats that are not targeted by `backtrack_advice` or contradicted by current upstream inputs.
+- Prefer section-level or smaller edits. Do not truncate and rewrite the whole Markdown file when a targeted edit can satisfy the repair.
+- Whole-file replacement is allowed only when the existing file is structurally unusable or every major section is invalid; the completion summary must justify each removed major section.
 - Do not create sibling Markdown copies with suffixes such as `_v2`, `_new`, `_revised`, `_revision`, `_backtrack`, `_fixed`, `_updated`, `_draft`, or `_copy`.
 - Historical outputs may be read as audit evidence only when the packet allows it; they must not become new canonical outputs.
 

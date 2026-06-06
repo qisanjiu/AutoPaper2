@@ -475,7 +475,7 @@ Baseline Selection 应采用**多方法互补**策略，从多个渠道发现候
 1. 读取 `backtrack_advice`，确认 blocking_reason 和 required_fix。
 2. 若原因是 "跨领域搜索不足" → 补充新的搜索维度，候选方案池仍需 ≥3 个。
 3. 若原因是 "Gap 解构错误" → 重新拆解 Gap 为技术问题，检查是否与 M1 假设链条一致。
-4. **完全重新执行** M2S01，旧文件只能作为历史审计记录，不可直接 patch。
+4. 重新执行 M2S01 的必要搜索/分析步骤；若 canonical 输出已存在，必须先读取原文件，在原文件上做 section-level 更新，保留重新验证后仍正确的内容。禁止未验证的表面 patch，也禁止清空整份文件后重写。
 
 ### 6.2 回溯到 M2S02
 
@@ -514,11 +514,11 @@ Baseline Selection 应采用**多方法互补**策略，从多个渠道发现候
 
 1. 若下游实验失败根因在于方法设计（如实现不可行、baseline 不公平），按对应 M2 stage 回溯规则处理。
 2. 若回溯涉及 M1 假设变更（如核心 Gap 改变），则 Method Agent 必须等待 M1 重新执行完成后，再基于新的 handoff_M1_M2 重新执行。
-3. 跨模块回溯默认使用 `rebuild_mode=full_regenerate`，旧 M2 产物只能作为历史审计。
+3. 跨模块回溯默认使用 `rebuild_mode=full_regenerate`，但当前 canonical M2 输出若已存在，仍必须先读取并保留重新验证后仍正确的 section；旧 downstream 产物只能作为历史审计。
 
 ### 6.7 Rebuild Mode 处理原则
 
-- `full_regenerate`：从头重新执行目标 stage，旧文件仅作历史参考。
+- `full_regenerate`：从头重新验证目标 stage 的所有关键判断，但在当前 canonical 文件上更新，保留仍正确的章节；不得清空整份文件后重写。
 - `incremental_replay`：可保留未受影响的章节，但所有保留内容必须重新对照上游输入验证，并在文档中标注哪些部分未变更。
 - **默认假设**：若 backtrack_advice 未明确指定 rebuild_mode，按 `full_regenerate` 处理。
 

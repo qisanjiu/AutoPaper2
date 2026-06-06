@@ -47,7 +47,8 @@ EXECUTOR_BOUNDARIES = [
     "Execute only the assigned stage and write the requested stage output.",
     "Do not write stage-review or gate-review verdicts.",
     "Do not advance pipeline state; the conductor will run state_manager.py advance.",
-    "Use old downstream files only as historical audit evidence when backtrack_advice is present.",
+    "If the requested output already exists, read it before writing and preserve correct content not targeted by the repair.",
+    "Do not truncate and rewrite the whole Markdown file when a section-level edit can satisfy the task.",
 ]
 
 
@@ -348,7 +349,11 @@ def _output_write_policy(output_ref: str) -> dict[str, Any]:
         "mode": "canonical_in_place",
         "target_path": output_ref,
         "overwrite_existing": True,
-        "if_target_exists": "Update or overwrite this exact file in place; do not create a sibling Markdown file.",
+        "read_existing_before_write": True,
+        "preserve_unaffected_content": True,
+        "edit_granularity": "section_or_smaller",
+        "whole_file_replacement": "forbidden unless the entire existing file is invalid; justify every removed major section in the completion summary.",
+        "if_target_exists": "Read the existing file first, then update this exact file in place with minimal section-level edits; preserve correct unaffected content and do not create a sibling Markdown file.",
         "forbid_alternate_outputs": True,
         "forbidden_suffixes": list(ALTERNATE_OUTPUT_SUFFIXES),
     }
@@ -406,7 +411,7 @@ def render_compact_launch_prompt(packet: dict[str, Any], packet_path: str | Path
             "First read the packet, then read the role instructions and input paths listed inside it.",
             "Read files selectively according to the packet context_policy; do not paste whole large inputs into context.",
             "Write only the requested output path and any explicitly allowed evidence/worklog paths.",
-            "If the requested output already exists, update or overwrite that exact canonical file in place; do not create v2/new/revised/backtrack Markdown copies.",
+            "If the requested output already exists, read it first, preserve correct unaffected content, and edit only the sections needed for the repair; do not create v2/new/revised/backtrack Markdown copies.",
         ]
     )
     policy = packet.get("context_policy") or {}
@@ -463,6 +468,9 @@ def build_stage_execution_packet(project_root: str | Path, stage: str | None = N
     plan = conductor.run_stage(stage_id)
     role = str(plan.get("agent", conductor.get_agent_for_stage(stage_id)))
     output_path = Path(plan["output_doc"])
+    input_docs = [Path(p) for p in plan.get("input_docs", [])]
+    if output_path.exists():
+        input_docs = [output_path, *[path for path in input_docs if path.resolve() != output_path.resolve()]]
     task_id = _slug(f"{stage_id}_{role}_execute")
     extra = {
         "stage": stage_id,
@@ -471,10 +479,11 @@ def build_stage_execution_packet(project_root: str | Path, stage: str | None = N
         "stage_checkers": plan.get("stage_checkers", []),
         "stage_review_outputs": plan.get("stage_review_outputs", {}),
         "backtrack_advice": plan.get("backtrack_advice", {}),
+        "existing_output_path": str(output_path) if output_path.exists() else "",
         "subagent_boundaries": EXECUTOR_BOUNDARIES,
         "after_completion": [
             f"Ensure output exists: {output_path}",
-            "If this is a re-execution/backtrack and the output already existed, confirm the same canonical file was updated in place.",
+            "If this is a re-execution/backtrack and the output already existed, confirm the existing file was read and correct unaffected sections were preserved.",
             "Return changed paths and a concise completion summary to the conductor.",
             "Do not call state_manager.py advance from inside the executor subagent.",
         ],
@@ -486,7 +495,7 @@ def build_stage_execution_packet(project_root: str | Path, stage: str | None = N
         role=role,
         agent_md=Path(plan["agent_md"]),
         output_path=output_path,
-        input_docs=[Path(p) for p in plan.get("input_docs", [])],
+        input_docs=input_docs,
         extra=extra,
     )
 
@@ -506,6 +515,8 @@ def build_m6s05_revision_routing_packet(project_root: str | Path) -> dict[str, A
     routing = build_revision_routes(root)
     task_id = _slug("M6S05_revision_routing")
     inputs = [Path(p) for p in plan.get("input_docs", [])]
+    if output_path.exists():
+        inputs = [output_path, *[path for path in inputs if path.resolve() != output_path.resolve()]]
 
     return _packet(
         task_type="revision_routing",
@@ -521,12 +532,13 @@ def build_m6s05_revision_routing_packet(project_root: str | Path) -> dict[str, A
             "md_protocol": plan.get("md_protocol", ""),
             "stage_checkers": plan.get("stage_checkers", []),
             "stage_review_outputs": plan.get("stage_review_outputs", {}),
+            "existing_output_path": str(output_path) if output_path.exists() else "",
             "revision_routing": routing,
             "subagent_boundaries": REVISION_ROUTING_BOUNDARIES,
             "after_completion": [
                 "Run or delegate the routed target-stage work before final M6S05 reporting.",
                 f"Ensure execution record exists only after evidence is available: {output_path}",
-                "If the execution record already existed, confirm the same canonical file was updated in place.",
+                "If the execution record already existed, confirm the existing file was read and correct unaffected sections were preserved.",
                 "Return routed item statuses, evidence paths, and the execution-record path to the conductor.",
                 "Do not call state_manager.py advance from inside the revision subagent.",
             ],
@@ -890,6 +902,10 @@ def render_subagent_prompt(packet: dict[str, Any]) -> str:
             "mode",
             "target_path",
             "overwrite_existing",
+            "read_existing_before_write",
+            "preserve_unaffected_content",
+            "edit_granularity",
+            "whole_file_replacement",
             "if_target_exists",
             "forbid_alternate_outputs",
             "forbidden_suffixes",

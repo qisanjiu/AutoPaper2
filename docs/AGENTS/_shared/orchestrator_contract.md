@@ -31,4 +31,4 @@ The main agent is conductor only.
 - Do not treat dataset, baseline code, baseline weight, checkpoint, model asset, external submission, or review-email acquisition blockers as PASS; continue attempts or require non-PASS/HALT.
 
 ## Backtrack
-Use structured repair advice. After backtrack, regenerate dispatch from target stage; old downstream files are historical unless `incremental_replay` is explicitly allowed.
+Use structured repair advice. After backtrack, regenerate dispatch from target stage. Subagents must read the current canonical `output_path`, preserve still-correct unaffected sections, and edit in place; separate old downstream files are historical unless `incremental_replay` explicitly allows reuse.

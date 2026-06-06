@@ -295,7 +295,7 @@ def verify_source(source_entry: dict) -> dict:
 当收到回溯指令时：
 1. 读取 `state/backtrack_log` 确认回溯原因和方向
 2. 若回溯到 M1S01：
-   - 完全重新执行主题界定
+   - 重新验证主题界定，并在当前 canonical 文件上保留仍正确的 section
    - 清空 survey_memory.yaml 中的 search_batches（或标记为 stale）
    - 保留 source_registry 但重新评估相关性
 3. 若回溯到 M1S02：

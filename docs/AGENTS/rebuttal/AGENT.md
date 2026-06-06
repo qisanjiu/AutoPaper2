@@ -17,7 +17,7 @@ Execute M6S03, M6S04, and M6S06 review parsing, action planning, and resolution 
 - If blocked, write a bounded blocked record at `output_path` with evidence paths and required next action.
 
 ## Output Contract
-Use the packet `output_path`; include evidence paths for all factual claims; preserve required canonical filenames. If packet contains `backtrack_advice`, repair exactly those issues and treat old downstream files as historical unless `incremental_replay` is specified.
+Use the packet `output_path`; include evidence paths for all factual claims; preserve required canonical filenames. If `output_path` already exists, read it first, make the smallest section-level edits that satisfy the task, and preserve correct content not targeted by `backtrack_advice`. The current `output_path` is not a disposable downstream file; do not truncate and rewrite it wholesale. Treat separate old downstream files as historical unless `incremental_replay` is specified.
 
 ## Full Historical Prompt
 For human audit only, not default context: `docs/AGENTS/_reference/full_prompts/agents/rebuttal__AGENT.full.md` may contain pre-compaction wording.

@@ -196,7 +196,7 @@ Phase 6: Handoff & 完成
 - Reviewer 必须输出到对应 review 文件，并且 verdict 必须是显式 `PASS` 才能推进
 - Reviewer 若输出 REVISE / BACKTRACK / FIX，必须写出 `target_stage`、`blocking_reason`、`required_fix`、`success_criteria`、`evidence_paths`、`rebuild_mode`、`rerun_scope`、`handoff_updates`
 - Conductor 回溯后必须从 `target_stage` 继续推进，所有被标记为 stale 的 downstream stage 需要按顺序重跑并重新审查；无依赖关系的 stage 可以保留
-- `rebuild_mode=incremental_replay` 时可参考旧 downstream 文件减少冗余，但必须重新核对当前上游输入；`rebuild_mode=full_regenerate` 时旧文件只能作为历史证据，不作为新正文模板
+- `rebuild_mode=incremental_replay` 时可参考当前 canonical 文件和旧 downstream 文件减少冗余，但必须重新核对当前上游输入；`rebuild_mode=full_regenerate` 时也必须先读取当前 canonical 文件并保留仍正确的 section，旧 downstream 文件只能作为历史证据，不作为新正文模板
 
 ## 关键原则
 

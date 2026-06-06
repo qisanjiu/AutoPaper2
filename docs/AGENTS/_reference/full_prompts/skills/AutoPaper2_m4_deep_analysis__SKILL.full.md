@@ -395,7 +395,7 @@ python scripts/state_manager.py auto-module M4
 - **负面结果必须可见**：所有 failed / blocked / null / negative slice 必须完整记录，隐藏负面结果视为学术不端。
 - **Stage Review 必须独立**：M4S01-M4S03 的 review 不得由执行 agent 自审。
 - **M4S03 的初步审查摘要不是最终 verdict**：它只是执行侧的异常分流，最终判断必须写入独立 review 文件。
-- **回溯策略必须区分 incremental_replay 与 full_regenerate**：小修可参考原始 downstream 文件；方向偏差大时只能把旧文件当历史证据，不得继续当新正文模板。
+- **回溯策略必须区分 incremental_replay 与 full_regenerate**：小修可参考当前 canonical 文件和原始 downstream 文件；方向偏差大时必须重新验证整份产物，但仍要保留当前 canonical 文件中仍正确的 section，旧 downstream 文件不得继续当新正文模板。
 - **Gate G4 必须三 Critic**：Logic + Evidence + Novelty 三个 Critic 都通过才算 Gate 通过。
 - **Claim Ledger 必须诚实**：不得将 unsupported 的 Claim 标记为 supported，不得隐瞒证据不足的声明。
 - **Handoff 文件必须生成**：M4 完成后必须产出 `knowledge/handoff_M4_M5.md`。

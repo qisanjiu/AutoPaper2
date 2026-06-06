@@ -535,7 +535,7 @@ gap_evidence_map:
 ### 9.1 回溯到 M1S01
 
 1. 读取 `state/backtrack_log` 和 `backtrack_advice`，确认回溯原因和 required_fix。
-2. **完全重新执行**主题界定，不可在旧文件上直接 patch。
+2. 重新执行主题界定的必要判断；若 canonical 输出已存在，必须先读取原文件，在原文件上做 section-level 更新，保留重新验证后仍正确的内容。禁止未验证的表面 patch，也禁止清空整份文件后重写。
 3. 清空 `survey_memory.yaml` 中的 search_batches（或标记为 stale）。
 4. 保留 source_registry 但重新评估相关性。
 5. 若 `rebuild_mode=incremental_replay`，可参考旧 M1S01 文件的结构，但所有结论必须重新验证。
@@ -549,7 +549,7 @@ gap_evidence_map:
 2. 将 Survey Memory 中对应 Round 及之后的 batch 标记为 stale 或删除。
 3. 保留已通过审查的前序 Round 内容，但需根据新的回溯方向重新评估其适用性。
 4. 重新执行目标 Round，产出新版本的 `M1S02_literature_deepdive.md` 和 `M1_source_log.yaml`。
-5. **禁止**：在旧文件上直接增删 patch 作为修正手段。
+5. **禁止**：不读取当前 canonical 文件就清空重写；也禁止只做未验证的表面增删 patch 作为修正手段。
 
 ### 9.3 跨模块回溯（M2/M3 回溯到 M1）
 

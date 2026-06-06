@@ -188,10 +188,28 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertEqual(policy["mode"], "canonical_in_place")
         self.assertEqual(policy["target_path"], packet["output_path"])
         self.assertIs(policy["overwrite_existing"], True)
+        self.assertIs(policy["read_existing_before_write"], True)
+        self.assertIs(policy["preserve_unaffected_content"], True)
+        self.assertEqual(policy["edit_granularity"], "section_or_smaller")
         self.assertIs(policy["forbid_alternate_outputs"], True)
         self.assertIn("_revised", policy["forbidden_suffixes"])
         self.assertIn("canonical_in_place", packet["subagent_prompt"])
+        self.assertIn("read_existing_before_write", packet["subagent_prompt"])
+        self.assertIn("preserve_unaffected_content", packet["subagent_prompt"])
         self.assertIn("do not create v2/new/revised/backtrack", packet["subagent_launch_prompt"])
+        self.assertIn("preserve correct unaffected content", packet["subagent_launch_prompt"])
+
+    def test_stage_execution_packet_reads_existing_output_before_repair(self) -> None:
+        output = self.root / "knowledge" / "M2" / "M2S01_cross_domain_search.md"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("# Existing M2S01\n\n## Valid Section\nKeep this.\n", encoding="utf-8")
+
+        packet = build_stage_execution_packet(self.root, "M2S01")
+
+        self.assertEqual(packet["existing_output_path"], "project:knowledge/M2/M2S01_cross_domain_search.md")
+        self.assertEqual(packet["input_docs"][0], "project:knowledge/M2/M2S01_cross_domain_search.md")
+        self.assertIn("Read the existing file first", packet["output_write_policy"]["if_target_exists"])
+        self.assertIn("correct unaffected sections were preserved", "\n".join(packet["after_completion"]))
 
     def test_written_markdown_packet_exposes_only_compact_launch_prompt(self) -> None:
         packet = build_stage_execution_packet(self.root, "M2S01")
