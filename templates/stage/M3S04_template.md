@@ -162,19 +162,17 @@ M3S04 不得在训练未完成时推进。随机初始化、E0、未训练 check
 - `experiments/logs/runtime_events.jsonl` 至少包含对应 run 的 `training_completed`、`run_completed`、`experiment_completed` 或 `checkpoint_saved` 事件。
 - `experiments/run_registry.yaml` 中同一 `run_id` 的 `status` 为 completed，`validity` 为 `valid_main` 或 `valid_reference`，并列出真实存在的 manifest/config/history/metrics/checkpoint/status 文件。
 
-### 2.6 PPL / Channel Leakage Sanity Contract（必须，文本语义通信/noisy-channel 任务）
-
-PPL 过低不是自动成功信号。若 noisy-channel 重建任务出现 PPL≈1、accuracy≈1 或所有 SNR 下 PPL 几乎相同，必须先按泄露/捷径处理，不能进入正式主结果。
+### 2.6 Metric Protocol / Result Validity Contract（必须）
 
 进入 `results_main.tsv` 的 formal row 必须满足：
 
-- 不存在未经过信道的 encoder memory、target token、teacher-forced clean state、clean embedding 进入 decoder；
-- 若模型使用 decoder cross-attention，`memory` 必须来自经过同一信道、噪声、功率约束和压缩瓶颈后的表示；干净 `memory` 只能作为 invalid diagnostic；
-- `results_main.tsv` 中如记录 PPL，应包含 `ppl_snr_*` 或等价 per-SNR 指标，并检查 SNR sensitivity；
-- PPL<=1.05 且 accuracy/train_acc>=0.95、或 per-SNR PPL 相对跨度 <2% 且指标接近完美时，该 row 必须移入 `experiments/tables/results_invalid.tsv`，并触发 M3S02/M3S03 回溯；
-- random-token/noise stress test 只能作为辅助，不能替代代码级 no-bypass 审计。
+- 每行包含 `metric_protocol_id`，并能在 `knowledge/M2/M2S05_metric_protocol.yaml` 找到；
+- `metric`、`direction`、dataset/scenario/split（如列出）与对应 metric protocol 一致；
+- `value` 落在 protocol `value_range` 内；
+- 若 `value` 超出 `normal_reference_range`，必须包含 anomaly_triage / evidence path / 保留或排除该行的理由；
+- implementation shortcut、metric/data/label leakage、protocol mismatch、interrupted run、checkpoint-only run 等只能进入 diagnostic/invalid 记录，不能作为 formal main evidence。
 
-`results_invalid.tsv` 应写明 `invalid_reason=channel_leakage|clean_memory_bypass|snr_invariant_metric|metric_bug` 和 `backtrack_target=M3S02/M3S03`。
+`results_invalid.tsv` 应写明 `invalid_reason`、`evidence_path`、`affected_run_id` 和 `backtrack_target`。
 
 ---
 

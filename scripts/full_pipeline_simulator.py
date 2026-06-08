@@ -865,9 +865,9 @@ def _write_stage_output(root: Path, stage: str) -> Path:
         _write(run_dir / "watchdog_checks.jsonl", watchdog_event)
         _write(
             root / "experiments" / "tables" / "results_main.tsv",
-            "method\trun_id\tseed\taccuracy\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
-            "baseline\tbaseline_run\t42\t0.75\tcompleted\tnot_applicable\t\t0\texperiments/runs/M3S04_main/run1/resource_monitor.csv\n"
-            "ours\trun1\t42\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/M3S04_main/run1/checkpoints/best.pt\t120\texperiments/runs/M3S04_main/run1/resource_monitor.csv\n",
+            "method\trun_id\tseed\tmetric_protocol_id\tmetric\tdirection\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.75\tcompleted\tnot_applicable\t\t0\texperiments/runs/M3S04_main/run1/resource_monitor.csv\n"
+            "ours\trun1\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/M3S04_main/run1/checkpoints/best.pt\t120\texperiments/runs/M3S04_main/run1/resource_monitor.csv\n",
         )
         _write(
             root / "experiments" / "tables" / "results_all.tsv",

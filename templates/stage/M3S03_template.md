@@ -150,20 +150,22 @@ verification_verdict: "..."
 
 ---
 
-## 4. No-Leakage / No-Bypass Audit（必须）
+## 4. Implementation Shortcut / Protocol Validity Audit（必须）
 
-文本语义通信或 noisy-channel 任务中，baseline 与本文方法都必须证明 decoder 只接收经过信道传输/噪声处理后的表示，以及允许的公开 side information（如 SNR）。以下任一情况会使 baseline 或 run 不可进入 M3S04：
+所有 baseline 与本文方法都必须证明其实现没有使用项目协议禁止的 side information、target-derived state、test-label leakage、metric shortcut 或其它绕过任务约束的路径。协议由 M2S05/M3S01/M3S03 的 dataset、scenario、split、metric_protocol_id、baseline_lock 和 fairness contract 定义。
 
-- decoder 使用未经过信道的 encoder hidden state、teacher-forced target hidden state、clean memory、clean embedding 或 target token 作为重建旁路；
-- 将 `self.decoder(x, memory)` / encoder-decoder cross-attention 作为修复方案，但 `memory` 没有经过同一信道、噪声、功率约束和压缩瓶颈；
-- noisy-channel 评估出现 PPL≈1、accuracy≈1、或跨 SNR PPL 几乎不变，且没有可审计的泄露排除证据；
-- 用随机 token / 随机噪声 stress test 代替结构审计，未检查代码中是否存在 clean memory/target bypass。
+以下任一情况会使 baseline 或 run 不可进入 M3S04 formal results：
 
-| Baseline | 代码路径 | decoder 输入 | clean-memory/target bypass | PPL≈1/SNR-invariant 检查 | 结论 |
-|----------|----------|---------------|-----------------------------|---------------------------|------|
-| Baseline-1 | `experiments/baselines/...` | ... | no / yes | pass / fail | eligible / ineligible |
+- 使用了 M2S05/M3S01 协议未允许的输入、标签、测试集统计、teacher signal、oracle state 或未来信息；
+- metric 计算与 `metric_protocol_id` 的 definition/calculation/direction/value_range 不一致；
+- formal result row 超出 `normal_reference_range`，但没有 anomaly_triage、证据路径和是否保留为 formal result 的理由；
+- 只用 smoke/stress test 替代代码/config/log 审计，未证明实现符合协议。
 
-若发现上述问题，`target_stage` 必须回到 `M3S02`（实现泄露）或 `M3S03`（baseline lock 失效），并在修复后重新执行 M3S04；不得把泄露问题留给 M4。
+| Baseline | code/config/log path | protocol contract checked | shortcut/leakage risk | anomaly triage | conclusion |
+|----------|----------------------|----------------------------|-----------------------|----------------|------------|
+| Baseline-1 | `experiments/baselines/...` | ... | no / yes | pass / fail / n/a | eligible / ineligible |
+
+若发现上述问题，`target_stage` 必须回到拥有错误假设的 stage（通常 M3S02 / M3S03 / M3S04），并在修复后重新执行受影响的 downstream stages；不得把主实验有效性问题留给 M4。
 
 ---
 

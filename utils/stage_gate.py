@@ -2294,22 +2294,20 @@ _M3S05_KEEP_BLOCKER_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pattern, re.IGNORECASE)
     for pattern in (
         r"\bineligible\b",
+        r"\bnot\s+eligible\b",
+        r"\bnot\s+comparable\b",
+        r"\bnon[-\s]?comparable\b",
         r"\bnot\s+implemented\b",
         r"\bnot\s+run\b",
+        r"\bnot\s+executed\b",
         r"\bproxy\s+only\b",
         r"\bundertrained\b|\binsufficient\s+training\b",
-        r"\bexternal\s+baseline\s+match\b.{0,80}(?:fail|failed|❌|✗|no\b)",
-        r"\bL4\b.{0,80}(?:fail|failed|❌|✗|no\b)",
-        r"\bDeepSC\b.{0,80}\bineligible\b",
-        r"\bmissing\b.{0,40}\b(?:baseline|metric|BLEU|cos(?:ine)?_?sim)\b",
-        r"\b(?:clean[-\s]?memory|memory|channel)\s+bypass\b",
-        r"\bbypass(?:es|ed|ing)?\s+(?:the\s+)?channel\b",
-        r"\bppl\s*(?:[~≈=]|<=|<)\s*1(?:\.0{0,3})?\b",
-        r"\bperplexity\s*(?:[~≈=]|<=|<)\s*1(?:\.0{0,3})?\b",
-        r"\bsnr[-\s]?invariant\b",
-        r"\b(?:data|metric|channel)?\s*leakage\b|\bshortcut\b",
-        r"\b(?:perfect\s+accuracy|accuracy\s*(?:[~≈=]|>=|>)\s*(?:0\.99|1(?:\.0+)?))\b",
-        r"(未实现|未运行|不合格|不可比较|训练不足|基线不匹配|指标缺失|只作为参考|仅作参考|泄露|旁路|绕过信道)",
+        r"\b(?:still\s+running|queued|checkpoint[-\s]?only|random|untrained)\b",
+        r"\bbaseline\s+(?:match|eligibility|comparability)\b.{0,80}(?:fail|failed|❌|✗|no\b)",
+        r"\bmissing\b.{0,40}\b(?:baseline|metric|protocol|evidence|artifact)\b",
+        r"\b(?:data|metric|label|target|test[-\s]?set)?\s*leakage\b",
+        r"\b(?:shortcut|invalid\s+result|diagnostic\s+only|outside\s+(?:normal_)?reference\s+range)\b",
+        r"(未实现|未运行|不合格|不可比较|训练不足|基线不匹配|指标缺失|只作为参考|仅作参考|泄露|无效结果|诊断结果|超出正常范围)",
     )
 )
 
@@ -2326,7 +2324,7 @@ def _m3s05_keep_blocking_lines(text: str) -> list[str]:
             continue
         lowered = line.lower()
         if re.search(r"\b(no|none|zero|resolved|fixed|implemented|completed|verified|not applicable|n/a)\b", lowered):
-            if not re.search(r"\bnot\s+implemented\b|\bnot\s+run\b|\bineligible\b|\bproxy\s+only\b", lowered):
+            if not re.search(r"\bnot\s+implemented\b|\bnot\s+run\b|\bineligible\b|\bnot\s+comparable\b|\bproxy\s+only\b", lowered):
                 continue
         if any(pattern.search(line) for pattern in _M3S05_KEEP_BLOCKER_PATTERNS):
             lines.append(line[:220])
@@ -4065,43 +4063,6 @@ def _row_first(row: dict[str, Any], names: tuple[str, ...]) -> str:
     return ""
 
 
-_PPL_LEAKAGE_TERMS = (
-    "ppl~1",
-    "ppl≈1",
-    "perplexity~1",
-    "perplexity≈1",
-    "clean memory bypass",
-    "clean-memory bypass",
-    "memory bypass",
-    "bypasses channel",
-    "channel bypass",
-    "leakage",
-    "data leakage",
-    "metric leakage",
-    "shortcut",
-    "snr-invariant",
-    "snr invariant",
-    "perfect accuracy",
-    "accuracy=1.0",
-    "acc=1.0",
-    "train_acc=1.0",
-    "泄露",
-    "旁路",
-    "绕过信道",
-)
-
-
-def _text_mentions_ppl_leakage(text: str) -> bool:
-    lowered = text.lower()
-    if any(term in lowered for term in _PPL_LEAKAGE_TERMS):
-        return True
-    return bool(
-        re.search(r"\bppl\s*(?:[~≈=]|<=|<)\s*1(?:\.0{0,3})?\b", lowered)
-        or re.search(r"\bperplexity\s*(?:[~≈=]|<=|<)\s*1(?:\.0{0,3})?\b", lowered)
-        or re.search(r"\b(?:accuracy|acc|train_acc)\s*(?:[~≈=]|>=|>)\s*(?:0\.99|1(?:\.0+)?)\b", lowered)
-    )
-
-
 def _numeric_values_from_row(row: dict[str, Any], names: tuple[str, ...]) -> list[float]:
     values: list[float] = []
     lowered = {str(key).strip().lower(): value for key, value in row.items()}
@@ -4127,83 +4088,108 @@ def _row_method_label(row: dict[str, Any], index: int) -> str:
     return _row_first(row, ("method", "model", "system", "name", "config_name", "baseline", "role")) or f"row {index}"
 
 
-def _check_m3s04_ppl_leakage_patterns(
+def _row_is_diagnostic_or_invalid(row: dict[str, Any]) -> bool:
+    status_text = " ".join(
+        _row_first(row, names)
+        for names in (
+            ("validity", "result_validity", "validity_status"),
+            ("status_note", "notes", "triage_status"),
+            ("result_type", "analysis_role"),
+        )
+    ).lower()
+    return any(marker in status_text for marker in ("invalid", "diagnostic", "excluded", "failed", "abnormal"))
+
+
+def _row_has_anomaly_triage(row: dict[str, Any]) -> bool:
+    triage_text = " ".join(
+        _row_first(row, names)
+        for names in (
+            ("anomaly_triage", "triage", "triage_status", "status_note", "notes"),
+            ("triage_evidence", "anomaly_evidence", "evidence_path"),
+        )
+    ).strip()
+    return bool(triage_text and not re.fullmatch(r"(?i)(none|n/a|na|not_applicable|-)?", triage_text))
+
+
+def _check_m3s04_protocol_result_rows(
     root: Path,
     rows: list[dict[str, Any]],
 ) -> tuple[bool, list[str]]:
-    """Reject implausible PPL/accuracy patterns that indicate channel leakage.
-
-    A noisy-channel text reconstruction run that reaches PPL ~= 1, perfect
-    accuracy, or nearly identical PPL across SNR values is usually not a
-    publishable success; it is a sign that target/encoder information bypassed
-    the noisy channel. Such rows must be moved to results_invalid.tsv and routed
-    back to M3S02/M3S03 before M3S04 can pass.
-    """
-    del root  # reserved for future artifact cross-checks
+    """Validate formal M3S04 result rows against the M2 metric protocol registry."""
     messages: list[str] = []
     ok = True
-    suspicious_rows = 0
+    registry_ok, registry_msgs, protocols = _load_m2_metric_protocol_registry(root)
+    messages.extend(registry_msgs)
+    if not registry_ok:
+        return False, messages
 
     for index, row in enumerate(rows, start=1):
-        metric_key = _row_metric_key(row)
         method = _row_method_label(row, index)
         row_label = f"M3S04 result row {index} ({method})"
-        validity = _row_first(row, ("validity", "result_validity", "status_note", "notes")).lower()
-        if any(marker in validity for marker in ("invalid", "diagnostic", "leak", "泄露")):
+        if _row_is_diagnostic_or_invalid(row):
+            messages.append(f"[PASS] {row_label}: marked diagnostic/invalid and excluded from formal claim checks")
             continue
 
-        ppl_values: list[float] = []
-        ppl_values.extend(_numeric_values_from_row(row, ("ppl", "mean_ppl", "val_ppl", "test_ppl", "perplexity", "value")))
-        if metric_key and "ppl" not in metric_key and "perplex" not in metric_key:
-            value = _parse_floatish(_row_first(row, ("value", "result", "score")))
-            if value is not None and value in ppl_values:
-                ppl_values.remove(value)
-        snr_ppl_keys = tuple(
-            key for key in row
-            if re.search(r"(?:^|_)ppl(?:_|$)|perplex", str(key).lower())
-            and "snr" in str(key).lower()
-        )
-        snr_ppls = _numeric_values_from_row(row, snr_ppl_keys)
-        if snr_ppls:
-            ppl_values.extend(snr_ppls)
-
-        accuracy_values = _numeric_values_from_row(
-            row,
-            (
-                "accuracy",
-                "acc",
-                "train_acc",
-                "val_acc",
-                "test_acc",
-                "token_acc",
-                "reconstruction_accuracy",
-            ),
-        )
-
-        low_ppl = [value for value in ppl_values if value <= 1.05]
-        near_perfect_acc = [value for value in accuracy_values if value >= 0.95]
-        if low_ppl and near_perfect_acc:
-            messages.append(
-                f"[FAIL] {row_label}: PPL leakage pattern detected "
-                f"(ppl<={min(low_ppl):.4g}, accuracy>={max(near_perfect_acc):.4g}); "
-                "route to M3S02/M3S03 and remove clean target/encoder bypass before rerunning M3S04"
-            )
-            suspicious_rows += 1
+        protocol_id = _row_first(row, ("metric_protocol_id", "protocol_id"))
+        if not protocol_id:
+            messages.append(f"[FAIL] {row_label}: missing metric_protocol_id linking row to M2S05")
             ok = False
+            continue
+        protocol = protocols.get(protocol_id)
+        if not protocol:
+            messages.append(f"[FAIL] {row_label}: unknown metric_protocol_id {protocol_id}")
+            ok = False
+            continue
+        messages.append(f"[PASS] {row_label}: metric_protocol_id={protocol_id} found in M2")
 
-        if len(snr_ppls) >= 3:
-            mean_abs = max(sum(abs(value) for value in snr_ppls) / len(snr_ppls), 1.0)
-            relative_span = (max(snr_ppls) - min(snr_ppls)) / mean_abs
-            if relative_span < 0.02 and (low_ppl or near_perfect_acc):
+        metric = _row_metric_key(row)
+        expected_metric = str(protocol.get("metric_key") or protocol.get("metric") or "").strip().lower()
+        if expected_metric and metric and metric != expected_metric:
+            messages.append(f"[FAIL] {row_label}: metric={metric} does not match protocol metric {expected_metric}")
+            ok = False
+        elif expected_metric and not metric:
+            messages.append(f"[FAIL] {row_label}: missing metric key")
+            ok = False
+        else:
+            messages.append(f"[PASS] {row_label}: metric key matches protocol")
+
+        direction = _row_first(row, ("direction", "metric_direction")).lower()
+        expected_direction = str(protocol.get("direction") or "").strip().lower()
+        if expected_direction and direction and direction != expected_direction:
+            messages.append(f"[FAIL] {row_label}: direction={direction} does not match protocol direction {expected_direction}")
+            ok = False
+        elif expected_direction and not direction:
+            messages.append(f"[FAIL] {row_label}: missing metric direction from protocol")
+            ok = False
+        else:
+            messages.append(f"[PASS] {row_label}: metric direction aligned")
+
+        value = _parse_floatish(_row_first(row, ("value", "result", "score", "metric_value")))
+        if value is None:
+            messages.append(f"[FAIL] {row_label}: missing numeric result value")
+            ok = False
+            continue
+
+        value_range = _metric_range_bounds(protocol.get("value_range"))
+        normal_range = _metric_range_bounds(protocol.get("normal_reference_range") or protocol.get("normal_range"))
+        if value_range and not (value_range[0] <= value <= value_range[1]):
+            messages.append(f"[FAIL] {row_label}: value {value:.4g} outside protocol value_range {value_range}")
+            ok = False
+        elif value_range:
+            messages.append(f"[PASS] {row_label}: value inside protocol value_range")
+
+        if normal_range and not (normal_range[0] <= value <= normal_range[1]):
+            if not _row_has_anomaly_triage(row):
                 messages.append(
-                    f"[FAIL] {row_label}: SNR-invariant noisy-channel metric detected "
-                    f"(relative PPL span={relative_span:.3g}); treat as leakage/shortcut until proven otherwise"
+                    f"[FAIL] {row_label}: value {value:.4g} outside normal_reference_range {normal_range} "
+                    "without anomaly_triage/evidence or diagnostic invalidation"
                 )
-                suspicious_rows += 1
                 ok = False
+            else:
+                messages.append(f"[PASS] {row_label}: out-of-normal-range value has anomaly triage evidence")
+        elif normal_range:
+            messages.append(f"[PASS] {row_label}: value inside normal_reference_range")
 
-    if suspicious_rows == 0:
-        messages.append("[PASS] M3S04: no obvious PPL leakage or SNR-invariant shortcut pattern in formal results")
     return ok, messages
 
 
@@ -4490,38 +4476,6 @@ def _missing_structured_fields(text: str, fields: tuple[str, ...] | None = None)
     return missing_m3_repair_fields(text, fields)
 
 
-def _repair_line_has_forbidden_clean_memory_fix(required_fix: str) -> bool:
-    bad_patterns = (
-        r"self\.decoder\s*\(\s*x\s*,\s*memory\s*\)",
-        r"\bdecoder\s*\(\s*x\s*,\s*memory\s*\)",
-        r"\bcross[-\s]?attention\b.{0,120}\b(?:encoder\s+)?memory\b",
-        r"\b(?:pass|use)\b.{0,80}\b(?:encoder\s+)?memory\b.{0,80}\bdecoder\b",
-    )
-    negating_terms = (
-        "do not",
-        "don't",
-        "never",
-        "forbid",
-        "remove",
-        "without",
-        "no clean",
-        "must not",
-        "禁止",
-        "不得",
-        "不要",
-        "移除",
-        "不能",
-    )
-    for raw_line in required_fix.splitlines() or [required_fix]:
-        line = raw_line.strip()
-        lowered = line.lower()
-        if any(term in lowered for term in negating_terms):
-            continue
-        if any(re.search(pattern, lowered, flags=re.IGNORECASE) for pattern in bad_patterns):
-            return True
-    return False
-
-
 def _check_repair_advice_evidence_scope(stage: str, text: str) -> tuple[bool, list[str]]:
     return check_repair_advice_evidence_scope(stage, text)
 
@@ -4541,20 +4495,16 @@ def _check_m3_repair_advice_consistency(stage: str, text: str) -> tuple[bool, li
     combined = "\n".join([blocking_reason, required_fix, success_criteria, rerun_scope, text])
     lowered = combined.lower()
 
-    has_leakage_signal = _text_mentions_ppl_leakage(combined)
-    if has_leakage_signal:
-        if target_stage not in {"M3S02", "M3S03"}:
+    implementation_blocker = bool(
+        re.search(r"\b(?:implementation|code|bug|leakage|shortcut|bypass|invalid\s+result|diagnostic\s+result)\b", lowered)
+        or re.search(r"(实现|代码|泄露|捷径|旁路|无效结果|诊断结果)", combined)
+    )
+    if implementation_blocker:
+        if target_stage not in {"M3S02", "M3S03", "M3S04"}:
             messages.append(
-                f"[FAIL] {stage}: repair advice routes PPL/channel leakage to "
-                f"{target_stage or 'unset'}; target_stage must be M3S02 for implementation leakage "
-                "or M3S03 for baseline-lock invalidation before rerunning M3S04"
-            )
-            ok = False
-        if _repair_line_has_forbidden_clean_memory_fix(required_fix):
-            messages.append(
-                f"[FAIL] {stage}: invalid leakage repair advice proposes clean encoder memory/cross-attention "
-                "as the fix; required_fix must remove the clean-memory path or pass only noised/channel-transmitted "
-                "state through the decoder"
+                f"[FAIL] {stage}: implementation/result-validity blocker cannot be routed to "
+                f"{target_stage or 'unset'}; route to M3S02 for implementation/env repair, "
+                "M3S03 for baseline-lock invalidation, or M3S04 for rerun-only failures"
             )
             ok = False
         if not _contains_any(
@@ -4562,13 +4512,13 @@ def _check_m3_repair_advice_consistency(stage: str, text: str) -> tuple[bool, li
             ("M3S04", "downstream", "重新运行", "重跑", "rerun", "re-run"),
         ):
             messages.append(
-                f"[FAIL] {stage}: leakage repair advice must mark M3S04 downstream results stale and rerun them"
+                f"[FAIL] {stage}: implementation/result-validity repair advice must mark M3S04 downstream results stale and rerun them"
             )
             ok = False
 
     baseline_mismatch = bool(
         re.search(r"\b(?:ineligible|not\s+comparable|non[-\s]?comparable)\b", lowered)
-        or re.search(r"\bexternal\s+baseline\s+match\b.{0,80}\b(?:fail|failed|no)\b", lowered)
+        or re.search(r"\bbaseline\s+(?:eligibility|comparability|match)\b.{0,80}\b(?:fail|failed|no)\b", lowered)
         or re.search(r"(基线不匹配|不可比较|不合格)", combined)
     )
     if baseline_mismatch and (target_stage.startswith("M4") or target_stage in {"M3S04", "M3S05"}):
@@ -4580,7 +4530,7 @@ def _check_m3_repair_advice_consistency(stage: str, text: str) -> tuple[bool, li
 
     metric_gap = bool(
         re.search(r"\b(?:not\s+implemented|proxy\s+only|not\s+run)\b", lowered)
-        and re.search(r"\b(?:metric|BLEU|cos(?:ine)?_?sim|ppl|perplexity)\b", lowered)
+        and re.search(r"\b(?:metric|score|measure|protocol|指标|度量|协议)\b", lowered)
     )
     if metric_gap and (target_stage.startswith("M4") or target_stage in {"M3S05"}):
         messages.append(
@@ -4589,7 +4539,18 @@ def _check_m3_repair_advice_consistency(stage: str, text: str) -> tuple[bool, li
         )
         ok = False
 
-    if ok and (has_leakage_signal or baseline_mismatch or metric_gap):
+    training_gap = bool(
+        re.search(r"\b(?:undertrained|not\s+trained|random|e0|checkpoint[-\s]?only|still\s+running|queued)\b", lowered)
+        or re.search(r"(训练不足|未训练|随机|仍在运行|排队|仅checkpoint)", combined)
+    )
+    if training_gap and target_stage not in {"M3S04", "M3S02"}:
+        messages.append(
+            f"[FAIL] {stage}: training/completion blocker cannot be routed to {target_stage or 'unset'}; "
+            "route to M3S04 for rerun/resume or M3S02 if environment/resource setup is the root cause"
+        )
+        ok = False
+
+    if ok and (implementation_blocker or baseline_mismatch or metric_gap or training_gap):
         messages.append(f"[PASS] {stage}: repair advice root-cause routing is consistent")
     return ok, messages
 
@@ -5313,9 +5274,9 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
 
                     rows = list(csv.DictReader(lines, delimiter="\t"))
                     result_rows = rows
-                    leakage_ok, leakage_msgs = _check_m3s04_ppl_leakage_patterns(root, rows)
-                    messages.extend(leakage_msgs)
-                    ok = ok and leakage_ok
+                    protocol_ok, protocol_msgs = _check_m3s04_protocol_result_rows(root, rows)
+                    messages.extend(protocol_msgs)
+                    ok = ok and protocol_ok
                     seed_keys = [key for key in (rows[0].keys() if rows else []) if str(key).lower() in {"seed", "random_seed", "rng_seed"}]
                     if not seed_keys:
                         messages.append(f"[FAIL] M3S04: {results.relative_to(root)} missing seed column")

@@ -8,7 +8,7 @@
 
 ## PASS Integrity
 - A `PASS` review must not contain unresolved blockers, vague approval, or deferred evidence. Phrases such as pending, failed, missing, unavailable, not verified, unable to download, ineligible, not implemented, not run, proxy only, undertrained, reference only, defer to M4, waiting for user, TODO/TBD, maybe/probably/likely, "基本通过", "先推进", "等待人工", "不合格", "未实现", "未运行", "训练不足", "仅作参考", or "留到M4" make PASS invalid.
-- In experiment reviews, PPL≈1, accuracy≈1, SNR-invariant PPL, clean memory bypass, target/encoder hidden-state bypass, leakage, or shortcut language also makes PASS invalid unless the line explicitly says the issue is resolved and verifies the no-bypass evidence.
+- In experiment reviews, unresolved invalid/diagnostic result rows, metric/data/label leakage, shortcut language, protocol mismatch, out-of-range metrics without triage, or incomplete trained-run evidence also make PASS invalid unless the line explicitly says the issue is resolved and cites verification evidence.
 - Dataset, baseline code, baseline weights, checkpoints, model assets, external submissions, and review emails must be either completed with evidence or reviewed as non-PASS. If human action is genuinely required after recorded attempts, use `HALT` with repair fields/evidence, not PASS.
 - Reviewers must treat "cannot download" as an objection unless the stage shows multiple concrete acquisition attempts and the review verdict is non-PASS.
 
@@ -25,8 +25,8 @@ Every `REVISE`, `BACKTRACK`, `FIX`, or `REWORK` review must include:
 
 ## Repair Advice Integrity
 - Route source/modality/task/baseline eligibility failures to the stage that owns the invalid assumption, usually M3S01 or M3S03.
-- Route implementation leakage, PPL≈1, clean memory bypass, target/encoder hidden-state bypass, or SNR-invariant noisy-channel metrics to M3S02 or M3S03 and require M3S04-M3S05 rerun.
-- Do not propose clean encoder memory cross-attention, such as `self.decoder(x, memory)`, as a leakage fix unless `memory` is explicitly channel-transmitted/noised under the same bottleneck.
+- Route implementation bugs, metric/data/label leakage, invalid/diagnostic result rows promoted as evidence, or protocol-result mismatches to the stage that owns the broken assumption, usually M3S02, M3S03, or M3S04, and require M3S04-M3S05 rerun when main results change.
+- Do not prescribe exact implementation patches as a leakage/shortcut fix unless the reviewer directly inspected the corresponding code/config/log evidence.
 - Do not route unresolved M3 experimental blockers to M4 analysis.
 
 ## Reviewer Evidence Boundary

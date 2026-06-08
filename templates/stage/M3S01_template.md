@@ -68,7 +68,7 @@ M3S01 只允许定义主实验计划：
 硬性要求：
 
 - 每个 baseline 必须绑定 `knowledge/M1/M1_source_log.yaml` 的 `source_id`，并逐字核对 title、venue、year、modality、task；不得由模型补全论文标题、venue 或任务类型；
-- baseline 的 modality/task 必须与本文主实验可比较。图像传输论文不能作为文本语义通信 baseline，除非明确标为不可进入 M3S04 的背景参考；
+- baseline 的 modality/task/dataset/scenario/split/metric 必须与本文主实验协议可比较；若只适合作背景或启发，必须明确标为不可进入 M3S04 的背景参考；
 - `reference_value` 必须是具体数值，不能写 TBD、unknown、见论文、待复现；
 - `value_source` 必须能定位到论文表格、官方 repo、leaderboard 或已验证历史 artifact；
 - baseline 不得是本方法消融变体；

@@ -371,7 +371,7 @@ M3S01 完成后必须由 `docs/AGENTS/critic/m3_main_experiment_design_review/AG
 ### 4.1 Baseline 选择强制规范（防止对比不足）
 
 **最低数量要求**: 外部基线（来自文献的独立方法）≥ **5 个**，且必须覆盖以下至少 4 个维度：
-1. **领域奠基/标准基线**（如 DeepJSCC、ResNet、BERT 等该领域默认对比方法）
+1. **领域奠基/标准基线**（如经典统计方法、标准深度模型、该领域默认对比方法）
 2. **最直接竞争方法**（与本文解决同一/相似问题的最新工作）
 3. **不同技术路线代表**（如传统方法 vs 深度学习方法、监督学习 vs RL、预测方法 vs 端到端方法）
 4. **不同架构代表**（如 CNN vs Transformer、单模态 vs 多模态）
@@ -393,11 +393,11 @@ Baseline Selection 应采用**多方法互补**策略，从多个渠道发现候
 - **输出**: 候选基线列表（仅候选，需经综合评估后决定是否纳入）
 - **为什么有效**: 高影响力论文的对比基线已经过作者和审稿人的双重筛选，是最具对比价值的方法集合之一
 
-> **示例**: 本研究在直接搜索"RL + 语义通信 + 混合动作空间"类工作时遇到困难，但通过分析 ADJSCC (Xu2022) 的对比基线发现 BPG+LDPC 是领域内实际使用的传统对比基线（优于最初考虑的 JPEG2000+LDPC）；通过分析 WITT (Yang2023) 的引用网络发现 SwinJSCC 作为后续工作。这些间接发现的候选基线经综合评估后部分被纳入最终 baseline 池。
+> **示例**: 本研究在直接搜索某个新组合问题的同题工作时遇到困难，但通过分析 2-4 篇最接近论文的实验设置，发现了领域内实际使用的传统基线、强监督基线和最新架构代表。这些间接发现的候选基线经 source log、协议匹配和实现可得性综合评估后，部分被纳入最终 baseline 池。
 
 **方法 3: 关键词/数据库搜索**
 - 在 Google Scholar、DBLP、Papers With Code 中使用精确关键词组合搜索
-- 例如：`"semantic communication" baseline comparison`、`"JSCC" evaluation benchmark`
+- 例如：`"<task keyword>" baseline comparison`、`"<dataset name>" evaluation benchmark`
 - 适用于：搜索特定方法/技术路线的 baseline，或验证已有候选的完整性
 
 **方法 4: 引用链追踪**

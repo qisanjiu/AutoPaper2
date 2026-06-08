@@ -578,8 +578,8 @@ class TestDispatchPackets(unittest.TestCase):
         self._write_valid_m3s01()
         path = self.root / "knowledge" / "M3" / "M3S01_main_experiment_design.md"
         text = path.read_text(encoding="utf-8")
-        text = text.replace("Demo Text Classification Baseline", "Deep Joint Source-Channel Coding for Textual Semantic Communication")
-        text = text.replace("| text | classification |", "| image | image transmission |")
+        text = text.replace("Demo Text Classification Baseline", "Unrelated Time Series Forecasting Baseline")
+        text = text.replace("| text | classification |", "| tabular | forecasting |")
         path.write_text(text, encoding="utf-8")
         self._write_pass_review("knowledge/reviews/M3S01_main_experiment_design_review.md")
 
@@ -587,8 +587,8 @@ class TestDispatchPackets(unittest.TestCase):
 
         self.assertFalse(ok)
         joined = "\n".join(messages)
-        self.assertIn("title=Deep Joint Source-Channel Coding", joined)
-        self.assertIn("modality=image does not match", joined)
+        self.assertIn("title=Unrelated Time Series Forecasting Baseline", joined)
+        self.assertIn("modality=tabular does not match", joined)
 
     def test_m3s01_stage_gate_accepts_main_design_with_pass_review(self) -> None:
         self._write_valid_m2s05()

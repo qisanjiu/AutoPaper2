@@ -19,10 +19,10 @@
 - `FIX`: bounded current-stage repair.
 - `BACKTRACK`: upstream design/experiment/data/baseline issue. Include full repair fields and rerun scope.
 - Never write KEEP to force progress when evidence contradicts the claim.
-- M3S05 must choose `FIX` or `BACKTRACK`, not `KEEP`, if any primary baseline is `ineligible`, external baseline match fails, a claimed metric is `not implemented`/`proxy only`/`not run`, proposed or baseline training is undertrained/running/checkpoint-only, or paper/published values are only rough references.
+- M3S05 must choose `FIX` or `BACKTRACK`, not `KEEP`, if any primary baseline is ineligible/non-comparable, baseline comparability checks fail, a claimed metric is `not implemented`/`proxy only`/`not run`, proposed or baseline training is undertrained/running/checkpoint-only, formal results are protocol-invalid, or paper/published values are only rough references.
 - Root-cause direction matters: source/modality/task mismatch routes to M3S01/M3S03, metric protocol mismatch routes to M2S05/M3S03, incomplete training routes to M3S04, and method failure with clean protocol routes to M2/M3 design as appropriate.
-- PPL≈1, accuracy≈1, SNR-invariant PPL, clean memory bypass, target/encoder hidden-state bypass, or metric leakage in a noisy-channel task is not a good result. It routes to M3S02 for implementation leakage or M3S03 for baseline-lock invalidation, then M3S04-M3S05 must be rerun.
-- Do not write a repair that uses clean `self.decoder(x, memory)` / encoder memory cross-attention as the fix for leakage unless the memory is explicitly channel-transmitted/noised under the same bottleneck.
+- Invalid/diagnostic result rows, implementation shortcuts, metric/data/label leakage, or out-of-protocol results are not good results. Route them to the stage that owns the broken assumption, then rerun M3S04-M3S05.
+- Do not write exact implementation patches for suspected shortcuts unless code/config/log evidence was directly inspected; otherwise write task-level inspect/verify/repair advice.
 
 ## M4S02 Task Queue Rules
 - `experiments/configs/m4_task_queue.yaml` must contain a nonempty `tasks` list.

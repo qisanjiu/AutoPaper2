@@ -83,7 +83,7 @@ python scripts/state_manager.py create \
 
 项目名称生成规则：
 - 取主题前 2-4 个关键词的首字母组合
-- 例如 "图像语义通信自适应调制" → "SemCom-Image"
+- 例如 "自适应时间序列预测" → "ATSF"
 - 例如 "Transformer Time Series Forecasting" → "TSF-Transformer"
 
 ### 显式：进入现有项目
@@ -108,9 +108,9 @@ python scripts/state_manager.py create \
 
 | 参数 | CLI 标志 | 说明 | 示例 |
 |------|---------|------|------|
-| topic | 位置参数 1 | 研究主题（一句话描述） | `"Semantic Communication for Images"` |
-| display_name | 位置参数 2 | 项目显示名称（用于生成目录名） | `"SemCom-Image-RL"` |
-| keywords | `--keywords` | 3-5 个关键词，影响 M1S02 搜索方向 | `"semantic communication, RL, image"` |
+| topic | 位置参数 1 | 研究主题（一句话描述） | `"Adaptive Time Series Forecasting"` |
+| display_name | 位置参数 2 | 项目显示名称（用于生成目录名） | `"ATSF-Transformer"` |
+| keywords | `--keywords` | 3-5 个关键词，影响 M1S02 搜索方向 | `"time series forecasting, calibration, robustness"` |
 
 ### 2. 投稿目标（必填，默认 arxiv）
 
@@ -161,47 +161,47 @@ python scripts/state_manager.py create \
 # 最简创建（仅基础信息）
 cd {framework_root}
 python scripts/state_manager.py create \
-  "Semantic Communication for Images" \
-  "SemCom-Image-RL"
+  "Adaptive Time Series Forecasting" \
+  "ATSF-Transformer"
 
 # 标准创建（含投稿目标和关键词）
 python scripts/state_manager.py create \
-  "Semantic Communication for Images" \
-  "SemCom-Image-RL" \
+  "Adaptive Time Series Forecasting" \
+  "ATSF-Transformer" \
   neurips \
-  --keywords "semantic communication, reinforcement learning, image transmission" \
-  --foundation "DeepJSCC: Deep Joint Source-Channel Coding" \
-  --reference "ADJSCC, SwinJSCC"
+  --keywords "time series forecasting, calibration, robustness" \
+  --foundation "Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting" \
+  --reference "Autoformer, FEDformer"
 
 # 完整配置（SSH 远程，已有密钥）
 python scripts/state_manager.py create \
-  "Semantic Communication for Images" \
-  "SemCom-Image-RL" \
+  "Adaptive Time Series Forecasting" \
+  "ATSF-Transformer" \
   neurips \
-  --keywords "semantic communication, reinforcement learning, image transmission" \
+  --keywords "time series forecasting, calibration, robustness" \
   --env-mode ssh \
   --ssh-host 10.10.9.210 \
   --ssh-user zhouzhehao \
   --ssh-port 30011 \
   --ssh-auth-method key \
-  --ssh-workspace "~/AutoPaper2/projects/SemCom-Image-RL" \
-  --ssh-conda-env "semcom-rl" \
+  --ssh-workspace "~/AutoPaper2/projects/ATSF-Transformer" \
+  --ssh-conda-env "atsf" \
   --python-version 3.10 \
   --cuda-version 12.1
 
 # 完整配置（SSH 远程，只有密码 → M3S02 自动部署密钥）
 python scripts/state_manager.py create \
-  "Semantic Communication for Images" \
-  "SemCom-Image-RL" \
+  "Adaptive Time Series Forecasting" \
+  "ATSF-Transformer" \
   neurips \
-  --keywords "semantic communication, reinforcement learning, image transmission" \
+  --keywords "time series forecasting, calibration, robustness" \
   --env-mode ssh \
   --ssh-host 10.10.9.210 \
   --ssh-user zhouzhehao \
   --ssh-port 30011 \
   --ssh-auth-method password \
   --ssh-password "your_password_here" \
-  --ssh-workspace "~/AutoPaper2/projects/SemCom-Image-RL" \
+  --ssh-workspace "~/AutoPaper2/projects/ATSF-Transformer" \
   --python-version 3.10 \
   --cuda-version 12.1
 ```

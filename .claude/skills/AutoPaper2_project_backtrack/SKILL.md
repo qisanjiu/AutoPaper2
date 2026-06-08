@@ -23,13 +23,13 @@ Required repair fields: target_stage, blocking_reason, required_fix, success_cri
 - Source truth, venue, modality, task, dataset/scenario/split, or baseline eligibility mismatch -> route to M3S01 or M3S03. Do not send this to M4.
 - Metric definition/protocol mismatch, missing primary metric implementation, proxy-only metric, or not-run metric -> route to M2S05/M3S03/M3S02 as appropriate, then rerun M3S04-M3S05.
 - Incomplete training, running/queued jobs, missing history/status, checkpoint-only results, or random/E0 weights -> route to M3S04 after baseline/protocol validity is confirmed.
-- Noisy-channel leakage signals such as PPL≈1, accuracy≈1, SNR-invariant PPL, clean memory bypass, target/encoder hidden-state bypass, shortcut, or metric leakage -> route to M3S02 for implementation repair or M3S03 for baseline-lock invalidation, and mark M3S04-M3S05 stale.
+- Implementation shortcuts, metric/data/label leakage, invalid diagnostic rows, protocol-mismatched results, or out-of-normal-range metrics without triage -> route to the stage that owns the broken assumption, usually M3S02, M3S03, or M3S04, and mark M3S04-M3S05 stale when main results change.
 - Method failure under a clean, comparable, leak-free protocol -> route to the method/design stage that owns the failed assumption, not to M4 polishing.
 
 ## Repair Advice Guardrails
 - If review `Evidence Checked`/`evidence_paths` only cite Markdown outputs, preserve advice as task-level inspect/verify/repair work; do not expand it into exact code lines, function calls, config values, or shell commands.
-- Never propose clean encoder memory/cross-attention, such as `self.decoder(x, memory)`, as the fix for channel leakage unless the advice explicitly says `memory` is channel-transmitted/noised under the same bottleneck.
-- Leakage repair must require removing clean target/encoder paths, adding no-bypass tests, moving suspicious rows to `experiments/tables/results_invalid.tsv`, and rerunning downstream M3 stages.
+- Never expand markdown-only review evidence into exact implementation edits.
+- Result-validity repair must require verifying the root cause, excluding invalid/diagnostic rows from formal results, adding evidence/tests, and rerunning downstream M3 stages.
 - Do not write "defer to M4", "rough reference only", or "limitation" as the resolution for M3 blockers.
 - If the reviewer advice itself has the wrong target stage or wrong fix direction, correct the advice before generating the dispatch packet.
 

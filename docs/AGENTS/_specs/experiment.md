@@ -27,8 +27,8 @@
 - If design, dataset, metric, or baseline is invalid, request structured backtrack instead of silently changing upstream assumptions.
 - Do not mark M3S04 complete while a required training stage is still running. E0/random/untrained weights are diagnostic only and must never populate the final proposed/ours result row.
 - If a run is under target, first use autonomous repair within scope: fix data/config/code, resume training, download missing weights, retrain a baseline, adjust resources, or backtrack to M3S03/M3S02/M2 as needed. Do not stop at hyperparameter tuning if the root cause is elsewhere.
-- In noisy-channel/PPL tasks, treat PPL≈1, accuracy≈1, SNR-invariant PPL, or clean encoder/target memory reaching the decoder as implementation leakage until proven otherwise. Route to M3S02/M3S03, invalidate downstream rows, and rerun M3S04; do not defer this to M4.
-- Never repair channel leakage by passing clean encoder memory to the decoder, e.g. `self.decoder(x, memory)`, unless that `memory` is explicitly channel-transmitted/noised under the same bottleneck. The safe fix is to remove the clean path or transmit/noise the memory itself.
+- Treat any implementation shortcut, metric/data/label leakage, invalid diagnostic row, or protocol-mismatched result as non-claim evidence until verified. Route to the owning M3 stage, invalidate downstream rows, and rerun M3S04; do not defer this to M4.
+- Do not prescribe exact code patches for suspected implementation shortcuts unless code/config/log evidence was directly inspected; otherwise write task-level inspect/verify/repair advice.
 
 ## M3S03 Baseline Lock Rules
 - M3S03 must not use paper-reported numbers alone as the baseline for M3S04; each primary comparator needs a local verified metric or an explicitly bounded waiver.
@@ -40,7 +40,7 @@
 - M3 baselines must be external comparators from prior work, official packages, or full faithful reproductions. They must not be ablations, variants, or disabled-component versions of the proposed method; ablations are M4-only.
 - A self-implemented/reimplemented baseline must be a full reproduction of the paper/model. Simplified, toy, minimal, proxy, or partial implementations are forbidden as M3 baselines; if full fidelity cannot be reached, request backtrack or mark the comparator ineligible.
 - Baseline code is mutable only during M3S03 repair. After `baseline_code_immutable_after_lock: true`, M3S04 must treat baseline code, checkpoint, dataset split, and metric contract as read-only.
-- For text semantic communication baselines, M3S03 must audit no-bypass behavior: decoder inputs may use noisy channel output and permitted public side information only. Clean encoder hidden states, target tokens, teacher-forced target states, or clean memory as decoder context make the baseline ineligible until repaired.
+- For any task where side information or target-derived state could create a shortcut, M3S03 must audit the implementation contract stated by M2S05/M3S01 and mark the comparator ineligible until the shortcut is removed or explicitly justified by the protocol.
 - `trusted_with_caveats` is not enough by itself. It must include `caveat_waiver_reason`, `comparison_scope_limit`, and `m3s04_eligible: true`; otherwise request backtrack or mark the baseline ineligible.
 - M3S04 may start only when `experiments/baselines/baseline_lock.yaml` declares a primary comparator with `m3s04_eligible: true` and an existing `metric_contract` path.
 
@@ -49,5 +49,5 @@
 - Every proposed/ours row in `results_main.tsv` must have a matching `experiments/run_registry.yaml` entry with `status: completed` and `validity: valid_main` or `valid_reference`.
 - Each formal run registry entry must point to existing `run_manifest.yaml`, `config.yaml`, `training_history.json`, `metrics.tsv`, checkpoint, `checkpoint_manifest.yaml`, `status.json`, `resource_monitor.csv`, and watchdog evidence.
 - Checkpoint-only, interrupted, legacy, invalid, metric-bug, C-mismatch, missing-history, or proxy-only runs must be labeled invalid/interrupted/checkpoint-only and cannot appear in `results_main.tsv`.
-- Leakage/shortcut rows, including PPL<=1.05 with near-perfect accuracy or per-SNR PPL relative span <2% under a noisy channel, must be labeled invalid and moved to `experiments/tables/results_invalid.tsv` with `backtrack_target=M3S02/M3S03`.
+- Leakage/shortcut/protocol-invalid rows must be labeled diagnostic or invalid, excluded from `experiments/tables/results_main.tsv`, and recorded with `invalid_reason`, evidence path, and `backtrack_target` in `experiments/tables/results_invalid.tsv`.
 - Use stable run ids: `<stage>_<role>_<config_id>_<dataset>_<keyparams>_seed42_<YYYYMMDD-HHMMSS>`. Do not mix baseline, main, analysis, invalid, and legacy runs in one undifferentiated directory.

@@ -612,6 +612,7 @@ class TestM3StageGate(unittest.TestCase):
         multi_gpu: bool = False,
     ) -> None:
         for rel in (
+            "knowledge/M2",
             "knowledge/M3",
             "knowledge/reviews",
             "experiments/configs",
@@ -621,6 +622,30 @@ class TestM3StageGate(unittest.TestCase):
             "experiments/tables",
         ):
             (self.root / rel).mkdir(parents=True, exist_ok=True)
+
+        (self.root / "knowledge" / "M2" / "M2S05_metric_protocol.yaml").write_text(
+            "schema_version: 1\n"
+            "metric_protocols:\n"
+            "  - metric_protocol_id: mp_demo_accuracy\n"
+            "    dataset: demo\n"
+            "    scenario: classification\n"
+            "    split: test\n"
+            "    metric_key: accuracy\n"
+            "    definition: fraction of correct labels\n"
+            "    calculation: correct / total over the test split\n"
+            "    direction: higher_is_better\n"
+            "    value_range: [0.0, 1.0]\n"
+            "    normal_reference_range: [0.5, 0.95]\n"
+            "    protocol_source:\n"
+            "      source_id: PaperX\n"
+            "      table_or_section: Table 1\n"
+            "      rationale: standard classification metric for demo\n"
+            "    metric_sanity_check:\n"
+            "      test_case: two correct out of four examples\n"
+            "      expected_value: 0.5\n"
+            "      tolerance: 1.0e-6\n",
+            encoding="utf-8",
+        )
 
         strategy_text = "DDP torchrun" if multi_gpu else "cpu_parallel task_parallel"
         (self.root / "knowledge" / "M3" / "M3S04_main_experiment.md").write_text(
@@ -702,9 +727,9 @@ class TestM3StageGate(unittest.TestCase):
             encoding="utf-8",
         )
         (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
-            "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
-            "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
-            "ours\trun_001\t42\taccuracy\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\n",
+            "method\trun_id\tseed\tmetric_protocol_id\tmetric\tdirection\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\trun_001\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\n",
             encoding="utf-8",
         )
         (self.root / "experiments" / "results.tsv").write_text(
@@ -792,9 +817,9 @@ class TestM3StageGate(unittest.TestCase):
         )
         (self.root / "experiments" / "tables").mkdir(parents=True, exist_ok=True)
         (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
-            "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
-            "baseline\tbaseline_run\t42\taccuracy\t0.753\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
-            "ours\trun_001\t42\taccuracy\t0.803\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\n",
+            "method\trun_id\tseed\tmetric_protocol_id\tmetric\tdirection\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.753\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\trun_001\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.803\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\n",
             encoding="utf-8",
         )
         (self.root / "experiments" / "results.tsv").write_text(
@@ -1022,9 +1047,9 @@ class TestM3StageGate(unittest.TestCase):
         )
         (self.root / "experiments" / "tables").mkdir(parents=True, exist_ok=True)
         (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
-            "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_id\tresource_kind\tresource_monitor\n"
-            "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\tlocal\tlocal\texperiments/runs/run_001/resource_monitor.csv\n"
-            "ours\trun_002\t42\taccuracy\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run_002/checkpoints/best.pt\t120\tssh:lab-a\tssh\texperiments/runs/run_002/resource_monitor.csv\n",
+            "method\trun_id\tseed\tmetric_protocol_id\tmetric\tdirection\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_id\tresource_kind\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.70\tcompleted\tnot_applicable\t\t0\tlocal\tlocal\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\trun_002\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run_002/checkpoints/best.pt\t120\tssh:lab-a\tssh\texperiments/runs/run_002/resource_monitor.csv\n",
             encoding="utf-8",
         )
         (self.root / "experiments" / "results.tsv").write_text(
@@ -1143,22 +1168,22 @@ class TestM3StageGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("PASS verdict but contains blocking/ambiguous language" in message for message in messages), messages)
 
-    def test_m3s03_stage_review_rejects_bad_ppl_leakage_repair_advice(self) -> None:
+    def test_m3s03_stage_review_rejects_bad_result_validity_repair_advice(self) -> None:
         self._write_m3s03_files()
         (self.root / "knowledge" / "reviews" / "M3S03_baseline_result_review.md").write_text(
             "# M3S03 Baseline Result Review\n\n"
             "## Verdict\n"
             "Verdict: REVISE\n\n"
             "## Findings\n"
-            "DeepSC clean memory bypass causes PPL~1 at all SNRs.\n\n"
+            "Formal result rows are invalid diagnostics but are still treated as main evidence.\n\n"
             "## Repair Fields\n"
             "- target_stage: M3S04\n"
-            "- blocking_reason: DeepSC clean memory bypass causes PPL~1 at all SNRs.\n"
-            "- required_fix: Fix the baseline by using encoder-decoder cross-attention `self.decoder(x, memory)`.\n"
-            "- success_criteria: PPL no longer leaks.\n"
+            "- blocking_reason: Invalid diagnostic result rows are treated as main evidence.\n"
+            "- required_fix: Mark invalid rows diagnostic, verify the implementation root cause, and rerun the affected M3S04 outputs.\n"
+            "- success_criteria: results_main.tsv contains only protocol-valid rows and invalid rows have triage evidence.\n"
             "- evidence_paths: experiments/external_baselines.py\n"
             "- rebuild_mode: incremental_replay\n"
-            "- rerun_scope: M3S04\n"
+            "- rerun_scope: M3S04 -> M3S05\n"
             "- handoff_updates: refresh M3S03 lock\n",
             encoding="utf-8",
         )
@@ -1167,8 +1192,7 @@ class TestM3StageGate(unittest.TestCase):
 
         self.assertFalse(ok)
         joined = "\n".join(messages)
-        self.assertIn("repair advice routes PPL/channel leakage", joined)
-        self.assertIn("invalid leakage repair advice", joined)
+        self.assertIn("repair advice root-cause routing is consistent", joined)
 
     def test_stage_review_rejects_code_patch_advice_without_code_evidence(self) -> None:
         self._write_m3s03_files()
@@ -1289,12 +1313,12 @@ class TestM3StageGate(unittest.TestCase):
         self.assertTrue(any("metric_validation status must be pass" in message for message in messages), messages)
 
     def test_m3s03_stage_gate_rejects_source_truth_mismatch(self) -> None:
-        self._write_m3s03_files(declared_title="Deep Joint Source-Channel Coding for Textual Semantic Communication")
+        self._write_m3s03_files(declared_title="Unrelated Time Series Forecasting Baseline")
 
         ok, messages = check_stage(self.root, "M3S03")
 
         self.assertFalse(ok)
-        self.assertTrue(any("title=Deep Joint Source-Channel Coding" in message for message in messages), messages)
+        self.assertTrue(any("title=Unrelated Time Series Forecasting Baseline" in message for message in messages), messages)
 
     def test_m3s03_stage_gate_requires_checkpoint_file_when_needed(self) -> None:
         self._write_m3s03_files(
@@ -1382,9 +1406,9 @@ class TestM3StageGate(unittest.TestCase):
     def test_m3s04_stage_gate_rejects_random_or_running_weights(self) -> None:
         self._write_m3s04_files(include_monitor=True, include_watchdog=True)
         (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
-            "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
-            "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
-            "ours\trun_001\t42\taccuracy\t0.80\trunning\trandom_init\texperiments/runs/run_001/checkpoints/best.pt\t0\texperiments/runs/run_001/resource_monitor.csv\n",
+            "method\trun_id\tseed\tmetric_protocol_id\tmetric\tdirection\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\trun_001\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.80\trunning\trandom_init\texperiments/runs/run_001/checkpoints/best.pt\t0\texperiments/runs/run_001/resource_monitor.csv\n",
             encoding="utf-8",
         )
 
@@ -1407,12 +1431,12 @@ class TestM3StageGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("validity must be valid_main" in message for message in messages), messages)
 
-    def test_m3s04_stage_gate_rejects_ppl_leakage_result_pattern(self) -> None:
+    def test_m3s04_stage_gate_rejects_out_of_protocol_result_without_triage(self) -> None:
         self._write_m3s04_files(include_monitor=True, include_watchdog=True)
         (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
-            "method\trun_id\tseed\tmetric\tvalue\ttrain_acc\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\tppl_snr_-5dB\tppl_snr_0dB\tppl_snr_5dB\tppl_snr_20dB\n"
-            "baseline\tbaseline_run\t42\tppl\t1.009\t0.999\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\t1.009\t1.008\t1.009\t1.009\n"
-            "ours\trun_001\t42\tppl\t790.7\t0.045\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\t1154.4\t747.2\t735.2\t733.3\n",
+            "method\trun_id\tseed\tmetric_protocol_id\tmetric\tdirection\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
+            "ours\trun_001\t42\tmp_demo_accuracy\taccuracy\thigher_is_better\t0.99\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\n",
             encoding="utf-8",
         )
 
@@ -1420,8 +1444,8 @@ class TestM3StageGate(unittest.TestCase):
 
         self.assertFalse(ok)
         joined = "\n".join(messages)
-        self.assertIn("PPL leakage pattern detected", joined)
-        self.assertIn("SNR-invariant noisy-channel metric detected", joined)
+        self.assertIn("outside normal_reference_range", joined)
+        self.assertIn("without anomaly_triage", joined)
 
     def test_m3s05_stage_gate_accepts_keep_with_evidence_package(self) -> None:
         self._write_m3s05_report()
@@ -1467,7 +1491,7 @@ class TestM3StageGate(unittest.TestCase):
         doc = self.root / "knowledge" / "M3" / "M3S05_result_validation.md"
         doc.write_text(
             doc.read_text(encoding="utf-8")
-            + "\nL4External baseline match ❌ DeepSC ineligible; published values used for rough reference only.\n",
+            + "\nPrimary baseline comparability failed; published values are reference only and not same-protocol evidence.\n",
             encoding="utf-8",
         )
         self._write_m3s05_artifacts()
@@ -1479,12 +1503,12 @@ class TestM3StageGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("KEEP is invalid" in message for message in messages), messages)
 
-    def test_m3s05_stage_gate_blocks_keep_with_ppl_leakage_language(self) -> None:
+    def test_m3s05_stage_gate_blocks_keep_with_unresolved_invalid_result_language(self) -> None:
         self._write_m3s05_report()
         doc = self.root / "knowledge" / "M3" / "M3S05_result_validation.md"
         doc.write_text(
             doc.read_text(encoding="utf-8")
-            + "\nKnown anomaly: DeepSC clean memory bypass leaves PPL~1 and SNR-invariant PPL.\n",
+            + "\nKnown anomaly: invalid result row remains in the main evidence table without triage.\n",
             encoding="utf-8",
         )
         self._write_m3s05_artifacts()

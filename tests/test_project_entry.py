@@ -155,10 +155,10 @@ class TestProjectEntryManifest(unittest.TestCase):
 
     def test_create_writes_research_brief_with_anchors(self) -> None:
         proj = ProjectManager.create(
-            topic="Adaptive Semantic Communication",
+            topic="Adaptive Time Series Forecasting",
             display_name="Entry-Test",
             projects_root=self.tmp_path,
-            keywords=["semantic communication, adaptive coding"],
+            keywords=["time series forecasting, adaptive calibration"],
             reference_papers=["A Close Reference Paper"],
             foundation_papers=["https://arxiv.org/abs/1234.56789"],
         )
@@ -169,8 +169,8 @@ class TestProjectEntryManifest(unittest.TestCase):
         brief = yaml.safe_load(brief_path.read_text(encoding="utf-8"))
         self.assertEqual(brief["project"]["anchor_count"], 2)
         self.assertEqual(brief["project"]["paper_anchor_count"], 2)
-        self.assertIn("semantic communication", brief["keywords"])
-        self.assertIn("adaptive coding", brief["keywords"])
+        self.assertIn("time series forecasting", brief["keywords"])
+        self.assertIn("adaptive calibration", brief["keywords"])
 
         roles = {anchor["canonical_value"]: anchor["role"] for anchor in brief["anchors"]}
         self.assertEqual(roles["A Close Reference Paper"], "reference")
