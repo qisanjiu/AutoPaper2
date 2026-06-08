@@ -34,12 +34,17 @@ Experiment Agent: M3S01-M3S04; Analysis Agent: M3S05; dedicated stage reviewers 
 ## M3 Autonomy Policy
 - Do not stop at failed or weak first runs. Repair code/config/data, resume or rerun training, acquire missing checkpoints, retrain baselines, adjust resources, or backtrack to M3S03/M3S02/M2 as evidence requires.
 - M3S01 must design only the main experiment: dataset/scenario/split, M2S05 metric_protocol_id, external baselines with concrete same-dataset same-metric reference values and sources, and proposed-method same-condition protocol. Ablation, robustness, mechanism, and M4 analysis design are forbidden in M3S01.
+- M3S01/M3S03 baseline sources must be source-log bound: every eligible baseline needs `source_id`, exact title, venue, year, modality, task, dataset, metric, and table/section matching `knowledge/M1/M1_source_log.yaml`. Do not let the stage invent paper titles, venues, modalities, or tasks.
 - Baseline weights, dataset downloads, and official code acquisition are Agent work by default. Ask only for credentials, paid/quota approvals, unavailable storage/network access, unsafe/destructive actions, or spiral limit.
 - Download/acquisition failures are not PASS conditions. Try official releases, README/model zoo links, code auto-downloaders, HuggingFace/ModelScope/PyTorch Hub, mirrors, project cache, and SSH public cache before declaring blocked; if still blocked, write non-PASS/HALT with evidence and required human action.
 - M3S02 must produce `experiments/data/dataset_manifest.yaml` with complete datasets, required files, explicit splits/counts, checksum evidence when available, and smoke-load logs. Partial or placeholder datasets are non-PASS.
 - M3S04 cannot PASS until proposed/ours results are produced by completed trained weights with loadable checkpoint evidence. E0/random/untrained weights are diagnostic only.
+- M3S04 formal results must use `experiments/tables/results_main.tsv` plus `experiments/run_registry.yaml`; each proposed/ours run must be `completed`, `valid_main`, and have manifest/config/history/metrics/checkpoint/status evidence. Checkpoint-only or no-history runs are diagnostic only.
+- Noisy-channel/PPL runs with PPL≈1, accuracy≈1, SNR-invariant PPL, clean memory bypass, target/encoder hidden-state bypass, or metric leakage are invalid diagnostic results, not successes. Route implementation leakage to M3S02 or invalid baseline lock to M3S03, then rerun M3S04-M3S05.
+- Do not accept or generate a leakage repair that passes clean encoder memory to the decoder (`self.decoder(x, memory)`) unless the memory is explicitly channel-transmitted/noised under the same bottleneck.
 - M3 baselines cannot be ablations or simplified implementations; ablations are deferred to M4.
 - M3S03 must use M2S05 metric protocols, not redefine metrics. Baseline contracts must cite `metric_protocol_id`, match dataset/scenario/split/metric/direction, run metric sanity checks, and report/backtrack abnormal metric values instead of silently advancing.
+- M3S05 KEEP is forbidden when any primary baseline is ineligible, external baseline match fails, claimed metrics are not implemented/proxy-only/not-run, training is undertrained/running/checkpoint-only, or leakage/shortcut signals remain unresolved; route these to FIX/BACKTRACK with structured repair fields.
 
 ## Forbidden Writes
 `knowledge/M*/`, `drafts/`, `knowledge/reviews/*_review.md`, `artifacts/paper.*` unless a delegated subagent owns the path.

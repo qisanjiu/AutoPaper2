@@ -8,7 +8,11 @@ from typing import Any
 
 import yaml
 from utils.file_guard import find_alternate_outputs
-from utils.review_integrity import find_pass_integrity_issues
+from utils.review_integrity import (
+    REPAIR_ADVICE_REQUIRED_FIELDS,
+    check_repair_advice_evidence_scope,
+    find_pass_integrity_issues,
+)
 
 RUBRIC_CONFIG_PATH = Path(__file__).parent.parent / "config" / "gate_rubrics.yaml"
 
@@ -23,14 +27,7 @@ _GATE_CRITICS: dict[str, list[str]] = {
     "G5": ["logic", "writing", "evidence", "novelty", "ethics"],
     "G6": ["logic", "evidence", "writing", "resolution"],
 }
-_REPAIR_FIELDS: tuple[str, ...] = (
-    "target_stage",
-    "blocking_reason",
-    "required_fix",
-    "success_criteria",
-    "rebuild_mode",
-    "rerun_scope",
-)
+_REPAIR_FIELDS: tuple[str, ...] = REPAIR_ADVICE_REQUIRED_FIELDS
 _REPAIR_FIELD_PATTERNS: dict[str, re.Pattern[str]] = {
     field: re.compile(
         rf"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?`?{re.escape(field)}`?(?:\*\*)?\s*[:：]\s*(.+?)\s*$"
@@ -182,6 +179,10 @@ def validate_gate_critic_reviews(
                     f"[FAIL] Gate {gate_id}: critic review {review_path.name} missing repair advice fields: "
                     + ", ".join(missing)
                 )
+            else:
+                scope_ok, scope_messages = check_repair_advice_evidence_scope(f"Gate {gate_id}", text)
+                messages.extend(scope_messages)
+                ok = ok and scope_ok
             ok = False
         else:
             integrity_issues = find_pass_integrity_issues(text)

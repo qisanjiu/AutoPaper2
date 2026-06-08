@@ -58,6 +58,8 @@ REVIEWER_BOUNDARIES = [
     "Write exactly one review file at the requested output path.",
     "Do not return PASS when evidence is pending, failed, unavailable, ambiguous, or waiting for human/manual action.",
     "For non-PASS verdicts, include target_stage, blocking_reason, required_fix, success_criteria, evidence_paths, rebuild_mode, rerun_scope, and handoff_updates.",
+    "Do not prescribe exact code edits, lines, function calls, signatures, config values, or commands unless the code/config/log path was directly checked and listed in Evidence Checked or evidence_paths.",
+    "If only Markdown outputs were checked, write task-level advice: inspect the suspected owner files, verify the root cause, repair it, add evidence/tests, and rerun downstream.",
 ]
 
 
@@ -310,6 +312,11 @@ def _task_objective(packet: dict[str, Any]) -> str:
     stage = packet.get("stage", "")
     output = packet.get("output_path", "")
     if task_type == "stage_execution":
+        if packet.get("backtrack_advice"):
+            return (
+                f"Re-execute stage {stage} as the {role} subagent using the packet backtrack_advice/repair_brief, "
+                f"then write the assigned stage output at {output}."
+            )
         return f"Execute stage {stage} as the {role} subagent and write the assigned stage output at {output}."
     if task_type == "stage_review":
         subject = packet.get("subject_output", "")
@@ -403,6 +410,8 @@ def render_compact_launch_prompt(packet: dict[str, Any], packet_path: str | Path
         lines.append(f"Required output: {packet['output_path']}")
     if packet.get("role_spec"):
         lines.append(f"Role spec: {packet['role_spec']}")
+    if packet.get("backtrack_advice"):
+        lines.append("Backtrack: read the packet Backtrack Advice and Repair Brief before opening stage files.")
     lines.extend(
         [
             "",
@@ -934,6 +943,20 @@ def render_subagent_prompt(packet: dict[str, Any]) -> str:
             "handoff_updates",
         ):
             lines.append(f"- {key}: {advice.get(key, '')}")
+        brief = advice.get("repair_brief") or {}
+        if brief:
+            lines.append("")
+            lines.append("Repair Brief For Executor:")
+            for key in (
+                "error_summary",
+                "required_change",
+                "success_criteria",
+                "evidence_to_recheck",
+                "rebuild_mode",
+                "rerun_scope",
+                "handoff_updates",
+            ):
+                lines.append(f"- {key}: {brief.get(key, '')}")
 
     routing = packet.get("revision_routing") or {}
     if routing:
@@ -1069,6 +1092,21 @@ def packet_to_markdown(packet: dict[str, Any]) -> str:
         lines.extend(["", "## Backtrack Advice", ""])
         for key, value in advice.items():
             lines.append(f"- {key}: {value}")
+        brief = advice.get("repair_brief") or {}
+        if brief:
+            lines.extend(["", "## Repair Brief For Executor", ""])
+            lines.append(f"- error_summary: {brief.get('error_summary', '')}")
+            lines.append(f"- required_change: {brief.get('required_change', '')}")
+            lines.append(f"- success_criteria: {brief.get('success_criteria', '')}")
+            lines.append(f"- evidence_to_recheck: {brief.get('evidence_to_recheck', [])}")
+            lines.append(f"- rebuild_mode: {brief.get('rebuild_mode', '')}")
+            lines.append(f"- rerun_scope: {brief.get('rerun_scope', '')}")
+            lines.append(f"- handoff_updates: {brief.get('handoff_updates', [])}")
+            instructions = brief.get("executor_instructions", [])
+            if instructions:
+                lines.append("- executor_instructions:")
+                for item in instructions:
+                    lines.append(f"  - {item}")
     routing = packet.get("revision_routing") or {}
     if routing:
         lines.extend(["", "## Revision Routing", "", "```json", json.dumps(routing, ensure_ascii=False, indent=2), "```"])

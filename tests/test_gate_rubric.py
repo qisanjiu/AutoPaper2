@@ -216,8 +216,40 @@ class TestGateRubricValidation(unittest.TestCase):
             exit_code, output = _call_advance(str(root), "M1S05", "critic_team", str(aggregate))
 
             self.assertFalse(critic_ok, "\n".join(critic_messages))
+            joined = "\n".join(critic_messages)
+            self.assertIn("evidence_paths", joined)
+            self.assertIn("handoff_updates", joined)
             self.assertEqual(exit_code, 1, output)
             self.assertIn("aggregate PASS cannot override individual critic verdicts", output)
+
+    def test_gate_critic_rejects_code_patch_advice_without_code_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            root.mkdir()
+            _setup_g1_project(root)
+            critic_review = root / "knowledge" / "reviews" / "G1_logic_review.md"
+            critic_review.write_text(
+                "# G1 Logic Review\n\n"
+                "## Verdict\n"
+                "Verdict: REVISE\n\n"
+                "## Evidence Checked\n"
+                "- knowledge/M1/M1S05_novelty_feasibility.md: observed unresolved implementation claim only\n\n"
+                "## Repair Fields\n"
+                "- target_stage: M1S05\n"
+                "- blocking_reason: Markdown claim implies implementation evidence is missing, but code was not inspected.\n"
+                "- required_fix: Change experiments/eval.py line 42 to call `evaluate_fixed()`.\n"
+                "- success_criteria: implementation evidence is inspected, repaired if needed, and re-reviewed.\n"
+                "- evidence_paths: knowledge/M1/M1S05_novelty_feasibility.md\n"
+                "- rebuild_mode: full_regenerate\n"
+                "- rerun_scope: M1S05 -> G1\n"
+                "- handoff_updates: refresh knowledge/handoff_M1_M2.md\n",
+                encoding="utf-8",
+            )
+
+            ok, messages = validate_gate_critic_reviews(root, "G1")
+
+            self.assertFalse(ok)
+            self.assertIn("code-level repair advice lacks direct code/config/log evidence", "\n".join(messages))
 
     def test_gate_advance_blocks_unsupported_conditional_verdict(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -134,6 +134,10 @@ def _source(idx: int) -> dict[str, Any]:
         "type": "academic",
         "credibility": 0.9,
         "authors": [f"Author{idx}", f"Coauthor{idx}"],
+        "venue": "DemoConf",
+        "year": 2024,
+        "modality": "text",
+        "task": "classification",
         "background": "Defines the problem background and scenario.",
         "contributions": "Contributes a relevant model and evaluation protocol.",
         "model": "Uses a neural model with a comparable baseline.",
@@ -507,7 +511,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                         "value_range": [0.0, 1.0],
                         "normal_reference_range": [0.5, 0.95],
                         "protocol_source": {
-                            "source_id": "PaperX",
+                            "source_id": "src1",
                             "table_or_section": "Table 1",
                             "rationale": "standard classification metric for demo",
                         },
@@ -532,9 +536,9 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "|---|---|---|---|---|---|---|---|---|\n"
             "| Exp-1 | demo | classification | test | mp_demo_accuracy | accuracy | higher_is_better | 0.5-0.95 | M2S05_metric_protocol.yaml |\n\n"
             "## Baseline Reference Values\n\n"
-            "| baseline | comparator_type | dataset | scenario | split | metric_protocol_id | metric | reference_value | value_source | table_or_section | expected_tolerance | acquisition_plan |\n"
-            "|---|---|---|---|---|---|---|---|---|---|---|---|\n"
-            "| baseline_1 | external_prior_work | demo | classification | test | mp_demo_accuracy | accuracy | 0.75 | paper | Table 1 | 0.02 | verify-local-existing |\n\n"
+            "| baseline | comparator_type | source_id | title | venue | year | modality | task | dataset | scenario | split | metric_protocol_id | metric | reference_value | value_source | table_or_section | expected_tolerance | acquisition_plan |\n"
+            "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+            "| baseline_1 | external_prior_work | src1 | Representative Paper 1 | DemoConf | 2024 | text | classification | demo | classification | test | mp_demo_accuracy | accuracy | 0.75 | paper | Table 1 | 0.02 | verify-local-existing |\n\n"
             "## Proposed Method Same-Condition Protocol\n\n"
             "| 条件 | Baseline | Proposed method | 是否一致 | 差异说明 |\n"
             "|---|---|---|---|---|\n"
@@ -698,6 +702,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             "### Baseline 1\n"
             "Verification path: verify-local-existing.\n"
             "Checkpoint verified loadable: not_applicable.\n"
+            "source_id: src1; title: Representative Paper 1; venue: DemoConf; year: 2024; modality: text; task: classification.\n"
             "metric_protocol_id: mp_demo_accuracy; scenario: classification.\n"
             "Paper value: 0.75; local value: 0.75; relative_deviation: 0.0.\n"
             "verification_verdict: verified_match.\n\n"
@@ -756,6 +761,12 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                         "comparison_role": "primary",
                         "source": "verify-local-existing",
                         "comparator_type": "external_prior_work",
+                        "source_id": "src1",
+                        "title": "Representative Paper 1",
+                        "venue": "DemoConf",
+                        "year": 2024,
+                        "modality": "text",
+                        "task": "classification",
                         "ablation_of_ours": False,
                         "implementation_fidelity": "official_code",
                         "implementation_path": "experiments/baselines/baseline_1/",
@@ -809,25 +820,37 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             },
         )
     elif stage == "M3S04":
+        run_dir = root / "experiments" / "runs" / "M3S04_main" / "run1"
         _write(
             out,
             "# M3S04 Main Experiment\n\n"
             "## Run Contract\ncontract. Resource Plan: experiments/configs/resource_plan.yaml.\n\n"
+            "## Experiments Directory Contract\n"
+            "Formal results are in experiments/tables/results_main.tsv and run_registry.yaml.\n\n"
             "## 资源利用率执行记录\n"
-            "Run run1 uses cpu_parallel task_parallel and records experiments/runs/run1/resource_monitor.csv; average CPU utilization 72%; low utilization none.\n\n"
+            "Run run1 uses cpu_parallel task_parallel and records experiments/runs/M3S04_main/run1/resource_monitor.csv; average CPU utilization 72%; low utilization none.\n\n"
             "## Runtime Watchdog 与告警记录\n"
-            "experiments/logs/runtime_events.jsonl and experiments/runs/run1/watchdog_checks.jsonl record watchdog 巡检. "
+            "experiments/logs/runtime_events.jsonl and experiments/runs/M3S04_main/run1/watchdog_checks.jsonl record watchdog 巡检. "
             "Watchdog only records alerts and does not automatically terminate the run. Agent 决策: continue; no alert observed.\n\n"
             "## Trained-Weight Evidence Contract\n"
-            "Final proposed result uses trained checkpoint experiments/runs/run1/checkpoints/best.pt and runtime_events records training_completed.\n\n"
+            "Final proposed result uses trained checkpoint experiments/runs/M3S04_main/run1/checkpoints/best.pt and runtime_events records training_completed.\n\n"
             "## 迭代循环记录\niterations with resource_monitor.csv.\n\n"
             "## Evidence Ladder\nsolid.\n\n"
             "## 随机种子\n42.\n",
         )
-        _write(root / "experiments" / "runs" / "run1" / "log.txt", "ok\n")
-        _write(root / "experiments" / "runs" / "run1" / "checkpoints" / "best.pt", "trained checkpoint placeholder\n")
+        _write(run_dir / "log.txt", "ok\n")
+        _write(run_dir / "checkpoints" / "best.pt", "trained checkpoint placeholder\n")
+        _write(run_dir / "run_manifest.yaml", "run_id: run1\nstage: M3S04\nrole: ours\n")
+        _write(run_dir / "config.yaml", "seed: 42\n")
+        _write(run_dir / "command.sh", "python experiments/code/train.py --seed 42\n")
+        _write(run_dir / "stdout.log", "training completed\n")
+        _write(run_dir / "stderr.log", "")
+        _write(run_dir / "training_history.json", "[{\"epoch\": 1, \"metric\": 0.8}]\n")
+        _write(run_dir / "metrics.tsv", "metric\tvalue\naccuracy\t0.80\n")
+        _write(run_dir / "checkpoint_manifest.yaml", "checkpoint_path: experiments/runs/M3S04_main/run1/checkpoints/best.pt\nverified_loadable: true\n")
+        _write(run_dir / "status.json", "{\"status\":\"completed\"}\n")
         _write(
-            root / "experiments" / "runs" / "run1" / "resource_monitor.csv",
+            run_dir / "resource_monitor.csv",
             "timestamp,command_pid,cpu_load_pct,mem_available_mb,gpu_index,gpu_util_pct,gpu_mem_used_mb,gpu_mem_total_mb\n"
             "2026-05-29T12:00:00,123,72,8000,,,,\n",
         )
@@ -836,15 +859,49 @@ def _write_stage_output(root: Path, stage: str) -> Path:
             '"run_id":"run1","severity":"info","decision_required":false,'
             '"agent_action_policy":"record_alert_only_agent_decides_continue_fix_or_stop","signals":[]}\n'
             '{"timestamp":"2026-05-29T12:30:00","stage":"M3S04","event_type":"training_completed",'
-            '"run_id":"run1","status":"completed","checkpoint_path":"experiments/runs/run1/checkpoints/best.pt"}\n'
+            '"run_id":"run1","status":"completed","checkpoint_path":"experiments/runs/M3S04_main/run1/checkpoints/best.pt"}\n'
         )
         _write(root / "experiments" / "logs" / "runtime_events.jsonl", watchdog_event)
-        _write(root / "experiments" / "runs" / "run1" / "watchdog_checks.jsonl", watchdog_event)
+        _write(run_dir / "watchdog_checks.jsonl", watchdog_event)
+        _write(
+            root / "experiments" / "tables" / "results_main.tsv",
+            "method\trun_id\tseed\taccuracy\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
+            "baseline\tbaseline_run\t42\t0.75\tcompleted\tnot_applicable\t\t0\texperiments/runs/M3S04_main/run1/resource_monitor.csv\n"
+            "ours\trun1\t42\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/M3S04_main/run1/checkpoints/best.pt\t120\texperiments/runs/M3S04_main/run1/resource_monitor.csv\n",
+        )
+        _write(
+            root / "experiments" / "tables" / "results_all.tsv",
+            (root / "experiments" / "tables" / "results_main.tsv").read_text(encoding="utf-8"),
+        )
         _write(
             root / "experiments" / "results.tsv",
-            "method\trun_id\tseed\taccuracy\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
-            "baseline\tbaseline_run\t42\t0.75\tcompleted\tnot_applicable\t\t0\texperiments/runs/run1/resource_monitor.csv\n"
-            "ours\trun1\t42\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run1/checkpoints/best.pt\t120\texperiments/runs/run1/resource_monitor.csv\n",
+            (root / "experiments" / "tables" / "results_main.tsv").read_text(encoding="utf-8"),
+        )
+        _write_yaml(
+            root / "experiments" / "run_registry.yaml",
+            {
+                "schema_version": 1,
+                "runs": [
+                    {
+                        "run_id": "run1",
+                        "stage": "M3S04",
+                        "role": "ours",
+                        "status": "completed",
+                        "validity": "valid_main",
+                        "run_dir": "experiments/runs/M3S04_main/run1",
+                        "run_manifest": "run_manifest.yaml",
+                        "config_path": "config.yaml",
+                        "command_path": "command.sh",
+                        "stdout_path": "stdout.log",
+                        "stderr_path": "stderr.log",
+                        "history_path": "training_history.json",
+                        "metrics_path": "metrics.tsv",
+                        "checkpoint_path": "experiments/runs/M3S04_main/run1/checkpoints/best.pt",
+                        "checkpoint_manifest": "checkpoint_manifest.yaml",
+                        "status_path": "status.json",
+                    }
+                ],
+            },
         )
     elif stage == "M3S05":
         _write(
@@ -883,7 +940,7 @@ def _write_stage_output(root: Path, stage: str) -> Path:
                 "method": "ours",
                 "dataset": "demo",
                 "baseline_refs": ["experiments/baselines/baseline_1/metric_contract.yaml"],
-                "trained_checkpoint": "experiments/runs/run1/checkpoints/best.pt",
+                "trained_checkpoint": "experiments/runs/M3S04_main/run1/checkpoints/best.pt",
                 "primary_metric": {"key": "accuracy", "value": 0.803},
                 "seed": 42,
                 "environment": {"python": "3.11", "hardware": "cpu"},

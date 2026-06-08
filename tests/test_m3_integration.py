@@ -352,8 +352,19 @@ class TestM3StageGate(unittest.TestCase):
         checkpoint_required: bool = False,
         checkpoint_verified: bool = False,
         checkpoint_file_exists: bool = True,
+        source_id: str = "SRC_DEMO_TEXT",
+        source_title: str = "Demo Text Classification Baseline",
+        source_venue: str = "DemoConf",
+        source_year: int = 2024,
+        source_modality: str = "text",
+        source_task: str = "classification",
+        declared_title: str | None = None,
+        declared_venue: str | None = None,
+        declared_modality: str | None = None,
+        declared_task: str | None = None,
     ) -> None:
         for rel in (
+            "knowledge/M1",
             "knowledge/M2",
             "knowledge/M3",
             "knowledge/reviews",
@@ -361,6 +372,19 @@ class TestM3StageGate(unittest.TestCase):
             "experiments/baselines/baseline_1/logs",
         ):
             (self.root / rel).mkdir(parents=True, exist_ok=True)
+
+        (self.root / "knowledge" / "M1" / "M1_source_log.yaml").write_text(
+            "sources:\n"
+            f"  - source_id: {source_id}\n"
+            f"    title: \"{source_title}\"\n"
+            f"    venue: {source_venue}\n"
+            f"    year: {source_year}\n"
+            f"    modality: {source_modality}\n"
+            f"    task: {source_task}\n"
+            "    dataset: demo\n"
+            "    metric: accuracy\n",
+            encoding="utf-8",
+        )
 
         if include_metric_protocol:
             (self.root / "knowledge" / "M2" / "M2S05_metric_protocol.yaml").write_text(
@@ -411,9 +435,11 @@ class TestM3StageGate(unittest.TestCase):
             "# M3S03 Baseline Lock\n\n"
             "### Baseline 1\n"
             f"Verification path: {source}.\n"
-            f"verification_verdict: {verification_verdict}.\n"
-            f"metric_protocol_id: {metric_protocol_id}; scenario: {scenario}.\n"
-            f"Paper value: {paper_value}; local value: {local_value}.\n\n"
+                f"verification_verdict: {verification_verdict}.\n"
+                f"metric_protocol_id: {metric_protocol_id}; scenario: {scenario}.\n"
+                f"source_id: {source_id}; title: {declared_title or source_title}; venue: {declared_venue or source_venue}; "
+                f"year: {source_year}; modality: {declared_modality or source_modality}; task: {declared_task or source_task}.\n"
+                f"Paper value: {paper_value}; local value: {local_value}.\n\n"
             "## Smoke Test\n"
             "Smoke Test passed with correct metric computation and checkpoint loading status.\n\n",
             encoding="utf-8",
@@ -465,6 +491,12 @@ class TestM3StageGate(unittest.TestCase):
                 "    comparison_role: primary\n"
                 f"    source: {source}\n"
                 f"    comparator_type: {comparator_type}\n"
+                f"    source_id: {source_id}\n"
+                f"    title: \"{declared_title or source_title}\"\n"
+                f"    venue: {declared_venue or source_venue}\n"
+                f"    year: {source_year}\n"
+                f"    modality: {declared_modality or source_modality}\n"
+                f"    task: {declared_task or source_task}\n"
                 f"    ablation_of_ours: {'true' if ablation_of_ours else 'false'}\n"
                 f"    implementation_fidelity: {implementation_fidelity}\n"
                 f"    fidelity_evidence: \"{fidelity_evidence}\"\n"
@@ -586,6 +618,7 @@ class TestM3StageGate(unittest.TestCase):
             "experiments/logs",
             "experiments/runs/run_001",
             "experiments/runs/run_001/checkpoints",
+            "experiments/tables",
         ):
             (self.root / rel).mkdir(parents=True, exist_ok=True)
 
@@ -668,14 +701,52 @@ class TestM3StageGate(unittest.TestCase):
             "    alert_policy: record_alert_only_agent_decides_continue_fix_or_stop\n",
             encoding="utf-8",
         )
-        (self.root / "experiments" / "results.tsv").write_text(
+        (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
             "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
             "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
             "ours\trun_001\t42\taccuracy\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\n",
             encoding="utf-8",
         )
+        (self.root / "experiments" / "results.tsv").write_text(
+            (self.root / "experiments" / "tables" / "results_main.tsv").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
         (self.root / "experiments" / "runs" / "run_001" / "checkpoints" / "best.pt").write_text(
             "trained checkpoint placeholder\n",
+            encoding="utf-8",
+        )
+        run_dir = self.root / "experiments" / "runs" / "run_001"
+        (run_dir / "run_manifest.yaml").write_text("run_id: run_001\nstage: M3S04\nrole: ours\n", encoding="utf-8")
+        (run_dir / "config.yaml").write_text("seed: 42\n", encoding="utf-8")
+        (run_dir / "command.sh").write_text("python experiments/code/train.py --seed 42\n", encoding="utf-8")
+        (run_dir / "stdout.log").write_text("training completed\n", encoding="utf-8")
+        (run_dir / "stderr.log").write_text("", encoding="utf-8")
+        (run_dir / "training_history.json").write_text("[{\"epoch\": 1, \"metric\": 0.8}]\n", encoding="utf-8")
+        (run_dir / "metrics.tsv").write_text("metric\tvalue\naccuracy\t0.80\n", encoding="utf-8")
+        (run_dir / "checkpoint_manifest.yaml").write_text(
+            "checkpoint_path: experiments/runs/run_001/checkpoints/best.pt\nverified_loadable: true\n",
+            encoding="utf-8",
+        )
+        (run_dir / "status.json").write_text("{\"status\":\"completed\"}\n", encoding="utf-8")
+        (self.root / "experiments" / "run_registry.yaml").write_text(
+            "schema_version: 1\n"
+            "runs:\n"
+            "  - run_id: run_001\n"
+            "    stage: M3S04\n"
+            "    role: ours\n"
+            "    status: completed\n"
+            "    validity: valid_main\n"
+            "    run_dir: experiments/runs/run_001\n"
+            "    run_manifest: run_manifest.yaml\n"
+            "    config_path: config.yaml\n"
+            "    command_path: command.sh\n"
+            "    stdout_path: stdout.log\n"
+            "    stderr_path: stderr.log\n"
+            "    history_path: training_history.json\n"
+            "    metrics_path: metrics.tsv\n"
+            "    checkpoint_path: experiments/runs/run_001/checkpoints/best.pt\n"
+            "    checkpoint_manifest: checkpoint_manifest.yaml\n"
+            "    status_path: status.json\n",
             encoding="utf-8",
         )
         if include_monitor:
@@ -719,10 +790,15 @@ class TestM3StageGate(unittest.TestCase):
             '"run_id":"run_001","status":"completed","checkpoint_path":"experiments/runs/run_001/checkpoints/best.pt"}\n',
             encoding="utf-8",
         )
-        (self.root / "experiments" / "results.tsv").write_text(
+        (self.root / "experiments" / "tables").mkdir(parents=True, exist_ok=True)
+        (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
             "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
             "baseline\tbaseline_run\t42\taccuracy\t0.753\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
             "ours\trun_001\t42\taccuracy\t0.803\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "results.tsv").write_text(
+            (self.root / "experiments" / "tables" / "results_main.tsv").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
         (artifacts / "manifest.yaml").write_text(
@@ -843,6 +919,19 @@ class TestM3StageGate(unittest.TestCase):
             "trained checkpoint placeholder\n",
             encoding="utf-8",
         )
+        run2 = self.root / "experiments" / "runs" / "run_002"
+        (run2 / "run_manifest.yaml").write_text("run_id: run_002\nstage: M3S04\nrole: ours\n", encoding="utf-8")
+        (run2 / "config.yaml").write_text("seed: 42\n", encoding="utf-8")
+        (run2 / "command.sh").write_text("python experiments/code/train.py --seed 42\n", encoding="utf-8")
+        (run2 / "stdout.log").write_text("training completed\n", encoding="utf-8")
+        (run2 / "stderr.log").write_text("", encoding="utf-8")
+        (run2 / "training_history.json").write_text("[{\"epoch\": 1, \"metric\": 0.8}]\n", encoding="utf-8")
+        (run2 / "metrics.tsv").write_text("metric\tvalue\naccuracy\t0.80\n", encoding="utf-8")
+        (run2 / "checkpoint_manifest.yaml").write_text(
+            "checkpoint_path: experiments/runs/run_002/checkpoints/best.pt\nverified_loadable: true\n",
+            encoding="utf-8",
+        )
+        (run2 / "status.json").write_text("{\"status\":\"completed\"}\n", encoding="utf-8")
         (self.root / "experiments" / "runs" / "run_002" / "resource_monitor.csv").write_text(
             "timestamp,command_pid,cpu_load_pct,mem_available_mb,gpu_index,gpu_util_pct,gpu_mem_used_mb,gpu_mem_total_mb\n"
             "2026-05-29T12:00:00,124,70,16000,0,80,8000,24576\n",
@@ -931,10 +1020,35 @@ class TestM3StageGate(unittest.TestCase):
             "blocked_tasks: []\n",
             encoding="utf-8",
         )
-        (self.root / "experiments" / "results.tsv").write_text(
+        (self.root / "experiments" / "tables").mkdir(parents=True, exist_ok=True)
+        (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
             "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_id\tresource_kind\tresource_monitor\n"
             "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\tlocal\tlocal\texperiments/runs/run_001/resource_monitor.csv\n"
             "ours\trun_002\t42\taccuracy\t0.80\tcompleted\ttrained_checkpoint\texperiments/runs/run_002/checkpoints/best.pt\t120\tssh:lab-a\tssh\texperiments/runs/run_002/resource_monitor.csv\n",
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "results.tsv").write_text(
+            (self.root / "experiments" / "tables" / "results_main.tsv").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        (self.root / "experiments" / "run_registry.yaml").write_text(
+            (self.root / "experiments" / "run_registry.yaml").read_text(encoding="utf-8")
+            + "  - run_id: run_002\n"
+            + "    stage: M3S04\n"
+            + "    role: ours\n"
+            + "    status: completed\n"
+            + "    validity: valid_main\n"
+            + "    run_dir: experiments/runs/run_002\n"
+            + "    run_manifest: run_manifest.yaml\n"
+            + "    config_path: config.yaml\n"
+            + "    command_path: command.sh\n"
+            + "    stdout_path: stdout.log\n"
+            + "    stderr_path: stderr.log\n"
+            + "    history_path: training_history.json\n"
+            + "    metrics_path: metrics.tsv\n"
+            + "    checkpoint_path: experiments/runs/run_002/checkpoints/best.pt\n"
+            + "    checkpoint_manifest: checkpoint_manifest.yaml\n"
+            + "    status_path: status.json\n",
             encoding="utf-8",
         )
         (self.root / "experiments" / "logs" / "runtime_events.jsonl").write_text(
@@ -1029,6 +1143,95 @@ class TestM3StageGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("PASS verdict but contains blocking/ambiguous language" in message for message in messages), messages)
 
+    def test_m3s03_stage_review_rejects_bad_ppl_leakage_repair_advice(self) -> None:
+        self._write_m3s03_files()
+        (self.root / "knowledge" / "reviews" / "M3S03_baseline_result_review.md").write_text(
+            "# M3S03 Baseline Result Review\n\n"
+            "## Verdict\n"
+            "Verdict: REVISE\n\n"
+            "## Findings\n"
+            "DeepSC clean memory bypass causes PPL~1 at all SNRs.\n\n"
+            "## Repair Fields\n"
+            "- target_stage: M3S04\n"
+            "- blocking_reason: DeepSC clean memory bypass causes PPL~1 at all SNRs.\n"
+            "- required_fix: Fix the baseline by using encoder-decoder cross-attention `self.decoder(x, memory)`.\n"
+            "- success_criteria: PPL no longer leaks.\n"
+            "- evidence_paths: experiments/external_baselines.py\n"
+            "- rebuild_mode: incremental_replay\n"
+            "- rerun_scope: M3S04\n"
+            "- handoff_updates: refresh M3S03 lock\n",
+            encoding="utf-8",
+        )
+
+        ok, messages = check_stage(self.root, "M3S03")
+
+        self.assertFalse(ok)
+        joined = "\n".join(messages)
+        self.assertIn("repair advice routes PPL/channel leakage", joined)
+        self.assertIn("invalid leakage repair advice", joined)
+
+    def test_stage_review_rejects_code_patch_advice_without_code_evidence(self) -> None:
+        self._write_m3s03_files()
+        (self.root / "knowledge" / "reviews" / "M3S03_baseline_result_review.md").write_text(
+            "# M3S03 Baseline Result Review\n\n"
+            "## Verdict\n"
+            "Verdict: REVISE\n\n"
+            "## Evidence Checked\n"
+            "- knowledge/M3/M3S03_baseline_lock.md: observed baseline lock summary only\n"
+            "- knowledge/M3/M3S04_main_experiment.md: observed anomalous reported result only\n\n"
+            "## Findings\n"
+            "The Markdown reports imply an implementation bug, but no code was inspected.\n\n"
+            "## Repair Fields\n"
+            "- target_stage: M3S02\n"
+            "- blocking_reason: reported baseline metrics imply an implementation bug, but the code root cause is unverified.\n"
+            "- required_fix: Change experiments/external_baselines.py line 123 to call `decode(noisy_symbols)`.\n"
+            "- success_criteria: implementation evidence shows the suspected bug was verified and repaired, then M3S04 reruns.\n"
+            "- evidence_paths: knowledge/M3/M3S03_baseline_lock.md; knowledge/M3/M3S04_main_experiment.md\n"
+            "- rebuild_mode: full_regenerate\n"
+            "- rerun_scope: M3S02 -> M3S03 -> M3S04 -> M3S05\n"
+            "- handoff_updates: refresh knowledge/handoff_M3_M4.md\n",
+            encoding="utf-8",
+        )
+
+        ok, messages = check_stage(self.root, "M3S03")
+
+        self.assertFalse(ok)
+        joined = "\n".join(messages)
+        self.assertIn("code-level repair advice lacks direct code/config/log evidence", joined)
+
+    def test_stage_review_allows_code_patch_advice_with_code_evidence(self) -> None:
+        self._write_m3s03_files()
+        (self.root / "experiments" / "external_baselines.py").write_text(
+            "def decode(noisy_symbols):\n    return noisy_symbols\n",
+            encoding="utf-8",
+        )
+        (self.root / "knowledge" / "reviews" / "M3S03_baseline_result_review.md").write_text(
+            "# M3S03 Baseline Result Review\n\n"
+            "## Verdict\n"
+            "Verdict: REVISE\n\n"
+            "## Evidence Checked\n"
+            "- project:experiments/external_baselines.py: inspected decode path\n\n"
+            "## Findings\n"
+            "The checked implementation has a local bug in the decode path.\n\n"
+            "## Repair Fields\n"
+            "- target_stage: M3S02\n"
+            "- blocking_reason: inspected baseline implementation has a decode-path bug.\n"
+            "- required_fix: Change experiments/external_baselines.py line 123 to call `decode(noisy_symbols)`.\n"
+            "- success_criteria: implementation evidence shows the bug was repaired and M3S04 reruns.\n"
+            "- evidence_paths: experiments/external_baselines.py\n"
+            "- rebuild_mode: full_regenerate\n"
+            "- rerun_scope: M3S02 -> M3S03 -> M3S04 -> M3S05\n"
+            "- handoff_updates: refresh knowledge/handoff_M3_M4.md\n",
+            encoding="utf-8",
+        )
+
+        ok, messages = check_stage(self.root, "M3S03")
+
+        self.assertFalse(ok)
+        joined = "\n".join(messages)
+        self.assertIn("code-level repair advice is backed by direct code/config/log evidence", joined)
+        self.assertNotIn("code-level repair advice lacks direct code/config/log evidence", joined)
+
     def test_m3s03_stage_gate_requires_baseline_lock_manifest(self) -> None:
         self._write_m3s03_files(include_lock=False)
 
@@ -1085,6 +1288,14 @@ class TestM3StageGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("metric_validation status must be pass" in message for message in messages), messages)
 
+    def test_m3s03_stage_gate_rejects_source_truth_mismatch(self) -> None:
+        self._write_m3s03_files(declared_title="Deep Joint Source-Channel Coding for Textual Semantic Communication")
+
+        ok, messages = check_stage(self.root, "M3S03")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("title=Deep Joint Source-Channel Coding" in message for message in messages), messages)
+
     def test_m3s03_stage_gate_requires_checkpoint_file_when_needed(self) -> None:
         self._write_m3s03_files(
             checkpoint_required=True,
@@ -1138,6 +1349,18 @@ class TestM3StageGate(unittest.TestCase):
         self.assertTrue(any("runtime_events.jsonl has" in message for message in messages), messages)
         self.assertTrue(any("watchdog check file" in message for message in messages), messages)
 
+    def test_m3s04_stage_gate_rejects_alternate_markdown_output(self) -> None:
+        self._write_m3s04_files(include_monitor=True, include_watchdog=True)
+        (self.root / "knowledge" / "M3" / "M3S04_result_validation.md").write_text(
+            "# Alternate M3S04 Output\n\nThis must be written into the canonical M3S04 file instead.\n",
+            encoding="utf-8",
+        )
+
+        ok, messages = check_stage(self.root, "M3S04")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("Single file principle violated" in message for message in messages), messages)
+
     def test_m3s04_stage_gate_requires_resource_monitor(self) -> None:
         self._write_m3s04_files(include_monitor=False)
 
@@ -1158,7 +1381,7 @@ class TestM3StageGate(unittest.TestCase):
 
     def test_m3s04_stage_gate_rejects_random_or_running_weights(self) -> None:
         self._write_m3s04_files(include_monitor=True, include_watchdog=True)
-        (self.root / "experiments" / "results.tsv").write_text(
+        (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
             "method\trun_id\tseed\tmetric\tvalue\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\n"
             "baseline\tbaseline_run\t42\taccuracy\t0.70\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\n"
             "ours\trun_001\t42\taccuracy\t0.80\trunning\trandom_init\texperiments/runs/run_001/checkpoints/best.pt\t0\texperiments/runs/run_001/resource_monitor.csv\n",
@@ -1171,6 +1394,34 @@ class TestM3StageGate(unittest.TestCase):
         joined = "\n".join(messages)
         self.assertIn("run_status/training_status must be completed", joined)
         self.assertIn("no proposed/ours result row is backed by completed trained weights", joined)
+
+    def test_m3s04_stage_gate_rejects_checkpoint_only_registry_run(self) -> None:
+        self._write_m3s04_files(include_monitor=True, include_watchdog=True)
+        registry = self.root / "experiments" / "run_registry.yaml"
+        text = registry.read_text(encoding="utf-8")
+        text = text.replace("validity: valid_main", "validity: checkpoint_only_unverified")
+        registry.write_text(text, encoding="utf-8")
+
+        ok, messages = check_stage(self.root, "M3S04")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("validity must be valid_main" in message for message in messages), messages)
+
+    def test_m3s04_stage_gate_rejects_ppl_leakage_result_pattern(self) -> None:
+        self._write_m3s04_files(include_monitor=True, include_watchdog=True)
+        (self.root / "experiments" / "tables" / "results_main.tsv").write_text(
+            "method\trun_id\tseed\tmetric\tvalue\ttrain_acc\trun_status\tweight_state\tcheckpoint_path\ttraining_steps\tresource_monitor\tppl_snr_-5dB\tppl_snr_0dB\tppl_snr_5dB\tppl_snr_20dB\n"
+            "baseline\tbaseline_run\t42\tppl\t1.009\t0.999\tcompleted\tnot_applicable\t\t0\texperiments/runs/run_001/resource_monitor.csv\t1.009\t1.008\t1.009\t1.009\n"
+            "ours\trun_001\t42\tppl\t790.7\t0.045\tcompleted\ttrained_checkpoint\texperiments/runs/run_001/checkpoints/best.pt\t120\texperiments/runs/run_001/resource_monitor.csv\t1154.4\t747.2\t735.2\t733.3\n",
+            encoding="utf-8",
+        )
+
+        ok, messages = check_stage(self.root, "M3S04")
+
+        self.assertFalse(ok)
+        joined = "\n".join(messages)
+        self.assertIn("PPL leakage pattern detected", joined)
+        self.assertIn("SNR-invariant noisy-channel metric detected", joined)
 
     def test_m3s05_stage_gate_accepts_keep_with_evidence_package(self) -> None:
         self._write_m3s05_report()
@@ -1210,6 +1461,40 @@ class TestM3StageGate(unittest.TestCase):
         self.assertIn("missing single-seed validation", joined)
         self.assertIn("missing hypothesis mapping", joined)
         self.assertIn("missing data quality checks", joined)
+
+    def test_m3s05_stage_gate_blocks_keep_with_ineligible_external_baseline(self) -> None:
+        self._write_m3s05_report()
+        doc = self.root / "knowledge" / "M3" / "M3S05_result_validation.md"
+        doc.write_text(
+            doc.read_text(encoding="utf-8")
+            + "\nL4External baseline match ❌ DeepSC ineligible; published values used for rough reference only.\n",
+            encoding="utf-8",
+        )
+        self._write_m3s05_artifacts()
+        self._write_m3s05_handoff()
+        self._write_m3s05_review()
+
+        ok, messages = check_stage(self.root, "M3S05")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("KEEP is invalid" in message for message in messages), messages)
+
+    def test_m3s05_stage_gate_blocks_keep_with_ppl_leakage_language(self) -> None:
+        self._write_m3s05_report()
+        doc = self.root / "knowledge" / "M3" / "M3S05_result_validation.md"
+        doc.write_text(
+            doc.read_text(encoding="utf-8")
+            + "\nKnown anomaly: DeepSC clean memory bypass leaves PPL~1 and SNR-invariant PPL.\n",
+            encoding="utf-8",
+        )
+        self._write_m3s05_artifacts()
+        self._write_m3s05_handoff()
+        self._write_m3s05_review()
+
+        ok, messages = check_stage(self.root, "M3S05")
+
+        self.assertFalse(ok)
+        self.assertTrue(any("KEEP is invalid" in message for message in messages), messages)
 
     def test_m3s05_stage_gate_blocks_fix_even_with_repair_advice(self) -> None:
         self._write_m3s05_report(decision="FIX")

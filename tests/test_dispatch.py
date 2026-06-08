@@ -17,6 +17,7 @@ from spiral.dispatch import (
 )
 from spiral.revision_router import build_revision_routes
 from spiral.state import PipelineState
+from spiral.verdict_parser import VerdictParser
 from utils.stage_gate import check_stage
 
 
@@ -211,6 +212,57 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertIn("Read the existing file first", packet["output_write_policy"]["if_target_exists"])
         self.assertIn("correct unaffected sections were preserved", "\n".join(packet["after_completion"]))
 
+    def test_non_pass_review_requires_complete_repair_fields(self) -> None:
+        review = self.root / "knowledge" / "reviews" / "M2S01_search_quality_review.md"
+        review.write_text(
+            "# Review\n\n"
+            "## Verdict\n"
+            "Verdict: REVISE\n\n"
+            "## Repair Fields\n"
+            "- blocking_reason: search coverage is incomplete\n"
+            "- required_fix: add missing query families\n"
+            "- success_criteria: M2S01 review can pass\n"
+            "- rebuild_mode: incremental_replay\n"
+            "- rerun_scope: M2S01\n",
+            encoding="utf-8",
+        )
+
+        parsed = VerdictParser.parse_stage_review("m2_search_quality", review)
+        ok, error = parsed.is_valid
+
+        self.assertFalse(ok)
+        self.assertIn("target_stage", parsed.missing_fields)
+        self.assertIn("evidence_paths", parsed.missing_fields)
+        self.assertIn("handoff_updates", parsed.missing_fields)
+        self.assertIn("missing repair advice fields", error)
+
+    def test_backtrack_stage_packet_contains_executor_repair_brief(self) -> None:
+        advice = {
+            "source_critic": "m2_search_quality",
+            "target_stage": "M2S01",
+            "blocking_reason": "M2S01 omitted the shared-principle search dimension.",
+            "required_fix": "Add shared-principle queries and update the candidate pool evidence.",
+            "success_criteria": "M2S01 includes the missing dimension and passes review.",
+            "evidence_paths": ["knowledge/M2/M2S01_cross_domain_search.md"],
+            "rebuild_mode": "incremental_replay",
+            "rerun_scope": "M2S01 -> M2S02 -> M2S03",
+            "handoff_updates": ["knowledge/handoff_M2_M3.md"],
+        }
+
+        result = Conductor(self.root).backtrack("M2S03", "M2S01", advice["blocking_reason"], advice=advice)
+        self.assertTrue(result["ok"], result)
+
+        packet = build_stage_execution_packet(self.root, "M2S01")
+
+        self.assertIn("repair_brief", packet["backtrack_advice"])
+        brief = packet["backtrack_advice"]["repair_brief"]
+        self.assertEqual(brief["error_summary"], advice["blocking_reason"])
+        self.assertEqual(brief["required_change"], advice["required_fix"])
+        self.assertIn("knowledge/M2/M2S01_cross_domain_search.md", brief["evidence_to_recheck"])
+        self.assertIn("Repair Brief For Executor", packet["subagent_prompt"])
+        self.assertIn("error_summary", packet["subagent_prompt"])
+        self.assertIn("Backtrack: read the packet Backtrack Advice", packet["subagent_launch_prompt"])
+
     def test_written_markdown_packet_exposes_only_compact_launch_prompt(self) -> None:
         packet = build_stage_execution_packet(self.root, "M2S01")
         paths = write_packets(self.root, [packet], fmt="markdown")
@@ -275,6 +327,13 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertEqual(packet["role"], "m2_search_quality")
         self.assertTrue(packet["output_path"].endswith("knowledge/reviews/M2S01_search_quality_review.md"))
         self.assertTrue(packet["subject_output"].endswith("knowledge/M2/M2S01_cross_domain_search.md"))
+
+    def test_stage_review_packet_includes_evidence_scoped_advice_boundary(self) -> None:
+        packets = build_stage_review_packets(self.root, "M3S03")
+
+        prompt = packets[0]["subagent_prompt"]
+        self.assertIn("Do not prescribe exact code edits", prompt)
+        self.assertIn("If only Markdown outputs were checked", prompt)
 
     def test_gate_review_packet_includes_rubric_block(self) -> None:
         packets = build_packets(self.root, "gate", "G2")
@@ -374,6 +433,17 @@ class TestDispatchPackets(unittest.TestCase):
         path.write_text("# Review\n\n## Verdict\nVerdict: PASS\n", encoding="utf-8")
 
     def _write_valid_m2s05(self) -> None:
+        (self.root / "knowledge" / "M1").mkdir(parents=True, exist_ok=True)
+        (self.root / "knowledge" / "M1" / "M1_source_log.yaml").write_text(
+            "sources:\n"
+            "  - source_id: PaperX\n"
+            "    title: \"Demo Text Classification Baseline\"\n"
+            "    venue: DemoConf\n"
+            "    year: 2024\n"
+            "    modality: text\n"
+            "    task: classification\n",
+            encoding="utf-8",
+        )
         (self.root / "knowledge" / "M2" / "M2S05_experiment_setup.md").write_text(
             "# M2S05 Experiment Setup\n\n"
             "## Dataset Selection\n\n"
@@ -428,9 +498,9 @@ class TestDispatchPackets(unittest.TestCase):
             "|---|---|---|---|---|---|---|---|---|\n"
             "| Exp-1 | DemoSet | classification | test | mp_demo_accuracy | accuracy | higher_is_better | 0.5-0.95 | M2S05_metric_protocol.yaml |\n\n"
             "## Baseline Reference Values\n\n"
-            "| baseline | comparator_type | dataset | scenario | split | metric_protocol_id | metric | reference_value | value_source | table_or_section | expected_tolerance | acquisition_plan |\n"
-            "|---|---|---|---|---|---|---|---|---|---|---|---|\n"
-            "| Baseline-1 | external_prior_work | DemoSet | classification | test | mp_demo_accuracy | accuracy | 0.75 | PaperX | Table 1 | 0.02 | official code/checkpoint URL |\n\n"
+            "| baseline | comparator_type | source_id | title | venue | year | modality | task | dataset | scenario | split | metric_protocol_id | metric | reference_value | value_source | table_or_section | expected_tolerance | acquisition_plan |\n"
+            "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+            "| Baseline-1 | external_prior_work | PaperX | Demo Text Classification Baseline | DemoConf | 2024 | text | classification | DemoSet | classification | test | mp_demo_accuracy | accuracy | 0.75 | PaperX | Table 1 | 0.02 | official code/checkpoint URL |\n\n"
             "## Proposed Method Same-Condition Protocol\n\n"
             "| 条件 | Baseline | Proposed method | 是否一致 | 差异说明 |\n"
             "|---|---|---|---|---|\n"
@@ -502,6 +572,23 @@ class TestDispatchPackets(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertTrue(any("ablation/M4 analysis planning" in message for message in messages), messages)
+
+    def test_m3s01_stage_gate_rejects_baseline_source_mismatch(self) -> None:
+        self._write_valid_m2s05()
+        self._write_valid_m3s01()
+        path = self.root / "knowledge" / "M3" / "M3S01_main_experiment_design.md"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace("Demo Text Classification Baseline", "Deep Joint Source-Channel Coding for Textual Semantic Communication")
+        text = text.replace("| text | classification |", "| image | image transmission |")
+        path.write_text(text, encoding="utf-8")
+        self._write_pass_review("knowledge/reviews/M3S01_main_experiment_design_review.md")
+
+        ok, messages = check_stage(self.root, "M3S01")
+
+        self.assertFalse(ok)
+        joined = "\n".join(messages)
+        self.assertIn("title=Deep Joint Source-Channel Coding", joined)
+        self.assertIn("modality=image does not match", joined)
 
     def test_m3s01_stage_gate_accepts_main_design_with_pass_review(self) -> None:
         self._write_valid_m2s05()

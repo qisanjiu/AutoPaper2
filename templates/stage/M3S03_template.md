@@ -19,6 +19,9 @@
 |------|------|
 | 来源 | 官方代码 / pip 包 / 自行实现 |
 | comparator_type | external_prior_work / official_baseline / reproduced_prior_work |
+| source_id | `knowledge/M1/M1_source_log.yaml` 中的 source_id |
+| title / venue / year | 必须与 source log 完全一致，不得模型补全 |
+| modality / task | 必须与 source log 一致，并与本文主实验可比较 |
 | ablation_of_ours | false |
 | implementation_fidelity | official_code / official_package / full_reproduction / paper_faithful_reproduction |
 | fidelity_evidence | `experiments/baselines/{id}/fidelity_report.md` 或官方 repo/config 证据 |
@@ -57,6 +60,12 @@ checkpoint:
 ```yaml
 baseline_id: "..."
 source: "..."
+source_id: "..."
+title: "exact title from M1_source_log.yaml"
+venue: "..."
+year: 20xx
+modality: "text/image/..."
+task: "..."
 comparator_type: external_prior_work
 ablation_of_ours: false
 implementation_fidelity: official_code / full_reproduction / paper_faithful_reproduction
@@ -141,7 +150,24 @@ verification_verdict: "..."
 
 ---
 
-## 4. 环境一致性确认
+## 4. No-Leakage / No-Bypass Audit（必须）
+
+文本语义通信或 noisy-channel 任务中，baseline 与本文方法都必须证明 decoder 只接收经过信道传输/噪声处理后的表示，以及允许的公开 side information（如 SNR）。以下任一情况会使 baseline 或 run 不可进入 M3S04：
+
+- decoder 使用未经过信道的 encoder hidden state、teacher-forced target hidden state、clean memory、clean embedding 或 target token 作为重建旁路；
+- 将 `self.decoder(x, memory)` / encoder-decoder cross-attention 作为修复方案，但 `memory` 没有经过同一信道、噪声、功率约束和压缩瓶颈；
+- noisy-channel 评估出现 PPL≈1、accuracy≈1、或跨 SNR PPL 几乎不变，且没有可审计的泄露排除证据；
+- 用随机 token / 随机噪声 stress test 代替结构审计，未检查代码中是否存在 clean memory/target bypass。
+
+| Baseline | 代码路径 | decoder 输入 | clean-memory/target bypass | PPL≈1/SNR-invariant 检查 | 结论 |
+|----------|----------|---------------|-----------------------------|---------------------------|------|
+| Baseline-1 | `experiments/baselines/...` | ... | no / yes | pass / fail | eligible / ineligible |
+
+若发现上述问题，`target_stage` 必须回到 `M3S02`（实现泄露）或 `M3S03`（baseline lock 失效），并在修复后重新执行 M3S04；不得把泄露问题留给 M4。
+
+---
+
+## 5. 环境一致性确认
 
 | 维度 | Baseline 运行环境 | 本文方法运行环境 | 是否一致 |
 |------|------------------|-----------------|---------|
@@ -152,7 +178,7 @@ verification_verdict: "..."
 
 ---
 
-## 5. 问题与修复记录
+## 6. 问题与修复记录
 
 | 问题 | Baseline | 根因 | 修复措施 | 修复后状态 |
 |------|---------|------|---------|-----------|
@@ -161,7 +187,7 @@ verification_verdict: "..."
 
 ---
 
-## 6. 传递给下游的信息
+## 7. 传递给下游的信息
 
 - **已验证的 baseline 列表**: ...
 - **主要 baseline 的 metric contract 路径**: ...
@@ -184,6 +210,12 @@ baselines:
     comparison_role: primary
     source: official_code / pip_package / reimplementation / imported_project
     comparator_type: external_prior_work / official_baseline / reproduced_prior_work
+    source_id: "..."
+    title: "exact title from M1_source_log.yaml"
+    venue: "..."
+    year: 20xx
+    modality: "..."
+    task: "..."
     ablation_of_ours: false
     implementation_fidelity: official_code / official_package / full_reproduction / paper_faithful_reproduction
     fidelity_evidence: experiments/baselines/baseline_1/fidelity_report.md
@@ -244,6 +276,13 @@ m3s04_contract:
 ```
 
 `trusted_with_caveats` 只有在 `caveat_waiver_reason` 和 `comparison_scope_limit` 都明确时才可进入 M3S04。若 baseline 依赖 checkpoint，`checkpoint.verified_loadable` 必须为 `true`。
+
+每个 `m3s04_eligible: true` baseline 必须同时满足：
+
+- `comparator_type` 属于 `external_prior_work`、`official_baseline`、`reproduced_prior_work`；
+- `source_id` 存在于 `knowledge/M1/M1_source_log.yaml`；
+- `title`、`venue`、`year`、`modality`、`task` 与 source log 一致；
+- modality/task 与本文主实验可比较；不匹配的论文只能作为背景参考或 ineligible，不得进入 M3S04。
 
 如果 `source: reimplementation` 或自行实现，`implementation_fidelity` 必须是 `full_reproduction`、`paper_faithful_reproduction` 或 `official_equivalent`，并且 `fidelity_evidence` 必须指向已存在的复现一致性报告。不得使用 simplified / toy / minimal / proxy baseline。
 

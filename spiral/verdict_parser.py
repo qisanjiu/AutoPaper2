@@ -216,18 +216,30 @@ class StageReviewParseResult:
     def missing_fields(self) -> list[str]:
         """Return fields that are required but absent (for non-PASS verdicts).
 
-        Only scalar repair-advice fields are strictly required.
-        List fields (evidence_paths, handoff_updates) may be empty.
-        target_stage defaults to the current stage if omitted.
+        Non-PASS review outputs are the durable handoff from reviewer to
+        conductor to executor, so every contract field must be present and
+        non-empty enough for dispatch.
         """
         if self.verdict == "PASS":
             return []
-        required = ("blocking_reason", "required_fix", "success_criteria",
-                    "rebuild_mode", "rerun_scope")
+        required = (
+            "target_stage",
+            "blocking_reason",
+            "required_fix",
+            "success_criteria",
+            "evidence_paths",
+            "rebuild_mode",
+            "rerun_scope",
+            "handoff_updates",
+        )
         missing: list[str] = []
         for field in required:
             val = self.payload.get(field)
-            if val is None or (isinstance(val, str) and not val.strip()):
+            if val is None:
+                missing.append(field)
+            elif isinstance(val, str) and not val.strip():
+                missing.append(field)
+            elif isinstance(val, list) and not val:
                 missing.append(field)
         return missing
 

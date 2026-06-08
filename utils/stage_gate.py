@@ -20,8 +20,11 @@ from spiral.verdict_parser import (
     extract_m3_repair_field_value,
     is_valid_rebuild_mode,
 )
-from utils.file_guard import find_alternate_outputs
-from utils.review_integrity import find_pass_integrity_issues
+from utils.file_guard import find_alternate_outputs, check_single_file_principle
+from utils.review_integrity import (
+    check_repair_advice_evidence_scope,
+    find_pass_integrity_issues,
+)
 from spiral.review_registry import STAGE_REVIEW_OUTPUTS as _STAGE_REVIEW_REQUIREMENTS
 
 _M1S02_ROUND_REVIEW_REQUIREMENTS: dict[int, str] = {
@@ -839,6 +842,173 @@ def _project_any_path_exists(root: Path, value: Any) -> bool:
     return _project_path_exists(root, value)
 
 
+def _normalize_key_text(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
+def _iter_mapping_tree(value: Any) -> list[dict[str, Any]]:
+    """Return every mapping nested inside *value* for loose source-log scans."""
+    mappings: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        mappings.append(value)
+        for child in value.values():
+            mappings.extend(_iter_mapping_tree(child))
+    elif isinstance(value, list):
+        for child in value:
+            mappings.extend(_iter_mapping_tree(child))
+    return mappings
+
+
+def _source_log_path(root: Path) -> Path:
+    return root / "knowledge" / "M1" / "M1_source_log.yaml"
+
+
+def _load_m1_source_log_index(root: Path) -> tuple[bool, list[str], dict[str, dict[str, Any]]]:
+    """Load M1_source_log.yaml into a source_id-indexed map.
+
+    The source log schema has evolved, so this intentionally accepts common
+    ID/title/venue/task/modality aliases while still requiring source_id rows
+    to exist before M3 can cite them.
+    """
+    path = _source_log_path(root)
+    messages: list[str] = []
+    if not path.exists():
+        return False, [f"[FAIL] M1 source log not found: {path.relative_to(root)}"], {}
+    try:
+        data = _load_yaml_mapping(path)
+    except Exception as exc:
+        return False, [f"[FAIL] M1 source log unreadable: {exc}"], {}
+
+    index: dict[str, dict[str, Any]] = {}
+    for mapping in _iter_mapping_tree(data):
+        source_id = str(
+            mapping.get("source_id")
+            or mapping.get("id")
+            or mapping.get("paper_id")
+            or mapping.get("ref_id")
+            or ""
+        ).strip()
+        title = str(mapping.get("title") or mapping.get("paper_title") or "").strip()
+        if not source_id or not title:
+            continue
+        index[source_id] = mapping
+
+    if not index:
+        return False, ["[FAIL] M1_source_log.yaml has no source entries with source_id/id and title"], {}
+    messages.append(f"[PASS] M1_source_log.yaml indexes {len(index)} source(s)")
+    return True, messages, index
+
+
+def _source_field(raw: dict[str, Any], *names: str) -> str:
+    for name in names:
+        value = raw.get(name)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    source = raw.get("source")
+    if isinstance(source, dict):
+        for name in names:
+            value = source.get(name)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+    provenance = raw.get("source_provenance")
+    if isinstance(provenance, dict):
+        for name in names:
+            value = provenance.get(name)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+    reference = raw.get("reference_result")
+    if isinstance(reference, dict):
+        for name in names:
+            value = reference.get(name)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+    return ""
+
+
+def _source_log_value(source: dict[str, Any], *names: str) -> str:
+    for name in names:
+        value = source.get(name)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
+def _matches_source_log_field(actual: str, expected: str, *, field: str) -> bool:
+    if not actual or not expected:
+        return False
+    actual_norm = _normalize_key_text(actual)
+    expected_norm = _normalize_key_text(expected)
+    if not actual_norm or not expected_norm:
+        return False
+    if field in {"title", "year"}:
+        return actual_norm == expected_norm
+    if actual_norm == expected_norm:
+        return True
+    return actual_norm in expected_norm or expected_norm in actual_norm
+
+
+def _check_baseline_source_truth(
+    root: Path,
+    label: str,
+    raw: dict[str, Any],
+    source_index: dict[str, dict[str, Any]],
+    *,
+    require_reference_value: bool = True,
+) -> tuple[bool, list[str]]:
+    """Validate that a baseline's bibliographic/task metadata is source-bound."""
+    messages: list[str] = []
+    ok = True
+
+    source_id = _source_field(raw, "source_id", "paper_id", "ref_id")
+    if not source_id:
+        messages.append(f"[FAIL] {label}: missing source_id linking baseline to M1_source_log.yaml")
+        return False, messages
+    source = source_index.get(source_id)
+    if not source:
+        messages.append(f"[FAIL] {label}: source_id {source_id} not found in M1_source_log.yaml")
+        return False, messages
+    messages.append(f"[PASS] {label}: source_id {source_id} found in M1 source log")
+
+    checks = (
+        ("title", ("title", "paper_title"), ("title", "paper_title")),
+        ("venue", ("venue", "journal", "conference"), ("venue", "journal", "conference")),
+        ("year", ("year", "publication_year"), ("year", "publication_year")),
+        ("modality", ("modality", "data_modality"), ("modality", "data_modality")),
+        ("task", ("task", "scenario", "task_type"), ("task", "scenario", "task_type")),
+    )
+    for field, actual_names, expected_names in checks:
+        actual = _source_field(raw, *actual_names)
+        expected = _source_log_value(source, *expected_names)
+        if not actual:
+            messages.append(f"[FAIL] {label}: missing source-truth field {field}")
+            ok = False
+            continue
+        if not expected:
+            messages.append(f"[FAIL] {label}: M1 source log entry {source_id} missing {field}")
+            ok = False
+            continue
+        if not _matches_source_log_field(actual, expected, field=field):
+            messages.append(
+                f"[FAIL] {label}: {field}={actual} does not match M1 source log value {expected}"
+            )
+            ok = False
+        else:
+            messages.append(f"[PASS] {label}: {field} matches M1 source log")
+
+    locator = _source_field(raw, "table_or_section", "section", "table", "value_locator")
+    if not locator:
+        messages.append(f"[FAIL] {label}: missing table_or_section/value locator")
+        ok = False
+    else:
+        messages.append(f"[PASS] {label}: includes table_or_section/value locator")
+
+    if require_reference_value and _baseline_reference_value(raw) is None:
+        messages.append(f"[FAIL] {label}: missing numeric reference_result/reference_value")
+        ok = False
+
+    return ok, messages
+
+
 def _metric_range_bounds(value: Any) -> tuple[float, float] | None:
     if isinstance(value, (list, tuple)) and len(value) >= 2:
         low = _parse_floatish(value[0])
@@ -1257,6 +1427,14 @@ def _check_m3s03_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
         for msg in registry_msgs
     )
     ok = ok and registry_ok
+    source_ok, source_msgs, source_index = _load_m1_source_log_index(root)
+    messages.extend(
+        f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S03 source truth: {msg.split('] ', 1)[1]}"
+        if msg.startswith("[") and "] " in msg
+        else msg
+        for msg in source_msgs
+    )
+    ok = ok and source_ok
 
     contract_rel_paths = {
         str(path.relative_to(root)).replace("\\", "/")
@@ -1288,6 +1466,21 @@ def _check_m3s03_baseline_lock_manifest(root: Path, baseline_contracts: list[Pat
             ok = False
         else:
             messages.append(f"[PASS] {label}: comparator is not marked as an ablation")
+
+        allowed_comparator_types = {"external_prior_work", "official_baseline", "reproduced_prior_work"}
+        comparator_type = str(raw.get("comparator_type") or raw.get("baseline_type") or "").strip().lower()
+        if eligible and comparator_type not in allowed_comparator_types:
+            messages.append(
+                f"[FAIL] {label}: m3s04_eligible baselines must be external_prior_work, "
+                "official_baseline, or reproduced_prior_work"
+            )
+            ok = False
+        elif comparator_type:
+            messages.append(f"[PASS] {label}: comparator_type={comparator_type}")
+
+        source_truth_ok, source_truth_msgs = _check_baseline_source_truth(root, label, raw, source_index)
+        messages.extend(source_truth_msgs)
+        ok = ok and source_truth_ok
 
         if _looks_simplified_implementation(raw):
             messages.append(f"[FAIL] {label}: simplified/toy/minimal baseline implementations are forbidden")
@@ -1960,6 +2153,34 @@ def _m3s01_baseline_reference_rows(text: str) -> list[dict[str, str]]:
     return rows
 
 
+def _m3s01_source_truth_rows(text: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for row in _markdown_table_rows(text):
+        baseline = _table_value(row, ("baseline", "基线", "comparator", "method", "方法"))
+        source_id = _table_value(row, ("source_id", "paper_id", "ref_id", "来源id"))
+        title = _table_value(row, ("title", "paper_title", "论文标题"))
+        venue = _table_value(row, ("venue", "journal", "conference", "期刊", "会议"))
+        year = _table_value(row, ("year", "年份"))
+        modality = _table_value(row, ("modality", "data_modality", "模态"))
+        task = _table_value(row, ("task", "scenario", "task_type", "任务", "场景"))
+        table_or_section = _table_value(row, ("table_or_section", "section", "table", "value_locator", "表格", "章节"))
+        if baseline and source_id:
+            rows.append(
+                {
+                    "baseline": baseline,
+                    "source_id": source_id,
+                    "title": title,
+                    "venue": venue,
+                    "year": year,
+                    "modality": modality,
+                    "task": task,
+                    "table_or_section": table_or_section,
+                    "reference_value": _table_value(row, ("reference_value", "value", "metric_value", "reported_value", "数值")),
+                }
+            )
+    return rows
+
+
 def _check_m3s01_main_experiment_design(root: Path, text: str) -> tuple[bool, list[str]]:
     """Validate the M3S01 main-experiment-only design contract."""
     messages: list[str] = []
@@ -2004,6 +2225,30 @@ def _check_m3s01_main_experiment_design(root: Path, text: str) -> tuple[bool, li
     else:
         messages.append(f"[PASS] M3S01: {len(baseline_rows)} baseline reference value row(s) found")
 
+    source_ok, source_msgs, source_index = _load_m1_source_log_index(root)
+    messages.extend(
+        f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S01 source truth: {msg.split('] ', 1)[1]}"
+        if msg.startswith("[") and "] " in msg
+        else msg
+        for msg in source_msgs
+    )
+    ok = ok and source_ok
+    source_truth_rows = _m3s01_source_truth_rows(text)
+    if not source_truth_rows:
+        messages.append("[FAIL] M3S01: missing baseline source-truth table rows with source_id/title/venue/year/modality/task")
+        ok = False
+    else:
+        messages.append(f"[PASS] M3S01: {len(source_truth_rows)} baseline source-truth row(s) found")
+        for index, row in enumerate(source_truth_rows, start=1):
+            row_ok, row_msgs = _check_baseline_source_truth(
+                root,
+                f"M3S01 baseline source row {index} ({row.get('baseline', 'baseline')})",
+                row,
+                source_index,
+            )
+            messages.extend(row_msgs)
+            ok = ok and row_ok
+
     registry_ok, registry_msgs, protocols = _load_m2_metric_protocol_registry(root)
     messages.extend(f"[{msg.split('] ', 1)[0].lstrip('[')}] M3S01 upstream: {msg.split('] ', 1)[1]}" if msg.startswith("[") and "] " in msg else msg for msg in registry_msgs)
     ok = ok and registry_ok
@@ -2045,6 +2290,49 @@ def _primary_metric_mapping(data: Any) -> dict[str, Any] | None:
     return None
 
 
+_M3S05_KEEP_BLOCKER_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"\bineligible\b",
+        r"\bnot\s+implemented\b",
+        r"\bnot\s+run\b",
+        r"\bproxy\s+only\b",
+        r"\bundertrained\b|\binsufficient\s+training\b",
+        r"\bexternal\s+baseline\s+match\b.{0,80}(?:fail|failed|❌|✗|no\b)",
+        r"\bL4\b.{0,80}(?:fail|failed|❌|✗|no\b)",
+        r"\bDeepSC\b.{0,80}\bineligible\b",
+        r"\bmissing\b.{0,40}\b(?:baseline|metric|BLEU|cos(?:ine)?_?sim)\b",
+        r"\b(?:clean[-\s]?memory|memory|channel)\s+bypass\b",
+        r"\bbypass(?:es|ed|ing)?\s+(?:the\s+)?channel\b",
+        r"\bppl\s*(?:[~≈=]|<=|<)\s*1(?:\.0{0,3})?\b",
+        r"\bperplexity\s*(?:[~≈=]|<=|<)\s*1(?:\.0{0,3})?\b",
+        r"\bsnr[-\s]?invariant\b",
+        r"\b(?:data|metric|channel)?\s*leakage\b|\bshortcut\b",
+        r"\b(?:perfect\s+accuracy|accuracy\s*(?:[~≈=]|>=|>)\s*(?:0\.99|1(?:\.0+)?))\b",
+        r"(未实现|未运行|不合格|不可比较|训练不足|基线不匹配|指标缺失|只作为参考|仅作参考|泄露|旁路|绕过信道)",
+    )
+)
+
+
+def _m3s05_keep_blocking_lines(text: str) -> list[str]:
+    lines: list[str] = []
+    in_fence = False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence or not line:
+            continue
+        lowered = line.lower()
+        if re.search(r"\b(no|none|zero|resolved|fixed|implemented|completed|verified|not applicable|n/a)\b", lowered):
+            if not re.search(r"\bnot\s+implemented\b|\bnot\s+run\b|\bineligible\b|\bproxy\s+only\b", lowered):
+                continue
+        if any(pattern.search(line) for pattern in _M3S05_KEEP_BLOCKER_PATTERNS):
+            lines.append(line[:220])
+    return lines[:8]
+
+
 def _check_m3s05_result_validation(root: Path) -> tuple[bool, list[str]]:
     """Validate M3S05 result validation and the evidence package needed by M4."""
     doc = root / "knowledge" / "M3" / "M3S05_result_validation.md"
@@ -2061,6 +2349,15 @@ def _check_m3s05_result_validation(root: Path) -> tuple[bool, list[str]]:
         ok = False
     else:
         messages.append(f"[PASS] M3S05: Decision found: {decision}")
+
+    if decision == "KEEP":
+        blocking_lines = _m3s05_keep_blocking_lines(text)
+        if blocking_lines:
+            messages.append(
+                "[FAIL] M3S05: KEEP is invalid because validation text still contains blocker(s): "
+                + " | ".join(blocking_lines)
+            )
+            ok = False
 
     required_sections = {
         "experiment stop reason": ("实验停止原因", "停止条件", "stop reason", "Evidence Ladder", "best 指标"),
@@ -2105,6 +2402,9 @@ def _check_m3s05_result_validation(root: Path) -> tuple[bool, list[str]]:
             ok = False
         else:
             messages.append("[PASS] M3S05: repair advice fields found")
+            advice_ok, advice_msgs = _check_m3_repair_advice_consistency("M3S05", text)
+            messages.extend(advice_msgs)
+            ok = ok and advice_ok
         messages.append("[FAIL] M3S05: FIX/BACKTRACK decision blocks advancement until the requested rerun is executed")
         return False, messages
 
@@ -3765,6 +4065,155 @@ def _row_first(row: dict[str, Any], names: tuple[str, ...]) -> str:
     return ""
 
 
+_PPL_LEAKAGE_TERMS = (
+    "ppl~1",
+    "ppl≈1",
+    "perplexity~1",
+    "perplexity≈1",
+    "clean memory bypass",
+    "clean-memory bypass",
+    "memory bypass",
+    "bypasses channel",
+    "channel bypass",
+    "leakage",
+    "data leakage",
+    "metric leakage",
+    "shortcut",
+    "snr-invariant",
+    "snr invariant",
+    "perfect accuracy",
+    "accuracy=1.0",
+    "acc=1.0",
+    "train_acc=1.0",
+    "泄露",
+    "旁路",
+    "绕过信道",
+)
+
+
+def _text_mentions_ppl_leakage(text: str) -> bool:
+    lowered = text.lower()
+    if any(term in lowered for term in _PPL_LEAKAGE_TERMS):
+        return True
+    return bool(
+        re.search(r"\bppl\s*(?:[~≈=]|<=|<)\s*1(?:\.0{0,3})?\b", lowered)
+        or re.search(r"\bperplexity\s*(?:[~≈=]|<=|<)\s*1(?:\.0{0,3})?\b", lowered)
+        or re.search(r"\b(?:accuracy|acc|train_acc)\s*(?:[~≈=]|>=|>)\s*(?:0\.99|1(?:\.0+)?)\b", lowered)
+    )
+
+
+def _numeric_values_from_row(row: dict[str, Any], names: tuple[str, ...]) -> list[float]:
+    values: list[float] = []
+    lowered = {str(key).strip().lower(): value for key, value in row.items()}
+    for name in names:
+        value = lowered.get(str(name).strip().lower())
+        if isinstance(value, str) and re.search(r"[,; ]", value.strip()):
+            for part in re.split(r"[,; ]+", value.strip()):
+                parsed = _parse_floatish(part)
+                if parsed is not None:
+                    values.append(parsed)
+            continue
+        parsed = _parse_floatish(value)
+        if parsed is not None:
+            values.append(parsed)
+    return values
+
+
+def _row_metric_key(row: dict[str, Any]) -> str:
+    return _row_first(row, ("metric", "primary_metric", "metric_key", "key")).lower()
+
+
+def _row_method_label(row: dict[str, Any], index: int) -> str:
+    return _row_first(row, ("method", "model", "system", "name", "config_name", "baseline", "role")) or f"row {index}"
+
+
+def _check_m3s04_ppl_leakage_patterns(
+    root: Path,
+    rows: list[dict[str, Any]],
+) -> tuple[bool, list[str]]:
+    """Reject implausible PPL/accuracy patterns that indicate channel leakage.
+
+    A noisy-channel text reconstruction run that reaches PPL ~= 1, perfect
+    accuracy, or nearly identical PPL across SNR values is usually not a
+    publishable success; it is a sign that target/encoder information bypassed
+    the noisy channel. Such rows must be moved to results_invalid.tsv and routed
+    back to M3S02/M3S03 before M3S04 can pass.
+    """
+    del root  # reserved for future artifact cross-checks
+    messages: list[str] = []
+    ok = True
+    suspicious_rows = 0
+
+    for index, row in enumerate(rows, start=1):
+        metric_key = _row_metric_key(row)
+        method = _row_method_label(row, index)
+        row_label = f"M3S04 result row {index} ({method})"
+        validity = _row_first(row, ("validity", "result_validity", "status_note", "notes")).lower()
+        if any(marker in validity for marker in ("invalid", "diagnostic", "leak", "泄露")):
+            continue
+
+        ppl_values: list[float] = []
+        ppl_values.extend(_numeric_values_from_row(row, ("ppl", "mean_ppl", "val_ppl", "test_ppl", "perplexity", "value")))
+        if metric_key and "ppl" not in metric_key and "perplex" not in metric_key:
+            value = _parse_floatish(_row_first(row, ("value", "result", "score")))
+            if value is not None and value in ppl_values:
+                ppl_values.remove(value)
+        snr_ppl_keys = tuple(
+            key for key in row
+            if re.search(r"(?:^|_)ppl(?:_|$)|perplex", str(key).lower())
+            and "snr" in str(key).lower()
+        )
+        snr_ppls = _numeric_values_from_row(row, snr_ppl_keys)
+        if snr_ppls:
+            ppl_values.extend(snr_ppls)
+
+        accuracy_values = _numeric_values_from_row(
+            row,
+            (
+                "accuracy",
+                "acc",
+                "train_acc",
+                "val_acc",
+                "test_acc",
+                "token_acc",
+                "reconstruction_accuracy",
+            ),
+        )
+
+        low_ppl = [value for value in ppl_values if value <= 1.05]
+        near_perfect_acc = [value for value in accuracy_values if value >= 0.95]
+        if low_ppl and near_perfect_acc:
+            messages.append(
+                f"[FAIL] {row_label}: PPL leakage pattern detected "
+                f"(ppl<={min(low_ppl):.4g}, accuracy>={max(near_perfect_acc):.4g}); "
+                "route to M3S02/M3S03 and remove clean target/encoder bypass before rerunning M3S04"
+            )
+            suspicious_rows += 1
+            ok = False
+
+        if len(snr_ppls) >= 3:
+            mean_abs = max(sum(abs(value) for value in snr_ppls) / len(snr_ppls), 1.0)
+            relative_span = (max(snr_ppls) - min(snr_ppls)) / mean_abs
+            if relative_span < 0.02 and (low_ppl or near_perfect_acc):
+                messages.append(
+                    f"[FAIL] {row_label}: SNR-invariant noisy-channel metric detected "
+                    f"(relative PPL span={relative_span:.3g}); treat as leakage/shortcut until proven otherwise"
+                )
+                suspicious_rows += 1
+                ok = False
+
+    if suspicious_rows == 0:
+        messages.append("[PASS] M3S04: no obvious PPL leakage or SNR-invariant shortcut pattern in formal results")
+    return ok, messages
+
+
+def _m3s04_results_table_path(root: Path) -> Path:
+    preferred = root / "experiments" / "tables" / "results_main.tsv"
+    if preferred.exists():
+        return preferred
+    return root / "experiments" / "results.tsv"
+
+
 def _jsonl_has_completion_event(path: Path, run_ids: set[str]) -> tuple[bool, str]:
     if not path.exists():
         return False, "missing"
@@ -3811,9 +4260,9 @@ def _check_m3s04_trained_weight_evidence(root: Path, *, doc_text: str = "") -> t
     """Require final M3S04 results to come from completed trained weights."""
     messages: list[str] = []
     ok = True
-    results = root / "experiments" / "results.tsv"
+    results = _m3s04_results_table_path(root)
     if not results.exists():
-        return False, ["[FAIL] M3S04: results.tsv missing, cannot verify trained-weight evidence"]
+        return False, ["[FAIL] M3S04: results_main.tsv/results.tsv missing, cannot verify trained-weight evidence"]
 
     try:
         import csv
@@ -3823,7 +4272,7 @@ def _check_m3s04_trained_weight_evidence(root: Path, *, doc_text: str = "") -> t
         return False, [f"[FAIL] M3S04: results.tsv unreadable for trained-weight verification: {exc}"]
 
     if not rows:
-        return False, ["[FAIL] M3S04: results.tsv has no rows for trained-weight verification"]
+        return False, [f"[FAIL] M3S04: {results.relative_to(root)} has no rows for trained-weight verification"]
 
     proposed_rows: list[dict[str, Any]] = []
     for row in rows:
@@ -3838,7 +4287,7 @@ def _check_m3s04_trained_weight_evidence(root: Path, *, doc_text: str = "") -> t
             proposed_rows.append(row)
 
     if not proposed_rows:
-        messages.append("[FAIL] M3S04: results.tsv has no proposed/ours row for trained-weight verification")
+        messages.append(f"[FAIL] M3S04: {results.relative_to(root)} has no proposed/ours row for trained-weight verification")
         return False, messages
 
     completed_statuses = {"completed", "succeeded", "success", "finished", "done", "pass", "passed"}
@@ -3917,6 +4366,105 @@ def _check_m3s04_trained_weight_evidence(root: Path, *, doc_text: str = "") -> t
     return ok, messages
 
 
+def _check_m3s04_run_registry(root: Path, *, results_rows: list[dict[str, Any]] | None = None) -> tuple[bool, list[str]]:
+    """Validate experiments/run_registry.yaml for formal M3S04 result runs."""
+    registry = root / "experiments" / "run_registry.yaml"
+    messages: list[str] = []
+    ok = True
+    if not registry.exists():
+        return False, ["[FAIL] M3S04: experiments/run_registry.yaml not found"]
+    try:
+        data = _load_yaml_mapping(registry)
+    except Exception as exc:
+        return False, [f"[FAIL] M3S04: run_registry.yaml unreadable: {exc}"]
+
+    runs = data.get("runs") or data.get("registry")
+    if not isinstance(runs, list) or not runs:
+        return False, ["[FAIL] M3S04: run_registry.yaml missing nonempty runs list"]
+    if not all(isinstance(run, dict) for run in runs):
+        return False, ["[FAIL] M3S04: every run_registry entry must be a mapping"]
+    messages.append(f"[PASS] M3S04: run_registry.yaml lists {len(runs)} run(s)")
+
+    result_run_ids: set[str] = set()
+    if results_rows is not None:
+        for row in results_rows:
+            method_text = " ".join(
+                _row_first(row, names)
+                for names in (
+                    ("method", "model", "system", "name"),
+                    ("role", "method_role", "comparison_role"),
+                )
+            ).lower()
+            if any(marker in method_text for marker in ("ours", "proposed", "our_method", "本文", "方法")):
+                run_id = _row_first(row, ("run_id", "run", "id"))
+                if run_id:
+                    result_run_ids.add(run_id)
+
+    completed_statuses = {"completed", "succeeded", "success", "finished", "done"}
+    validities = {"valid_main", "valid_reference", "valid"}
+    by_id: dict[str, dict[str, Any]] = {}
+    for index, run in enumerate(runs, start=1):
+        run_id = str(run.get("run_id") or run.get("id") or "").strip()
+        label = f"M3S04 run_registry[{run_id or index}]"
+        if not run_id:
+            messages.append(f"[FAIL] {label}: missing run_id")
+            ok = False
+            continue
+        by_id[run_id] = run
+        stage = str(run.get("stage") or "").strip()
+        role = str(run.get("role") or run.get("run_type") or "").strip().lower()
+        status = str(run.get("status") or run.get("run_status") or "").strip().lower()
+        validity = str(run.get("validity") or "").strip().lower()
+        if stage and stage not in {"M3S03", "M3S04", "M4S03", "M4"}:
+            messages.append(f"[WARN] {label}: unexpected stage={stage}")
+        if run_id in result_run_ids or (stage == "M3S04" and role in {"ours", "proposed", "main", "main_experiment"}):
+            if status not in completed_statuses:
+                messages.append(f"[FAIL] {label}: formal result run must be completed, got {status or 'unset'}")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: status={status}")
+            if validity not in validities:
+                messages.append(f"[FAIL] {label}: formal result run validity must be valid_main/valid_reference, got {validity or 'unset'}")
+                ok = False
+            else:
+                messages.append(f"[PASS] {label}: validity={validity}")
+            required_paths = {
+                "run_manifest": run.get("run_manifest") or run.get("manifest_path") or "run_manifest.yaml",
+                "config": run.get("config_path") or run.get("config") or "config.yaml",
+                "command": run.get("command_path") or run.get("command") or "command.sh",
+                "stdout": run.get("stdout_path") or run.get("stdout_log") or "stdout.log",
+                "stderr": run.get("stderr_path") or run.get("stderr_log") or "stderr.log",
+                "training_history": run.get("history_path") or run.get("training_history") or "training_history.json",
+                "metrics": run.get("metrics_path") or run.get("metrics") or "metrics.tsv",
+                "checkpoint": run.get("checkpoint_path") or run.get("best_checkpoint") or run.get("checkpoint"),
+                "checkpoint_manifest": run.get("checkpoint_manifest") or "checkpoint_manifest.yaml",
+                "status": run.get("status_path") or "status.json",
+            }
+            run_dir_value = run.get("run_dir") or run.get("path") or f"experiments/runs/M3S04_main/{run_id}"
+            run_dir = _resolve_project_path(root, run_dir_value)
+            for field, value in required_paths.items():
+                path_ref = value
+                if isinstance(value, str) and run_dir and not value.startswith(("project:", "/", "experiments/")):
+                    path_ref = str(run_dir.relative_to(root) / value)
+                if not _project_path_exists(root, path_ref):
+                    messages.append(f"[FAIL] {label}: missing existing {field} path ({path_ref or 'unset'})")
+                    ok = False
+                else:
+                    messages.append(f"[PASS] {label}: {field} path exists")
+            if any(marker in validity for marker in ("checkpoint_only", "interrupted", "invalid", "legacy")):
+                messages.append(f"[FAIL] {label}: invalid/interrupted/checkpoint-only run cannot be formal M3S04 result")
+                ok = False
+
+    missing_result_runs = sorted(result_run_ids - set(by_id))
+    if missing_result_runs:
+        messages.append("[FAIL] M3S04: proposed result run_id(s) missing from run_registry.yaml: " + ", ".join(missing_result_runs))
+        ok = False
+    elif result_run_ids:
+        messages.append("[PASS] M3S04: proposed result run_id(s) are present in run_registry.yaml")
+
+    return ok, messages
+
+
 # Backward-compatible aliases for internal callers
 _extract_structured_field_value = extract_m3_repair_field_value
 _extract_review_verdict = extract_stage_review_verdict
@@ -3925,13 +4473,125 @@ _extract_review_verdict = extract_stage_review_verdict
 def _missing_structured_fields(text: str, fields: tuple[str, ...] | None = None) -> list[str]:
     """Return missing required repair-advice fields from review text.
 
-    Defaults to the critical scalar fields (matching VerdictParser semantics).
-    Callers may pass a custom *fields* tuple for stricter checks.
+    Defaults to the full review contract. Callers may pass a custom *fields*
+    tuple for narrower checks.
     """
     if fields is None:
-        fields = ("blocking_reason", "required_fix", "success_criteria",
-                  "rebuild_mode", "rerun_scope")
+        fields = (
+            "target_stage",
+            "blocking_reason",
+            "required_fix",
+            "success_criteria",
+            "evidence_paths",
+            "rebuild_mode",
+            "rerun_scope",
+            "handoff_updates",
+        )
     return missing_m3_repair_fields(text, fields)
+
+
+def _repair_line_has_forbidden_clean_memory_fix(required_fix: str) -> bool:
+    bad_patterns = (
+        r"self\.decoder\s*\(\s*x\s*,\s*memory\s*\)",
+        r"\bdecoder\s*\(\s*x\s*,\s*memory\s*\)",
+        r"\bcross[-\s]?attention\b.{0,120}\b(?:encoder\s+)?memory\b",
+        r"\b(?:pass|use)\b.{0,80}\b(?:encoder\s+)?memory\b.{0,80}\bdecoder\b",
+    )
+    negating_terms = (
+        "do not",
+        "don't",
+        "never",
+        "forbid",
+        "remove",
+        "without",
+        "no clean",
+        "must not",
+        "禁止",
+        "不得",
+        "不要",
+        "移除",
+        "不能",
+    )
+    for raw_line in required_fix.splitlines() or [required_fix]:
+        line = raw_line.strip()
+        lowered = line.lower()
+        if any(term in lowered for term in negating_terms):
+            continue
+        if any(re.search(pattern, lowered, flags=re.IGNORECASE) for pattern in bad_patterns):
+            return True
+    return False
+
+
+def _check_repair_advice_evidence_scope(stage: str, text: str) -> tuple[bool, list[str]]:
+    return check_repair_advice_evidence_scope(stage, text)
+
+
+def _check_m3_repair_advice_consistency(stage: str, text: str) -> tuple[bool, list[str]]:
+    """Validate that non-PASS M3 repair advice routes root causes correctly."""
+    if not stage.startswith("M3"):
+        return True, []
+
+    messages: list[str] = []
+    ok = True
+    target_stage = _extract_structured_field_value(text, "target_stage").strip().upper()
+    blocking_reason = _extract_structured_field_value(text, "blocking_reason")
+    required_fix = _extract_structured_field_value(text, "required_fix")
+    success_criteria = _extract_structured_field_value(text, "success_criteria")
+    rerun_scope = _extract_structured_field_value(text, "rerun_scope")
+    combined = "\n".join([blocking_reason, required_fix, success_criteria, rerun_scope, text])
+    lowered = combined.lower()
+
+    has_leakage_signal = _text_mentions_ppl_leakage(combined)
+    if has_leakage_signal:
+        if target_stage not in {"M3S02", "M3S03"}:
+            messages.append(
+                f"[FAIL] {stage}: repair advice routes PPL/channel leakage to "
+                f"{target_stage or 'unset'}; target_stage must be M3S02 for implementation leakage "
+                "or M3S03 for baseline-lock invalidation before rerunning M3S04"
+            )
+            ok = False
+        if _repair_line_has_forbidden_clean_memory_fix(required_fix):
+            messages.append(
+                f"[FAIL] {stage}: invalid leakage repair advice proposes clean encoder memory/cross-attention "
+                "as the fix; required_fix must remove the clean-memory path or pass only noised/channel-transmitted "
+                "state through the decoder"
+            )
+            ok = False
+        if not _contains_any(
+            rerun_scope + " " + success_criteria,
+            ("M3S04", "downstream", "重新运行", "重跑", "rerun", "re-run"),
+        ):
+            messages.append(
+                f"[FAIL] {stage}: leakage repair advice must mark M3S04 downstream results stale and rerun them"
+            )
+            ok = False
+
+    baseline_mismatch = bool(
+        re.search(r"\b(?:ineligible|not\s+comparable|non[-\s]?comparable)\b", lowered)
+        or re.search(r"\bexternal\s+baseline\s+match\b.{0,80}\b(?:fail|failed|no)\b", lowered)
+        or re.search(r"(基线不匹配|不可比较|不合格)", combined)
+    )
+    if baseline_mismatch and (target_stage.startswith("M4") or target_stage in {"M3S04", "M3S05"}):
+        messages.append(
+            f"[FAIL] {stage}: baseline/source comparability failure cannot be routed to {target_stage}; "
+            "route to M3S03 or M3S01 and invalidate downstream M3 results"
+        )
+        ok = False
+
+    metric_gap = bool(
+        re.search(r"\b(?:not\s+implemented|proxy\s+only|not\s+run)\b", lowered)
+        and re.search(r"\b(?:metric|BLEU|cos(?:ine)?_?sim|ppl|perplexity)\b", lowered)
+    )
+    if metric_gap and (target_stage.startswith("M4") or target_stage in {"M3S05"}):
+        messages.append(
+            f"[FAIL] {stage}: primary metric implementation/proxy gap cannot be deferred to {target_stage}; "
+            "route to M2S05/M3S03/M3S02 as appropriate, then rerun M3S04"
+        )
+        ok = False
+
+    if ok and (has_leakage_signal or baseline_mismatch or metric_gap):
+        messages.append(f"[PASS] {stage}: repair advice root-cause routing is consistent")
+    return ok, messages
 
 
 def _check_stage_reviews(root: Path, stage: str) -> tuple[bool, list[str]]:
@@ -3996,6 +4656,12 @@ def _check_stage_reviews(root: Path, stage: str) -> tuple[bool, list[str]]:
                     messages.append(
                         f"[PASS] {stage}: stage review {review_path.name} includes repair advice fields"
                     )
+                    scope_ok, scope_msgs = _check_repair_advice_evidence_scope(stage, text)
+                    messages.extend(scope_msgs)
+                    ok = ok and scope_ok
+                    advice_ok, advice_msgs = _check_m3_repair_advice_consistency(stage, text)
+                    messages.extend(advice_msgs)
+                    ok = ok and advice_ok
             messages.append(
                 f"[FAIL] {stage}: stage review {review_path.name} verdict={verdict}; "
                 f"advance blocked until reviewer returns PASS."
@@ -4131,6 +4797,14 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
     root = Path(project_root)
     messages: list[str] = []
     ok = True
+
+    if re.match(r"^M[1-6]S\d{2}$", stage):
+        single_ok, single_msg = check_single_file_principle(root, stage)
+        if single_ok:
+            messages.append(f"[PASS] {stage}: {single_msg}")
+        else:
+            messages.append(f"[FAIL] {stage}: {single_msg}")
+            ok = False
 
     # M1S02: Literature Deep Dive
     if stage == "M1S02":
@@ -4581,8 +5255,9 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
     # M3S04: Main Experiment Result Review
     if stage == "M3S04":
         main_doc = root / "knowledge" / "M3" / "M3S04_main_experiment.md"
-        results = root / "experiments" / "results.tsv"
+        results = _m3s04_results_table_path(root)
         runs_dir = root / "experiments" / "runs"
+        result_rows: list[dict[str, Any]] | None = None
         if not main_doc.exists():
             messages.append("[FAIL] M3S04: M3S04_main_experiment.md not found")
             ok = False
@@ -4625,21 +5300,25 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                 messages.append(f"[PASS] M3S04: experiments/runs/ contains {len(run_entries)} entries")
 
         if not results.exists():
-            messages.append("[FAIL] M3S04: experiments/results.tsv not found")
+            messages.append("[FAIL] M3S04: experiments/tables/results_main.tsv or experiments/results.tsv not found")
             ok = False
         else:
             lines = [line for line in results.read_text(encoding="utf-8").splitlines() if line.strip()]
             if len(lines) < 2:
-                messages.append("[FAIL] M3S04: results.tsv has no data rows")
+                messages.append(f"[FAIL] M3S04: {results.relative_to(root)} has no data rows")
                 ok = False
             else:
                 try:
                     import csv
 
                     rows = list(csv.DictReader(lines, delimiter="\t"))
+                    result_rows = rows
+                    leakage_ok, leakage_msgs = _check_m3s04_ppl_leakage_patterns(root, rows)
+                    messages.extend(leakage_msgs)
+                    ok = ok and leakage_ok
                     seed_keys = [key for key in (rows[0].keys() if rows else []) if str(key).lower() in {"seed", "random_seed", "rng_seed"}]
                     if not seed_keys:
-                        messages.append("[FAIL] M3S04: results.tsv missing seed column")
+                        messages.append(f"[FAIL] M3S04: {results.relative_to(root)} missing seed column")
                         ok = False
                     else:
                         seed_key = seed_keys[0]
@@ -4650,10 +5329,10 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                         }
                         seed_values = {s for s in seed_values if s.lower() not in {"mean", "std", "mean±std", "mean/std"}}
                         if "42" not in seed_values:
-                            messages.append("[FAIL] M3S04: results.tsv must use fixed seed 42")
+                            messages.append(f"[FAIL] M3S04: {results.relative_to(root)} must use fixed seed 42")
                             ok = False
                         else:
-                            messages.append("[PASS] M3S04: results.tsv records fixed seed 42")
+                            messages.append(f"[PASS] M3S04: {results.relative_to(root)} records fixed seed 42")
                     plan_path = root / "experiments" / "configs" / "resource_plan.yaml"
                     if plan_path.exists():
                         try:
@@ -4668,32 +5347,36 @@ def check_stage(project_root: str | Path, stage: str) -> tuple[bool, list[str]]:
                             missing_resource_headers = sorted(resource_headers - headers)
                             if missing_resource_headers:
                                 messages.append(
-                                    "[FAIL] M3S04: multi-resource results.tsv missing columns: "
+                                    f"[FAIL] M3S04: multi-resource {results.relative_to(root)} missing columns: "
                                     + ", ".join(missing_resource_headers)
                                 )
                                 ok = False
                             else:
-                                messages.append("[PASS] M3S04: results.tsv includes multi-resource columns")
+                                messages.append(f"[PASS] M3S04: {results.relative_to(root)} includes multi-resource columns")
                 except Exception as exc:
-                    messages.append(f"[FAIL] M3S04: results.tsv seed parsing failed: {exc}")
+                    messages.append(f"[FAIL] M3S04: {results.relative_to(root)} seed parsing failed: {exc}")
                     ok = False
                 text = "\n".join(lines).lower()
                 if "baseline" not in text:
-                    messages.append("[FAIL] M3S04: results.tsv missing baseline comparison rows")
+                    messages.append(f"[FAIL] M3S04: {results.relative_to(root)} missing baseline comparison rows")
                     ok = False
                 else:
                     messages.append("[PASS] M3S04: baseline comparison rows found")
                 if "ours" not in text and "proposed" not in text:
-                    messages.append("[FAIL] M3S04: results.tsv missing our-method row")
+                    messages.append(f"[FAIL] M3S04: {results.relative_to(root)} missing our-method row")
                     ok = False
                 else:
                     messages.append("[PASS] M3S04: our-method row found")
                 if "42" not in text:
-                    messages.append("[FAIL] M3S04: results.tsv missing fixed seed 42 evidence")
+                    messages.append(f"[FAIL] M3S04: {results.relative_to(root)} missing fixed seed 42 evidence")
                     ok = False
                 else:
                     messages.append("[PASS] M3S04: fixed seed 42 evidence found")
-                messages.append("[PASS] M3S04: results.tsv exists")
+                messages.append(f"[PASS] M3S04: {results.relative_to(root)} exists")
+
+        registry_ok, registry_msgs = _check_m3s04_run_registry(root, results_rows=result_rows)
+        messages.extend(registry_msgs)
+        ok = ok and registry_ok
 
         review_ok, review_msgs = _check_stage_reviews(root, stage)
         messages.extend(review_msgs)

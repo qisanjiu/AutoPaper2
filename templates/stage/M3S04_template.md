@@ -3,7 +3,7 @@
 > **Stage**: M3S04
 > **Agent**: Experiment Agent
 > **输入**: `knowledge/M3/M3S03_baseline_lock.md`, `knowledge/M3/M3S01_main_experiment_design.md`, `knowledge/M3/M3S02_implementation.md`
-> **输出**: `knowledge/M3/M3S04_main_experiment.md` + `experiments/results.tsv` + `experiments/runs/<run_id>/` + `experiments/logs/runtime_events.jsonl`
+> **输出**: `knowledge/M3/M3S04_main_experiment.md` + `experiments/tables/results_main.tsv` + `experiments/tables/results_all.tsv` + `experiments/run_registry.yaml` + `experiments/runs/<stage>/<run_id>/` + `experiments/logs/runtime_events.jsonl`
 >
 > **审查重点**: 主实验结果是否超过 baseline、结果表是否完整、统计摘要是否齐全、负面结果是否诚实记录
 
@@ -28,7 +28,49 @@
 | 多资源任务分配 | `experiments/configs/m3_task_queue.yaml` / `experiments/configs/m3_task_allocation.yaml`（如适用） |
 | Runtime watchdog | 巡检间隔: 默认 4h / 最长 6h；告警只记录，不自动结束；Agent 决策: continue / fix_and_rerun / early_stop / backtrack_request |
 
-### 1.2 证据层级目标
+### 1.2 Experiments Directory Contract
+
+M3S04 正式产物必须使用如下结构；旧的 `experiments/results.tsv` 可作为兼容镜像，但不得作为唯一真源：
+
+```text
+experiments/
+├── code/                         # 训练/评估代码
+├── configs/                      # resource_plan、task queue、run configs
+├── data/                         # dataset_manifest.yaml 与项目内数据引用
+├── assets/                       # tokenizer、schedule、固定外部资产
+├── baselines/                    # M3S03 locked baseline contracts
+├── tables/
+│   ├── results_main.tsv          # 仅有效 M3S04 主结果
+│   ├── results_all.tsv           # 全部有效/诊断/失败尝试
+│   └── results_invalid.tsv       # 明确无效的历史/异常结果
+├── runs/
+│   ├── M3S03_baseline/<run_id>/
+│   ├── M3S04_main/<run_id>/
+│   ├── M4_analysis/<run_id>/
+│   └── archive/
+├── logs/
+└── run_registry.yaml
+```
+
+每个进入 `results_main.tsv` 的 run 必须在 `run_registry.yaml` 中登记，并且 run 目录至少包含：
+
+```text
+run_manifest.yaml
+config.yaml
+command.sh
+stdout.log / stderr.log
+training_history.json
+metrics.tsv
+best_model.pt 或 checkpoint 路径
+checkpoint_manifest.yaml
+status.json
+resource_monitor.csv
+watchdog_checks.jsonl
+```
+
+没有 `training_history.json` 或 `status.json` 的 checkpoint-only run 只能标为 `validity: checkpoint_only_unverified`，不得进入 `results_main.tsv`。
+
+### 1.3 证据层级目标
 
 - **minimum**: [目标，如"代码运行完成，指标可计算"]
 - **solid**: [目标，如"主指标显著优于 baseline"]
@@ -107,7 +149,7 @@ python scripts/resource_planner.py allocate \
 
 M3S04 不得在训练未完成时推进。随机初始化、E0、未训练 checkpoint、仍在 running/queued 的训练结果只能作为负面/诊断记录，不能填入最终 proposed/ours 主结果。
 
-`experiments/results.tsv` 的 proposed/ours 行必须至少包含：
+`experiments/tables/results_main.tsv` 的 proposed/ours 行必须至少包含：
 
 | method | run_id | seed | metric | value | run_status | weight_state | checkpoint_path | training_steps | resource_monitor |
 |--------|--------|------|--------|-------|------------|--------------|-----------------|----------------|------------------|
@@ -118,6 +160,21 @@ M3S04 不得在训练未完成时推进。随机初始化、E0、未训练 check
 - `run_status` / `training_status` 为 completed / succeeded / finished / done；
 - `weight_state` 证明是训练完成的权重，不得为 random / random_init / untrained / E0；
 - `experiments/logs/runtime_events.jsonl` 至少包含对应 run 的 `training_completed`、`run_completed`、`experiment_completed` 或 `checkpoint_saved` 事件。
+- `experiments/run_registry.yaml` 中同一 `run_id` 的 `status` 为 completed，`validity` 为 `valid_main` 或 `valid_reference`，并列出真实存在的 manifest/config/history/metrics/checkpoint/status 文件。
+
+### 2.6 PPL / Channel Leakage Sanity Contract（必须，文本语义通信/noisy-channel 任务）
+
+PPL 过低不是自动成功信号。若 noisy-channel 重建任务出现 PPL≈1、accuracy≈1 或所有 SNR 下 PPL 几乎相同，必须先按泄露/捷径处理，不能进入正式主结果。
+
+进入 `results_main.tsv` 的 formal row 必须满足：
+
+- 不存在未经过信道的 encoder memory、target token、teacher-forced clean state、clean embedding 进入 decoder；
+- 若模型使用 decoder cross-attention，`memory` 必须来自经过同一信道、噪声、功率约束和压缩瓶颈后的表示；干净 `memory` 只能作为 invalid diagnostic；
+- `results_main.tsv` 中如记录 PPL，应包含 `ppl_snr_*` 或等价 per-SNR 指标，并检查 SNR sensitivity；
+- PPL<=1.05 且 accuracy/train_acc>=0.95、或 per-SNR PPL 相对跨度 <2% 且指标接近完美时，该 row 必须移入 `experiments/tables/results_invalid.tsv`，并触发 M3S02/M3S03 回溯；
+- random-token/noise stress test 只能作为辅助，不能替代代码级 no-bypass 审计。
+
+`results_invalid.tsv` 应写明 `invalid_reason=channel_leakage|clean_memory_bypass|snr_invariant_metric|metric_bug` 和 `backtrack_target=M3S02/M3S03`。
 
 ---
 
@@ -239,3 +296,27 @@ M3S04 不得在训练未完成时推进。随机初始化、E0、未训练 check
 - **Evidence Artifact 路径**: `experiments/runs/<best_run_id>/`
 - **Trained checkpoint**: `experiments/runs/<best_run_id>/checkpoints/best.pt`，runtime event 已记录 completed
 - **远程结果同步状态**（如适用）: 已同步 / 部分同步 / 未同步
+
+## 12. Run Registry Snapshot
+
+`experiments/run_registry.yaml` 必须至少包含以下字段：
+
+```yaml
+schema_version: 1
+runs:
+  - run_id: M3S04_main_ours_demo_seed42_YYYYMMDD-HHMMSS
+    stage: M3S04
+    role: ours
+    status: completed
+    validity: valid_main
+    config_id: ...
+    seed: 42
+    dataset: ...
+    metric_protocol_id: mp_...
+    checkpoint_path: experiments/runs/M3S04_main/.../best_model.pt
+    history_path: training_history.json
+    metrics_path: metrics.tsv
+    run_manifest: run_manifest.yaml
+    checkpoint_manifest: checkpoint_manifest.yaml
+    status_path: status.json
+```

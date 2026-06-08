@@ -31,6 +31,7 @@ from spiral.verdict_parser import (
     extract_m3s05_decision,
     is_valid_rebuild_mode,
 )
+from spiral.conductor import missing_backtrack_advice_fields, normalize_backtrack_advice
 
 
 # ---------------------------------------------------------------------------
@@ -1778,6 +1779,12 @@ def cmd_backtrack(
             "evidence_paths": evidence_paths if evidence_paths is not None else parsed.evidence_paths,
             "handoff_updates": handoff_updates if handoff_updates is not None else parsed.handoff_updates,
         }
+        advice = normalize_backtrack_advice(advice)
+        missing = missing_backtrack_advice_fields(advice)
+        if missing:
+            print("[ERROR] Review-file backtrack advice is incomplete.")
+            print(f"  Missing fields: {', '.join(missing)}")
+            sys.exit(1)
     elif any([required_fix, success_criteria, rebuild_mode, rerun_scope, evidence_paths, handoff_updates]):
         # Structured advice provided via CLI flags
         advice = {
@@ -1790,6 +1797,13 @@ def cmd_backtrack(
             "evidence_paths": evidence_paths or [],
             "handoff_updates": handoff_updates or [],
         }
+        advice = normalize_backtrack_advice(advice)
+        missing = missing_backtrack_advice_fields(advice)
+        if missing:
+            print("[ERROR] Structured CLI backtrack advice is incomplete.")
+            print(f"  Missing fields: {', '.join(missing)}")
+            print("  Provide all repair fields or omit structured flags and let Conductor create default advice.")
+            sys.exit(1)
 
     if advice is None:
         print("  [WARN] Human backtrack without structured repair advice. "

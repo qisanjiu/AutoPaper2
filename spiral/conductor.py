@@ -20,6 +20,16 @@ GATE_CRITICS = {
 }
 
 ALL_MODULES = list(MODULE_STAGES.keys())
+BACKTRACK_ADVICE_REQUIRED_FIELDS = (
+    "target_stage",
+    "blocking_reason",
+    "required_fix",
+    "success_criteria",
+    "evidence_paths",
+    "rebuild_mode",
+    "rerun_scope",
+    "handoff_updates",
+)
 
 
 def _module_of_stage(stage: str) -> str:
@@ -57,7 +67,7 @@ def _build_backtrack_advice(
         or payload.get("acceptance_criteria")
         or f"{target_stage} passes its stage review and downstream stale stages can be re-run cleanly"
     )
-    evidence_paths = payload.get("evidence_paths") or payload.get("evidence") or []
+    evidence_paths = payload.get("evidence_paths") or payload.get("evidence") or ["state/pipeline_state.yaml"]
     if isinstance(evidence_paths, str):
         evidence_paths = [evidence_paths]
     rebuild_mode = payload.get("rebuild_mode") or _infer_rebuild_mode(
@@ -66,7 +76,7 @@ def _build_backtrack_advice(
         str(payload.get("direction", direction)),
     )
 
-    return {
+    advice = {
         "source_critic": critic or payload.get("critic", ""),
         "target_stage": target_stage,
         "blocking_reason": blocking_reason,
@@ -75,8 +85,10 @@ def _build_backtrack_advice(
         "evidence_paths": evidence_paths,
         "rebuild_mode": rebuild_mode,
         "rerun_scope": payload.get("rerun_scope", f"Re-execute {target_stage} and downstream stale stages"),
-        "handoff_updates": payload.get("handoff_updates", []),
+        "handoff_updates": payload.get("handoff_updates")
+        or [f"Refresh downstream handoff documents affected by re-running {target_stage} if evidence changes"],
     }
+    return normalize_backtrack_advice(advice)
 
 
 def _infer_rebuild_mode(reason: str, required_fix: str = "", direction: str = "") -> str:
@@ -121,6 +133,75 @@ def _infer_rebuild_mode(reason: str, required_fix: str = "", direction: str = ""
     if any(marker in text for marker in incremental_markers):
         return "incremental_replay"
     return "full_regenerate"
+
+
+def _ensure_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, str):
+        return [item.strip() for item in value.replace("\n", ";").split(";") if item.strip()]
+    return [value]
+
+
+def missing_backtrack_advice_fields(advice: dict[str, Any]) -> list[str]:
+    """Return missing fields from a durable backtrack-advice payload."""
+    missing: list[str] = []
+    for field in BACKTRACK_ADVICE_REQUIRED_FIELDS:
+        value = advice.get(field)
+        if value is None:
+            missing.append(field)
+        elif isinstance(value, str) and not value.strip():
+            missing.append(field)
+        elif isinstance(value, list) and not value:
+            missing.append(field)
+    return missing
+
+
+def build_repair_brief(advice: dict[str, Any]) -> dict[str, Any]:
+    """Create an executor-facing repair brief from structured advice."""
+    return {
+        "error_summary": advice.get("blocking_reason", ""),
+        "required_change": advice.get("required_fix", ""),
+        "success_criteria": advice.get("success_criteria", ""),
+        "evidence_to_recheck": _ensure_list(advice.get("evidence_paths")),
+        "rebuild_mode": advice.get("rebuild_mode", "full_regenerate"),
+        "rerun_scope": advice.get("rerun_scope", ""),
+        "handoff_updates": _ensure_list(advice.get("handoff_updates")),
+        "executor_instructions": [
+            "Read evidence_to_recheck before editing.",
+            "Modify only the assigned target_stage output and explicitly allowed evidence artifacts.",
+            "Do not treat stale downstream files as current evidence; use them only as audit history.",
+            "Report how each success_criteria item was satisfied.",
+        ],
+    }
+
+
+def normalize_backtrack_advice(advice: dict[str, Any]) -> dict[str, Any]:
+    """Normalize repair advice before it is stored or dispatched."""
+    normalized = dict(advice)
+    normalized["evidence_paths"] = _ensure_list(normalized.get("evidence_paths"))
+    normalized["handoff_updates"] = _ensure_list(normalized.get("handoff_updates"))
+    normalized.setdefault("rebuild_mode", "full_regenerate")
+    stage_map = normalized.get("stage_backtrack_advice")
+    if isinstance(stage_map, dict):
+        normalized_stage_map: dict[str, Any] = {}
+        for stage, stage_advice in stage_map.items():
+            if isinstance(stage_advice, dict):
+                per_stage = dict(stage_advice)
+                per_stage["evidence_paths"] = _ensure_list(per_stage.get("evidence_paths"))
+                per_stage["handoff_updates"] = _ensure_list(per_stage.get("handoff_updates"))
+                per_stage.setdefault("rebuild_mode", normalized.get("rebuild_mode", "full_regenerate"))
+                per_stage["repair_brief"] = build_repair_brief(per_stage)
+                normalized_stage_map[stage] = per_stage
+            else:
+                normalized_stage_map[stage] = stage_advice
+        normalized["stage_backtrack_advice"] = normalized_stage_map
+    normalized["repair_brief"] = build_repair_brief(normalized)
+    return normalized
 
 
 class Conductor:
@@ -428,6 +509,14 @@ class Conductor:
             reason=reason,
             direction=direction,
         )
+        backtrack_advice = normalize_backtrack_advice(backtrack_advice)
+        missing = missing_backtrack_advice_fields(backtrack_advice)
+        if missing:
+            return {
+                "ok": False,
+                "error": "Backtrack advice missing required field(s): " + ", ".join(missing),
+                "missing_fields": missing,
+            }
         direction = direction or backtrack_advice.get("required_fix", "")
 
         self.state.record_backtrack(from_stage, to_stage, reason, direction, advice=backtrack_advice)

@@ -108,6 +108,18 @@ KEEP 只能在以下材料同时完成时使用：
 - M3S04 final proposed/ours 行引用的 trained checkpoint 真实存在，且 `runtime_events.jsonl` 记录训练完成事件；random/E0/untrained 权重不得 KEEP
 - `knowledge/handoff_M3_M4.md`：包含 KEEP 决策、claim/evidence 映射、M3S05 来源、artifact 路径、M4 分析方向
 
+KEEP 禁止条件：
+
+- 外部 baseline match 为 fail/❌，或任一 primary baseline 标为 `ineligible`；
+- 主指标、BLEU/cosine/semantic metric 等声明指标 `not implemented`、`proxy only`、`not run`；
+- proposed/ours 或 primary baseline 训练不足、仍在 running/queued、checkpoint-only、history 缺失；
+- 把 published values、rough reference、背景论文数值当成 M3S04 可比较 baseline；
+- 发现 dataset/split/metric/source/modality/task mismatch 却只写 limitation 或留给 M4。
+- noisy-channel/PPL 任务出现 PPL≈1、accuracy≈1、SNR-invariant PPL、clean memory bypass、target/encoder hidden state bypass、metric leakage 或 shortcut，且未通过代码级 no-bypass 审计；
+- reviewer/backtrack advice 把 `self.decoder(x, memory)` 或“使用 encoder memory 做 cross-attention”写成泄露修复方案，但 `memory` 未明确经过同一信道、噪声、功率约束和压缩瓶颈。
+
+出现任一禁止条件时，决策必须是 `FIX` 或 `BACKTRACK`，并填写结构化回溯字段。
+
 ### 如果 FIX
 - **修复目标**: M3S04 / M3S03 / M3S02
 - **修复内容**: ...
@@ -128,6 +140,12 @@ KEEP 只能在以下材料同时完成时使用：
 - `rebuild_mode`: `incremental_replay` / `full_regenerate`
 - `rerun_scope`: 从 `target_stage` 起需要重跑的范围，必须说明是否包含 downstream stale stages
 - `handoff_updates`: 如需要刷新交接文档时填写
+
+泄露类回溯路由规则：
+
+- clean memory/target/encoder hidden-state bypass、PPL≈1、accuracy≈1、SNR-invariant PPL → `target_stage: M3S02`（实现泄露）或 `M3S03`（baseline lock 失效），`rerun_scope` 必须包含 M3S04-M3S05；
+- `required_fix` 必须写“移除干净旁路/只允许 noised channel output 或 channel-transmitted memory”，不得写“改用 `self.decoder(x, memory)`”作为修复；
+- 已产出的异常 row 必须标入 `experiments/tables/results_invalid.tsv`，不能作为 limitation 交给 M4。
 
 ---
 

@@ -60,13 +60,15 @@ M3S01 只允许定义主实验计划：
 
 每个 baseline 必须是外部 prior work、官方 baseline 或忠实完整复现的 prior work。这里记录的是后续 M3S03 本地复现/验证的参考值，不等于最终比较结果。
 
-| baseline | comparator_type | dataset | scenario | split | metric_protocol_id | metric | reference_value | value_source | table_or_section | expected_tolerance | acquisition_plan |
-|----------|-----------------|---------|----------|-------|--------------------|--------|-----------------|--------------|------------------|--------------------|------------------|
-| Baseline-1 | external_prior_work / official_baseline / reproduced_prior_work | ... | ... | ... | mp_... | ... | 0.000 | paper / official repo / leaderboard | ... | ... | official code/checkpoint URL or training plan |
-| Baseline-2 | ... | ... | ... | ... | mp_... | ... | 0.000 | ... | ... | ... | ... |
+| baseline | comparator_type | source_id | title | venue | year | modality | task | dataset | scenario | split | metric_protocol_id | metric | reference_value | value_source | table_or_section | expected_tolerance | acquisition_plan |
+|----------|-----------------|-----------|-------|-------|------|----------|------|---------|----------|-------|--------------------|--------|-----------------|--------------|------------------|--------------------|------------------|
+| Baseline-1 | external_prior_work / official_baseline / reproduced_prior_work | `M1_source_log.yaml` 中的 source_id | exact title from source log | exact venue from source log | 20xx | text/image/... | exact task from source log | ... | ... | ... | mp_... | ... | 0.000 | paper / official repo / leaderboard | ... | ... | official code/checkpoint URL or training plan |
+| Baseline-2 | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | mp_... | ... | 0.000 | ... | ... | ... | ... |
 
 硬性要求：
 
+- 每个 baseline 必须绑定 `knowledge/M1/M1_source_log.yaml` 的 `source_id`，并逐字核对 title、venue、year、modality、task；不得由模型补全论文标题、venue 或任务类型；
+- baseline 的 modality/task 必须与本文主实验可比较。图像传输论文不能作为文本语义通信 baseline，除非明确标为不可进入 M3S04 的背景参考；
 - `reference_value` 必须是具体数值，不能写 TBD、unknown、见论文、待复现；
 - `value_source` 必须能定位到论文表格、官方 repo、leaderboard 或已验证历史 artifact；
 - baseline 不得是本方法消融变体；

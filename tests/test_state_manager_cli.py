@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import unittest
 from pathlib import Path
 
 
@@ -18,18 +19,18 @@ def _run_state_manager(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_state_manager_help_flag_exits_zero() -> None:
-    result = _run_state_manager("--help")
+class TestStateManagerCli(unittest.TestCase):
+    def test_state_manager_help_flag_exits_zero(self) -> None:
+        result = _run_state_manager("--help")
 
-    assert result.returncode == 0
-    assert "AutoPaper2 State Manager" in result.stdout
-    assert "list/list-projects" in result.stdout
-    assert "Unknown command" not in result.stdout
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("AutoPaper2 State Manager", result.stdout)
+        self.assertIn("list/list-projects", result.stdout)
+        self.assertNotIn("Unknown command", result.stdout)
 
+    def test_state_manager_list_alias_exits_zero(self) -> None:
+        result = _run_state_manager("list")
 
-def test_state_manager_list_alias_exits_zero() -> None:
-    result = _run_state_manager("list")
-
-    assert result.returncode == 0
-    assert "PROJECTS in" in result.stdout or "No projects directory found" in result.stdout
-    assert "Unknown command" not in result.stdout
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue("PROJECTS in" in result.stdout or "No projects directory found" in result.stdout)
+        self.assertNotIn("Unknown command", result.stdout)

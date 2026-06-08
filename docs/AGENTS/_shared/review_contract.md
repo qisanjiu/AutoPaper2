@@ -7,7 +7,8 @@
 - `HALT`: cannot proceed without user/external action, unsafe state, missing secret, legal/ethical blocker, or repeated impossible dependency.
 
 ## PASS Integrity
-- A `PASS` review must not contain unresolved blockers, vague approval, or deferred evidence. Phrases such as pending, failed, missing, unavailable, not verified, unable to download, waiting for user, TODO/TBD, maybe/probably/likely, "基本通过", "先推进", or "等待人工" make PASS invalid.
+- A `PASS` review must not contain unresolved blockers, vague approval, or deferred evidence. Phrases such as pending, failed, missing, unavailable, not verified, unable to download, ineligible, not implemented, not run, proxy only, undertrained, reference only, defer to M4, waiting for user, TODO/TBD, maybe/probably/likely, "基本通过", "先推进", "等待人工", "不合格", "未实现", "未运行", "训练不足", "仅作参考", or "留到M4" make PASS invalid.
+- In experiment reviews, PPL≈1, accuracy≈1, SNR-invariant PPL, clean memory bypass, target/encoder hidden-state bypass, leakage, or shortcut language also makes PASS invalid unless the line explicitly says the issue is resolved and verifies the no-bypass evidence.
 - Dataset, baseline code, baseline weights, checkpoints, model assets, external submissions, and review emails must be either completed with evidence or reviewed as non-PASS. If human action is genuinely required after recorded attempts, use `HALT` with repair fields/evidence, not PASS.
 - Reviewers must treat "cannot download" as an objection unless the stage shows multiple concrete acquisition attempts and the review verdict is non-PASS.
 
@@ -21,6 +22,18 @@ Every `REVISE`, `BACKTRACK`, `FIX`, or `REWORK` review must include:
 - `rebuild_mode`: `full_regenerate` or `incremental_replay`
 - `rerun_scope`
 - `handoff_updates`
+
+## Repair Advice Integrity
+- Route source/modality/task/baseline eligibility failures to the stage that owns the invalid assumption, usually M3S01 or M3S03.
+- Route implementation leakage, PPL≈1, clean memory bypass, target/encoder hidden-state bypass, or SNR-invariant noisy-channel metrics to M3S02 or M3S03 and require M3S04-M3S05 rerun.
+- Do not propose clean encoder memory cross-attention, such as `self.decoder(x, memory)`, as a leakage fix unless `memory` is explicitly channel-transmitted/noised under the same bottleneck.
+- Do not route unresolved M3 experimental blockers to M4 analysis.
+
+## Reviewer Evidence Boundary
+- Reviewer findings and `required_fix` must stay within the evidence actually checked.
+- If `Evidence Checked` and `evidence_paths` contain only Markdown stage outputs, the reviewer may write task-level advice only: identify the symptom, target owner stage, files/classes to inspect if justified by the Markdown, required verification, and rerun scope.
+- Do not invent line-level patches, function calls, signatures, config values, commands, or exact code edits unless the corresponding code/config path was directly checked and is listed in `Evidence Checked` or `evidence_paths`.
+- For suspected implementation bugs observed only through result Markdown, write `required_fix` as inspect -> verify root cause -> repair -> add evidence/tests -> rerun downstream, not as an unverified patch.
 
 ## Review Output Location
 - Write the review only to packet `output_path`.
