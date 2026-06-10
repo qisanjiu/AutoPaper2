@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 
 def _add_project_root(root: Path) -> None:
     value = str(root.resolve())
@@ -108,6 +110,31 @@ def _check_skill_roots(root: Path, messages: list[str]) -> bool:
     if ok:
         messages.append("[PASS] skills/ is the canonical source and .claude/skills/ is synchronized")
     return ok
+
+
+def _check_skill_index(root: Path, messages: list[str]) -> bool:
+    _add_project_root(root)
+    from scripts.skill_index import build_index
+
+    path = root / "skills" / "index.yaml"
+    if not path.exists():
+        messages.append("[FAIL] skills/index.yaml missing; run: python scripts/skill_index.py build --write")
+        return False
+
+    try:
+        stored = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        messages.append(f"[FAIL] skills/index.yaml is not readable YAML: {exc}")
+        return False
+
+    actual = build_index(root)
+    stored_names = sorted(entry.get("name", "") for entry in stored.get("skills", []))
+    actual_names = sorted(entry.get("name", "") for entry in actual.get("skills", []))
+    if stored_names != actual_names:
+        messages.append("[FAIL] skills/index.yaml skill list is stale; run: python scripts/skill_index.py build --write")
+        return False
+    messages.append(f"[PASS] skills/index.yaml covers {len(actual_names)} project-local skills")
+    return True
 
 
 def _check_agent_prompts(root: Path, messages: list[str]) -> bool:
@@ -294,6 +321,7 @@ def run_checks(root: Path) -> dict[str, Any]:
     messages: list[str] = []
     checks = {
         "skill_roots": _check_skill_roots(root, messages),
+        "skill_index": _check_skill_index(root, messages),
         "agent_prompts": _check_agent_prompts(root, messages),
         "dispatch_packets": _check_dispatch_packets(root, messages),
         "cli_instructions": _check_cli_instructions(root, messages),

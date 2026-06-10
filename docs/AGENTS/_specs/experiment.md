@@ -13,6 +13,7 @@
 - M3S03: baseline metric contract with checkpoint source/local path/checksum/loadability when applicable, source truth fields matching `M1_source_log.yaml`, metric_protocol_id alignment, metric sanity-check evidence, plus `experiments/baselines/baseline_lock.yaml` with at least one primary baseline marked `m3s04_eligible: true`.
 - M3S04: `experiments/tables/results_main.tsv`, `experiments/tables/results_all.tsv`, `experiments/run_registry.yaml`, run directories, config/seed, resource monitor, watchdog checks for long runs, failure/negative records, and a completed trained-checkpoint path for each proposed/ours result row.
 - M4S03: `analysis_results.tsv`, slice logs, baseline inclusion, monitor paths, artifacts manifest, sandbox record.
+- Code/edit/run audit: when a stage writes code, changes configs, launches experiments, runs tests, or builds artifacts, it must cite the packet `runtime_observability.command_ledger_path` and/or `runtime_observability.code_change_ledger_path` in the stage output. These ledgers should include command, cwd, return code, stdout/stderr log paths, git diff patch path, changed files, hashes, and validation summary.
 
 ## Resource Rules
 - Use visible GPUs/CPUs deliberately. If multiple GPUs/resources exist, generate task queues/allocation or explain why not parallelizable.

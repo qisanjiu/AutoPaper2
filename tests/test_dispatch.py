@@ -9,10 +9,12 @@ import yaml
 from scripts.context_budget import resolve_packet_path
 from spiral.conductor import Conductor
 from spiral.dispatch import (
+    build_dispatch_bundle,
     build_packets,
     build_stage_execution_packet,
     build_stage_review_packets,
     build_ssh_ops_packet,
+    write_dispatch_bundle,
     write_packets,
 )
 from spiral.revision_router import build_revision_routes
@@ -175,6 +177,24 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertTrue(packet["agent_md"].startswith("framework:"))
         self.assertTrue(packet["output_path"].startswith("project:"))
         self.assertTrue(packet["role_spec"].endswith("docs/AGENTS/_specs/method.md"))
+        self.assertEqual(packet["context_policy"]["event_log_path"], "project:state/agent_runs/M2S01_method_execute.jsonl")
+        self.assertEqual(
+            packet["runtime_observability"]["artifact_manifest_path"],
+            "project:state/agent_runs/M2S01_method_execute_artifacts.yaml",
+        )
+        self.assertEqual(
+            packet["runtime_observability"]["command_ledger_path"],
+            "project:state/agent_runs/M2S01_method_execute_commands.yaml",
+        )
+        self.assertEqual(
+            packet["runtime_observability"]["code_change_ledger_path"],
+            "project:state/agent_runs/M2S01_method_execute_code_changes.yaml",
+        )
+        self.assertEqual(
+            packet["runtime_observability"]["code_execution_ledger_cli"],
+            "framework:scripts/code_execution_ledger.py",
+        )
+        self.assertEqual(packet["skill_discovery"]["index_path"], "framework:skills/index.yaml")
         self.assertIn("Do not use the parent conversation", packet["subagent_launch_prompt"])
         self.assertIn("Read and execute this AutoPaper2 dispatch packet", packet["subagent_launch_prompt"])
         self.assertIn("Resolve project: refs", packet["subagent_launch_prompt"])
@@ -194,9 +214,12 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertEqual(policy["edit_granularity"], "section_or_smaller")
         self.assertIs(policy["forbid_alternate_outputs"], True)
         self.assertIn("_revised", policy["forbidden_suffixes"])
+        self.assertTrue(policy["section_anchor_policy"]["enabled"])
+        self.assertEqual(policy["section_anchor_policy"]["tool"], "framework:scripts/markdown_section_hash.py")
         self.assertIn("canonical_in_place", packet["subagent_prompt"])
         self.assertIn("read_existing_before_write", packet["subagent_prompt"])
         self.assertIn("preserve_unaffected_content", packet["subagent_prompt"])
+        self.assertIn("section_anchor_policy", packet["subagent_prompt"])
         self.assertIn("do not create v2/new/revised/backtrack", packet["subagent_launch_prompt"])
         self.assertIn("preserve correct unaffected content", packet["subagent_launch_prompt"])
 
@@ -271,6 +294,8 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertIn("packet_path: `project:state/dispatch/", text)
         self.assertIn("## Compact Launch Prompt", text)
         self.assertIn("## Context Policy", text)
+        self.assertIn("## Runtime Observability", text)
+        self.assertIn("## Skill Discovery", text)
         self.assertIn("handoff_mode: packet_path_only", text)
         self.assertIn("role_spec:", text)
         self.assertIn("docs/AGENTS/_specs/method.md", text)
@@ -327,6 +352,8 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertEqual(packet["role"], "m2_search_quality")
         self.assertTrue(packet["output_path"].endswith("knowledge/reviews/M2S01_search_quality_review.md"))
         self.assertTrue(packet["subject_output"].endswith("knowledge/M2/M2S01_cross_domain_search.md"))
+        self.assertEqual(packet["reviewer_memory_path"], "project:knowledge/reviews/reviewer_memory.yaml")
+        self.assertTrue(any(path.endswith("knowledge/reviews/reviewer_memory.yaml") for path in packet["input_docs"]))
 
     def test_stage_review_packet_includes_evidence_scoped_advice_boundary(self) -> None:
         packets = build_stage_review_packets(self.root, "M3S03")
@@ -345,6 +372,22 @@ class TestDispatchPackets(unittest.TestCase):
         self.assertIn("Gate rubric: G2", packet["gate_rubric"])
         self.assertIn("G2-R1", packet["subagent_prompt"])
         self.assertIn("Rubric Results", packet["subagent_prompt"])
+        self.assertEqual(packet["reviewer_memory_path"], "project:knowledge/reviews/reviewer_memory.yaml")
+
+    def test_gate_review_dispatch_bundle_marks_parallel_fanout(self) -> None:
+        packets = build_packets(self.root, "gate", "G2")
+        packet_paths = write_packets(self.root, packets, fmt="json")
+
+        bundle = build_dispatch_bundle(self.root, packets, packet_paths)
+        bundle_path = write_dispatch_bundle(self.root, packets, packet_paths)
+
+        self.assertEqual(bundle["bundle_type"], "gate_review_parallel_bundle")
+        self.assertTrue(bundle["parallel_execution"])
+        self.assertEqual(bundle["gate_id"], "G2")
+        self.assertEqual(len(bundle["packet_paths"]), len(packets))
+        self.assertEqual(bundle["reviewer_memory_path"], "project:knowledge/reviews/reviewer_memory.yaml")
+        self.assertIsNotNone(bundle_path)
+        self.assertTrue(bundle_path.exists())
 
     def test_m1s02_review_dispatch_creates_three_round_packets(self) -> None:
         packets = build_stage_review_packets(self.root, "M1S02")

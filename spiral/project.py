@@ -206,7 +206,15 @@ class ProjectManager:
                 (drafts_dir / stage).mkdir(parents=True, exist_ok=True)
 
         # Supporting directories
-        for sub in ["state", "knowledge", "knowledge/reviews", "artifacts", "experiments", "config"]:
+        for sub in [
+            "state",
+            "state/agent_runs",
+            "knowledge",
+            "knowledge/reviews",
+            "artifacts",
+            "experiments",
+            "config",
+        ]:
             (proj_dir / sub).mkdir(parents=True, exist_ok=True)
 
         # Module knowledge directories
@@ -289,6 +297,9 @@ class ProjectManager:
             f"# Spiral Log — {display_str}\n\n",
             encoding="utf-8",
         )
+        from spiral.agent_runtime import ensure_reviewer_memory
+
+        ensure_reviewer_memory(proj_dir, folder_name)
 
         # Copy stage templates
         tpl_root = framework_root / "templates" / "stage"

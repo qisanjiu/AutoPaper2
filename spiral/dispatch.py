@@ -16,10 +16,10 @@ from typing import Any
 from utils.file_guard import ALTERNATE_OUTPUT_SUFFIXES, get_canonical_output_path
 from utils.gate_rubric import render_gate_rubric_block
 
-from .conductor import Conductor, GATE_CRITICS
+from .agent_runtime import AGENT_RUNS_DIR, REVIEWER_MEMORY_REL
+from .conductor import GATE_CRITICS, Conductor
 from .project import GATE_STAGES
 from .revision_router import build_revision_routes
-
 
 PATH_RESOLUTION = {
     "project": "`project:<relative-path>` resolves from the project root. The packet path normally lives under `<project>/state/dispatch/`, so the project root can be recovered from the packet location.",
@@ -55,7 +55,8 @@ EXECUTOR_BOUNDARIES = [
 REVIEWER_BOUNDARIES = [
     "Review only; do not modify the stage output under review.",
     "Read the original file paths directly; do not rely on executor summaries.",
-    "Write exactly one review file at the requested output path.",
+    "Write exactly one canonical review file at the requested output path.",
+    "If the packet includes reviewer_memory_path, update only that shared reviewer-memory file for persistent concerns and resolved concerns; do not create alternate memory files.",
     "Do not return PASS when evidence is pending, failed, unavailable, ambiguous, or waiting for human/manual action.",
     "For non-PASS verdicts, include target_stage, blocking_reason, required_fix, success_criteria, evidence_paths, rebuild_mode, rerun_scope, and handoff_updates.",
     "Do not prescribe exact code edits, lines, function calls, signatures, config values, or commands unless the code/config/log path was directly checked and listed in Evidence Checked or evidence_paths.",
@@ -336,6 +337,7 @@ def _context_policy(packet: dict[str, Any]) -> dict[str, Any]:
     stage = str(packet.get("stage", "") or "")
     task_type = str(packet.get("task_type", "") or "")
     task_id = _slug(str(packet.get("task_id", "task")))
+    event_log = f"project:{AGENT_RUNS_DIR}/{task_id}.jsonl"
     return {
         "handoff_mode": "packet_path_only",
         "no_parent_context": True,
@@ -346,6 +348,18 @@ def _context_policy(packet: dict[str, Any]) -> dict[str, Any]:
         "directory_policy": "List/index directories before reading contained files; only open files needed for the assigned task.",
         "resume_required": stage in LONG_CONTEXT_STAGES or task_type in {"revision_routing", "ssh_ops"},
         "worklog_path": f"project:state/agent_runs/{task_id}.yaml",
+        "event_log_path": event_log,
+    }
+
+
+def _section_anchor_policy(output_ref: str) -> dict[str, Any]:
+    return {
+        "enabled": bool(output_ref),
+        "anchor_format": "<!-- ap2:section id=<stable-id> sha256=<section-sha256> -->",
+        "tool": "framework:scripts/markdown_section_hash.py",
+        "verify_before_section_edit": True,
+        "refresh_after_edit": True,
+        "stale_anchor_action": "If anchors are stale, inspect the current file and record the conflict in the runtime event log before refreshing hashes or editing.",
     }
 
 
@@ -363,6 +377,36 @@ def _output_write_policy(output_ref: str) -> dict[str, Any]:
         "if_target_exists": "Read the existing file first, then update this exact file in place with minimal section-level edits; preserve correct unaffected content and do not create a sibling Markdown file.",
         "forbid_alternate_outputs": True,
         "forbidden_suffixes": list(ALTERNATE_OUTPUT_SUFFIXES),
+        "section_anchor_policy": _section_anchor_policy(output_ref),
+    }
+
+
+def _runtime_observability(task_id: str) -> dict[str, Any]:
+    safe = _slug(task_id)
+    return {
+        "event_log_path": f"project:{AGENT_RUNS_DIR}/{safe}.jsonl",
+        "artifact_manifest_path": f"project:{AGENT_RUNS_DIR}/{safe}_artifacts.yaml",
+        "command_ledger_path": f"project:{AGENT_RUNS_DIR}/{safe}_commands.yaml",
+        "code_change_ledger_path": f"project:{AGENT_RUNS_DIR}/{safe}_code_changes.yaml",
+        "event_log_cli": "framework:scripts/agent_run_log.py",
+        "artifact_manifest_cli": "framework:scripts/agent_run_log.py",
+        "code_execution_ledger_cli": "framework:scripts/code_execution_ledger.py",
+        "minimum_events": [
+            "packet_read",
+            "inputs_inspected",
+            "output_written_or_blocked",
+            "completed_or_blocked",
+        ],
+        "metadata_policy": "Record paths, artifact hashes, blocked states, and verification evidence. Redact secrets.",
+        "code_work_policy": "For substantial code edits or experiment commands, record command runs and git diffs in the task command/code-change ledgers. This is audit evidence, not a command permission system.",
+    }
+
+
+def _skill_discovery() -> dict[str, str]:
+    return {
+        "index_path": "framework:skills/index.yaml",
+        "index_cli": "framework:scripts/skill_index.py",
+        "canonical_root": "framework:skills",
     }
 
 
@@ -419,10 +463,16 @@ def render_compact_launch_prompt(packet: dict[str, Any], packet_path: str | Path
             "Resolve project: refs from the packet project root; resolve framework: refs from SPIRAL_FRAMEWORK_ROOT or the current AutoPaper2 root.",
             "First read the packet, then read the role instructions and input paths listed inside it.",
             "Read files selectively according to the packet context_policy; do not paste whole large inputs into context.",
+            "Log progress, artifacts, command runs, and code diffs in runtime_observability ledgers; these are audit evidence, not permission boundaries.",
             "Write only the requested output path and any explicitly allowed evidence/worklog paths.",
             "If the requested output already exists, read it first, preserve correct unaffected content, and edit only the sections needed for the repair; do not create v2/new/revised/backtrack Markdown copies.",
         ]
     )
+    write_policy = packet.get("output_write_policy") or {}
+    if write_policy.get("section_anchor_policy", {}).get("enabled"):
+        lines.append("For Markdown section edits, verify existing ap2:section anchors before editing and refresh anchors after editing.")
+    if packet.get("reviewer_memory_path"):
+        lines.append(f"Reviewer memory: read/update {packet['reviewer_memory_path']} for persistent concerns and resolved concerns.")
     policy = packet.get("context_policy") or {}
     worklog = policy.get("worklog_path", "")
     if policy.get("resume_required") and worklog:
@@ -452,6 +502,8 @@ def _packet(
         "input_docs": _path_refs(input_docs, project_root),
         "output_path": _path_ref(output_path, project_root, default_scope="project") if output_path else "",
         "main_agent_boundaries": MAIN_AGENT_BOUNDARIES,
+        "runtime_observability": _runtime_observability(task_id),
+        "skill_discovery": _skill_discovery(),
     }
     if data["output_path"]:
         data["output_write_policy"] = _output_write_policy(data["output_path"])
@@ -565,11 +617,13 @@ def build_stage_review_packets(project_root: str | Path, stage: str) -> list[dic
     outputs = conductor.get_stage_review_outputs(stage)
     packets: list[dict[str, Any]] = []
     subject_output = get_canonical_output_path(root, stage)
+    reviewer_memory = root / REVIEWER_MEMORY_REL
     base_inputs = [subject_output, *conductor.get_stage_input_docs(stage)]
     extra_expected = [
         root / "knowledge" / "M1" / "M1_source_log.yaml",
         root / "knowledge" / "M2" / "M2_source_log.yaml",
         root / "state" / "research_brief.yaml",
+        reviewer_memory,
     ]
     if stage == "M3S01":
         extra_expected.extend(
@@ -641,10 +695,12 @@ def build_stage_review_packets(project_root: str | Path, stage: str) -> list[dic
                 extra={
                     "stage": stage,
                     "subject_output": str(subject_output),
+                    "reviewer_memory_path": str(reviewer_memory),
                     "subagent_boundaries": REVIEWER_BOUNDARIES,
                     "after_completion": [
                         f"Ensure review exists: {output}",
                         "If this review already existed, confirm the same canonical review file was updated in place.",
+                        f"Update persistent reviewer concerns and resolved concerns in {reviewer_memory}.",
                         "Return verdict and the review path to the conductor.",
                     ],
                 },
@@ -679,6 +735,7 @@ def _build_m1s02_round_review_packets(root: Path, conductor: Conductor) -> list[
     subject_output = root / "knowledge" / "M1" / "M1S02_literature_deepdive.md"
     source_log = root / "knowledge" / "M1" / "M1_source_log.yaml"
     survey_memory = root / "state" / "survey_memory.yaml"
+    reviewer_memory = root / REVIEWER_MEMORY_REL
     packets: list[dict[str, Any]] = []
 
     for round_num, rel_output in M1S02_ROUND_REVIEW_OUTPUTS.items():
@@ -692,15 +749,17 @@ def _build_m1s02_round_review_packets(root: Path, conductor: Conductor) -> list[
                 role="survey_review",
                 agent_md=agent_md,
                 output_path=output,
-                input_docs=[subject_output, source_log, survey_memory],
+                input_docs=[subject_output, source_log, survey_memory, reviewer_memory],
                 extra={
                     "stage": "M1S02",
                     "round": round_num,
                     "subject_output": str(subject_output),
+                    "reviewer_memory_path": str(reviewer_memory),
                     "subagent_boundaries": REVIEWER_BOUNDARIES,
                     "after_completion": [
                         f"Ensure round review exists: {output}",
                         "If this round review already existed, confirm the same canonical review file was updated in place.",
+                        f"Update persistent reviewer concerns and resolved concerns in {reviewer_memory}.",
                         "Return verdict and the review path to the conductor.",
                     ],
                 },
@@ -722,6 +781,8 @@ def build_gate_review_packets(
 
     gate_stage = _gate_stage_for_id(gate_id)
     input_docs = conductor.get_stage_input_docs(gate_stage)
+    reviewer_memory = root / REVIEWER_MEMORY_REL
+    input_docs = _existing_or_expected([*[Path(path) for path in input_docs], reviewer_memory])
     if gate_id == "G3":
         input_docs = _existing_or_expected(
             [
@@ -752,10 +813,12 @@ def build_gate_review_packets(
                     "gate_stage": gate_stage,
                     "aggregate_output": str(aggregate_output),
                     "gate_rubric": rubric_block,
+                    "reviewer_memory_path": str(reviewer_memory),
                     "subagent_boundaries": REVIEWER_BOUNDARIES,
                     "after_completion": [
                         f"Ensure gate critic review exists: {output}",
                         "If this gate critic review already existed, confirm the same canonical review file was updated in place.",
+                        f"Update persistent reviewer concerns and resolved concerns in {reviewer_memory}.",
                         "Return verdict and the review path to the conductor.",
                         f"The conductor aggregates all critic reviews into {aggregate_output}.",
                         "Use only PASS, REVISE, REWORK, BACKTRACK, FIX, or HALT. Do not use CONDITIONAL.",
@@ -891,9 +954,37 @@ def render_subagent_prompt(packet: dict[str, Any]) -> str:
             "large_input_policy",
             "directory_policy",
             "worklog_path",
+            "event_log_path",
         ):
             value = policy.get(key, "")
             if value != "":
+                lines.append(f"- {key}: {value}")
+    runtime = packet.get("runtime_observability") or {}
+    if runtime:
+        lines.append("")
+        lines.append("Runtime observability:")
+        for key in (
+            "event_log_path",
+            "artifact_manifest_path",
+            "command_ledger_path",
+            "code_change_ledger_path",
+            "event_log_cli",
+            "artifact_manifest_cli",
+            "code_execution_ledger_cli",
+            "minimum_events",
+            "metadata_policy",
+            "code_work_policy",
+        ):
+            value = runtime.get(key, "")
+            if value != "":
+                lines.append(f"- {key}: {value}")
+    skill_discovery = packet.get("skill_discovery") or {}
+    if skill_discovery:
+        lines.append("")
+        lines.append("Skill discovery:")
+        for key in ("index_path", "index_cli", "canonical_root"):
+            value = skill_discovery.get(key, "")
+            if value:
                 lines.append(f"- {key}: {value}")
     lines.append("")
     lines.append("Input paths (read directly; do not rely on summaries):")
@@ -918,10 +1009,13 @@ def render_subagent_prompt(packet: dict[str, Any]) -> str:
             "if_target_exists",
             "forbid_alternate_outputs",
             "forbidden_suffixes",
+            "section_anchor_policy",
         ):
             value = write_policy.get(key, "")
             if value != "":
                 lines.append(f"- {key}: {value}")
+    if packet.get("reviewer_memory_path"):
+        lines.append(f"Reviewer memory path: {packet['reviewer_memory_path']}")
     if packet.get("aggregate_output"):
         lines.append(f"Gate aggregate path for conductor: {packet['aggregate_output']}")
     if packet.get("gate_rubric"):
@@ -1055,6 +1149,8 @@ def packet_to_markdown(packet: dict[str, Any]) -> str:
         lines.append(f"- role_spec: `{packet['role_spec']}`")
     if packet.get("agent_sections"):
         lines.append(f"- agent_sections: `{', '.join(packet['agent_sections'])}`")
+    if packet.get("reviewer_memory_path"):
+        lines.append(f"- reviewer_memory_path: `{packet['reviewer_memory_path']}`")
     resolution = packet.get("path_resolution") or PATH_RESOLUTION
     if resolution:
         lines.extend(["", "## Path Resolution", ""])
@@ -1078,6 +1174,16 @@ def packet_to_markdown(packet: dict[str, Any]) -> str:
     policy = packet.get("context_policy") or {}
     for key, value in policy.items():
         lines.append(f"- {key}: {value}")
+    runtime = packet.get("runtime_observability") or {}
+    if runtime:
+        lines.extend(["", "## Runtime Observability", ""])
+        for key, value in runtime.items():
+            lines.append(f"- {key}: {value}")
+    skill_discovery = packet.get("skill_discovery") or {}
+    if skill_discovery:
+        lines.extend(["", "## Skill Discovery", ""])
+        for key, value in skill_discovery.items():
+            lines.append(f"- {key}: {value}")
     lines.extend(["", "## Input Paths", ""])
     for path in packet.get("input_docs", []):
         lines.append(f"- `{path}`")
@@ -1125,6 +1231,88 @@ def packet_to_markdown(packet: dict[str, Any]) -> str:
 
 def packets_to_json(packets: list[dict[str, Any]]) -> str:
     return json.dumps(packets, ensure_ascii=False, indent=2)
+
+
+def build_dispatch_bundle(
+    project_root: str | Path,
+    packets: list[dict[str, Any]],
+    packet_paths: list[str | Path] | None = None,
+) -> dict[str, Any]:
+    """Build a parallel review bundle for stage-review or gate-review fan-out."""
+    if len(packets) <= 1:
+        return {}
+    task_types = {packet.get("task_type") for packet in packets}
+    if not task_types <= {"stage_review", "gate_review"}:
+        return {}
+
+    root = Path(project_root)
+    first = packets[0]
+    task_type = str(first.get("task_type", ""))
+    target = str(first.get("gate_id") or first.get("stage") or "review")
+    packet_refs: list[str] = []
+    if packet_paths:
+        packet_refs = [_packet_path_ref(path, root) for path in packet_paths]
+    else:
+        for packet in packets:
+            value = str(packet.get("packet_path", "") or "")
+            if value:
+                packet_refs.append(_packet_path_ref(value, root))
+
+    reviewers = [
+        {
+            "role": packet.get("role", ""),
+            "task_id": packet.get("task_id", ""),
+            "output_path": packet.get("output_path", ""),
+            "agent_md": packet.get("agent_md", ""),
+        }
+        for packet in packets
+    ]
+    bundle_type = "gate_review_parallel_bundle" if task_type == "gate_review" else "stage_review_parallel_bundle"
+    bundle: dict[str, Any] = {
+        "schema_version": "dispatch_bundle.v1",
+        "bundle_type": bundle_type,
+        "target": target,
+        "project_root": "project:.",
+        "parallel_execution": True,
+        "packet_paths": packet_refs,
+        "reviewers": reviewers,
+        "reviewer_memory_path": first.get("reviewer_memory_path", f"project:{REVIEWER_MEMORY_REL}"),
+        "dependency_policy": {
+            "may_run_in_parallel": True,
+            "aggregate_after_all_packets_complete": True,
+            "do_not_advance_on_partial_reviews": True,
+        },
+    }
+    if first.get("aggregate_output"):
+        bundle["aggregate_output"] = first.get("aggregate_output")
+    if first.get("gate_id"):
+        bundle["gate_id"] = first.get("gate_id")
+        bundle["gate_stage"] = first.get("gate_stage", "")
+    if first.get("stage"):
+        bundle["stage"] = first.get("stage")
+    return bundle
+
+
+def write_dispatch_bundle(
+    project_root: str | Path,
+    packets: list[dict[str, Any]],
+    packet_paths: list[str | Path],
+    *,
+    out_dir: str | Path | None = None,
+) -> Path | None:
+    bundle = build_dispatch_bundle(project_root, packets, packet_paths)
+    if not bundle:
+        return None
+    root = Path(project_root)
+    target_dir = Path(out_dir) if out_dir else root / "state" / "dispatch"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    target = _slug(str(bundle.get("target", "review")))
+    path = target_dir / f"{timestamp}_{target}_{bundle['bundle_type']}.json"
+    written = dict(bundle)
+    written["bundle_path"] = _packet_path_ref(path, root)
+    path.write_text(json.dumps(written, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def write_packets(

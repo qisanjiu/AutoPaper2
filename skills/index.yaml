@@ -1,0 +1,139 @@
+version: 1
+generated_at: '2026-06-09T22:11:37'
+canonical_root: skills/
+claude_mirror_root: .claude/skills/
+skills:
+- name: AutoPaper2_env_probe
+  path: skills/AutoPaper2_env_probe/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_env_probe/SKILL.md
+  skill_role: utility
+  argument_hint:
+  - 项目路径（可选）
+  description: AutoPaper2 环境探测与基础配置 Skill。 当项目部署到新环境、需要自动检测当前机器的 GPU/Python/CUDA/框架版本，
+    并自动填充 config/execution_env.yaml 时触发。 也用于项目迁移到新机器后重新探测环境。
+- name: AutoPaper2_m1_survey
+  path: skills/AutoPaper2_m1_survey/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_m1_survey/SKILL.md
+  skill_role: stage
+  argument_hint:
+  - 研究主题或现有项目路径
+  description: AutoPaper2 Module 1 (Domain Survey) 全流程执行 Skill。 当用户需要开始一个新的研究项目的领域调研阶段时触发，包括：
+    创建新项目 → M1S01 Topic Scoping → M1S02 3-Round 迭代搜索（含 Survey Review） → Gate G1（Coverage
+    + Logic Critic）→ M1S03-M1S05 Ideation → Handoff M1→M2。 默认行为是创建新项目；仅在用户明确指定进入现有项目时复用已有项目。
+- name: AutoPaper2_m2_method_design
+  path: skills/AutoPaper2_m2_method_design/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_m2_method_design/SKILL.md
+  skill_role: stage
+  argument_hint:
+  - 现有项目路径或项目名称
+  description: AutoPaper2 Module 2 (Method Design) 全流程执行 Skill。 当用户需要进入方法设计阶段时触发，包括：
+    前置检查 (M1 完成状态) → M2S01 Cross-Domain Search → M2S02 Migration Analysis → M2S03
+    Method Architecture Design → M2S04 Algorithm & Theory Design → M2S05 Experiment
+    Setup / Metric Protocol / M2→M3 Handoff → Gate G2（Logic + Method + Novelty Critic）。
+    仅在用户明确指定进入 M2 或 M1 完成后建议进入 M2 时触发。
+- name: AutoPaper2_m3_experiment
+  path: skills/AutoPaper2_m3_experiment/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_m3_experiment/SKILL.md
+  skill_role: stage
+  argument_hint:
+  - 现有项目路径或项目名称
+  description: AutoPaper2 Module 3 (Experiment Implementation & Execution) 全流程执行 Skill。
+    当用户需要进入实验执行阶段时触发，包括： 前置检查 (M2 完成状态) → M3S01 Main Experiment Design → M3S02 Dataset
+    & Environment Review / Setup → M3S03 Baseline Result Review → M3S04 Main Experiment
+    Result Review → M3S05 Result Validation Review & Evidence Packaging → Gate G3（Method
+    + Evidence Critic）→ Handoff M3→M4。 仅在用户明确指定进入 M3 或 M2 完成后建议进入 M3 时触发。
+- name: AutoPaper2_m4_deep_analysis
+  path: skills/AutoPaper2_m4_deep_analysis/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_m4_deep_analysis/SKILL.md
+  skill_role: stage
+  argument_hint:
+  - 现有项目路径或项目名称
+  description: AutoPaper2 Module 4 (Deep Analysis) 全流程执行 Skill。 当用户需要进入深度分析阶段时触发，包括：
+    前置检查 (M3 完成状态) → M4S01 Post-Experiment Audit & Findings Consolidation → M4S02
+    Deep Analysis Experiment Design → M4S03 Deep Analysis Experiment Execution → M4S04
+    Analysis Results Integration & Evidence Packaging → Gate G4（Logic + Evidence +
+    Novelty Critic）→ Handoff M4→M5。 仅在用户明确指定进入 M4 或 M3 完成后建议进入 M4 时触发。
+- name: AutoPaper2_m5_writing
+  path: skills/AutoPaper2_m5_writing/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_m5_writing/SKILL.md
+  skill_role: stage
+  argument_hint:
+  - 现有项目路径或项目名称
+  description: AutoPaper2 Module 5 (Writing & Finalization) 全流程执行 Skill。 当用户需要进入论文写作与定稿阶段时触发，包括：
+    前置检查 (M4 完成状态) → M5S01 Pre-Write Audit → M5S02 Paper Outline → M5S04 Methodology
+    → M5S05 Experiments & Results → M5S06 Analysis & Discussion → M5S03 Introduction
+    & Related Work → M5S07 Abstract & Conclusion → M5S08 Full Draft Assembly & Compilation
+    → M5S09 Full-Polish & Narrative Coherence Review → Gate G5（Logic + Writing + Evidence
+    + Novelty + Ethics Critic） → 可选 Peer Review Simulation → Handoff M5→投稿/归档。 M5S01
+    还会筛选高水平相近论文作为风格参照；M5S02 负责蒸馏出 Style & Layout Profile 和 Figure Style Profile。 每个
+    Stage 完成后必须先通过对应 stage reviewer，再推进到下一个 Stage。 仅在用户明确指定进入 M5 或 M4 完成后建议进入 M5 时触发。
+- name: AutoPaper2_m6_submission_review
+  path: skills/AutoPaper2_m6_submission_review/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_m6_submission_review/SKILL.md
+  skill_role: stage
+  argument_hint:
+  - 现有项目路径或项目名称
+  description: AutoPaper2 Module 6 (Submission Review & Revision Loop) 全流程执行 Skill。
+    当用户需要进入最终审稿与回溯修正阶段时触发，包括： 前置检查 (M5 完成状态) → M6S01 投稿前审计与包组装 → M6S01 内部严审（多 reviewer，≥8/10
+    且 High 未解决项为 0） → M6S02 外部审稿提交 (paperreview.ai) → M6S03 审稿意见接收与解析 (IMAP 邮箱监控)
+    → M6S04 回溯规划与 Rebuttal 策略 → M6S05 修订执行 (跨模块回溯) → M6S06 修订验证与完成判定 → Gate G6（Logic
+    + Evidence + Writing + Resolution Critic） → Handoff M6→归档/投稿。 仅在用户明确指定进入 M6 或
+    M5 完成后建议进入 M6 时触发。
+- name: AutoPaper2_manual_import
+  path: skills/AutoPaper2_manual_import/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_manual_import/SKILL.md
+  skill_role: utility
+  argument_hint:
+  - 文献路径/数据集路径/项目路径
+  description: AutoPaper2 手动资源导入 Skill。 当用户需要向框架的公共资源池中手动添加文献或数据集时触发。 支持两种资源类型： 1.
+    文献 → 导入公共文献数据库（SQLite + FTS5） 2. 数据集 → 注册到公共数据集缓存（data/datasets/）
+- name: AutoPaper2_project_auto_run
+  path: skills/AutoPaper2_project_auto_run/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_project_auto_run/SKILL.md
+  skill_role: orchestrator
+  argument_hint: '[项目名/路径] [可选：起始stage]'
+  description: '> AutoPaper2 项目级端到端自动运行 Skill。 当用户要求从头到尾自动执行、全自动推进项目、或继续自动运行时触发。 主
+    Agent 负责循环编排：读取状态 → 委派 subagent 执行 stage → 触发 review → 处理 verdict → 推进或回溯。'
+- name: AutoPaper2_project_backtrack
+  path: skills/AutoPaper2_project_backtrack/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_project_backtrack/SKILL.md
+  skill_role: orchestrator
+  argument_hint: '[项目名/路径] [stage或回溯意见]'
+  description: '> AutoPaper2 项目级回溯与修订 Skill。 当用户需要回溯到某个 stage、重新执行某个 stage、修订产出、或根据意见回退时触发。
+    主 Agent 只做编排；stage 选择、回溯决策、重新执行均由 subagent 完成。'
+- name: AutoPaper2_project_onboarding
+  path: skills/AutoPaper2_project_onboarding/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_project_onboarding/SKILL.md
+  skill_role: orchestrator
+  argument_hint:
+  - 项目路径
+  description: AutoPaper2 项目创建后的 Onboarding（入项配置）Skill。 当项目刚被创建、或项目从其他环境迁移过来时触发。 负责暂停流程，要求用户确认并补全项目配置（SSH、作者、环境、数据集等），
+    用户确认 "已填写" 后才允许继续执行 M1 及后续模块。
+- name: AutoPaper2_project_router
+  path: skills/AutoPaper2_project_router/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_project_router/SKILL.md
+  skill_role: orchestrator
+  argument_hint: '[项目名/路径] [模块名或stage]'
+  description: '> AutoPaper2 项目级通用路由 Skill。 当用户需要在指定项目中运行指定模块、切换项目、或定位到某个项目的某个 stage
+    时触发。 负责项目定位、前置依赖检查、模块入口设置，然后将执行权交给对应模块级 Skill。'
+- name: AutoPaper2_ssh_ops
+  path: skills/AutoPaper2_ssh_ops/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_ssh_ops/SKILL.md
+  skill_role: orchestrator
+  argument_hint:
+  - server|lease|probe|doctor|sync|project path
+  description: AutoPaper2 SSH server registry and remote execution infrastructure
+    skill. Use when the user wants to add/list/probe SSH servers, allocate a managed
+    server lease to a project, prepare remote workspaces, sync project files, or route
+    SSH operations to the dedicated SSH Ops subagent.
+- name: AutoPaper2_ssh_server_onboarding
+  path: skills/AutoPaper2_ssh_server_onboarding/SKILL.md
+  mirror_path: .claude/skills/AutoPaper2_ssh_server_onboarding/SKILL.md
+  skill_role: orchestrator
+  argument_hint:
+  - new server id / host / user
+  description: Guided AutoPaper2 SSH server creation skill. Use when the user wants
+    to add a new remote server/GPU machine to the AutoPaper2 SSH server library, collect
+    required host/user/port/password bootstrap/resource metadata, push a dedicated
+    SSH key, validate SSH login, probe remote GPU/software capabilities, scan stored
+    datasets, and show how to allocate the server to future projects.

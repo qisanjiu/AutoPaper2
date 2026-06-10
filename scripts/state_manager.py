@@ -1701,14 +1701,16 @@ def cmd_dispatch(
         packet_to_markdown,
         packets_to_json,
         render_compact_launch_prompt,
+        write_dispatch_bundle,
         write_packets,
     )
 
     packets = build_packets(project_dir, scope, target or None)
     if write:
         paths = write_packets(project_dir, packets, fmt=fmt, out_dir=out_dir or None)
+        bundle_path = write_dispatch_bundle(project_dir, packets, paths, out_dir=out_dir or None)
         print("[DISPATCH] Wrote subagent packet(s):")
-        for packet, path in zip(packets, paths):
+        for packet, path in zip(packets, paths, strict=True):
             try:
                 display_path = path.resolve().relative_to(Path.cwd().resolve())
             except ValueError:
@@ -1719,6 +1721,12 @@ def cmd_dispatch(
             print("  Compact subagent launch prompt:")
             for line in render_compact_launch_prompt(packet, display_path).rstrip().splitlines():
                 print(f"    {line}")
+        if bundle_path:
+            try:
+                bundle_display = bundle_path.resolve().relative_to(Path.cwd().resolve())
+            except ValueError:
+                bundle_display = Path(os.path.relpath(bundle_path.resolve(), Path.cwd().resolve()))
+            print(f"  Parallel review bundle: {bundle_display}")
         print("  Pass only the compact launch prompt/packet path to the matching subagent.")
         print("  Do not paste the parent conversation or upstream document contents into the subagent prompt.")
         print("  Main agent must not write stage/review content directly.")

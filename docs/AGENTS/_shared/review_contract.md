@@ -35,10 +35,16 @@ Every `REVISE`, `BACKTRACK`, `FIX`, or `REWORK` review must include:
 - Do not invent line-level patches, function calls, signatures, config values, commands, or exact code edits unless the corresponding code/config path was directly checked and is listed in `Evidence Checked` or `evidence_paths`.
 - For suspected implementation bugs observed only through result Markdown, write `required_fix` as inspect -> verify root cause -> repair -> add evidence/tests -> rerun downstream, not as an unverified patch.
 
+## Reviewer Memory
+- If the packet includes `reviewer_memory_path`, read it before reviewing and update it after reviewing.
+- Use reviewer memory only for durable concerns, resolved concerns, venue pressure points, repeat failure patterns, and cross-round calibration. Do not use it as a substitute for reading current evidence paths.
+- Reviewer memory must not contain secrets, private review emails, or unredacted credentials.
+
 ## Review Output Location
 - Write the review only to packet `output_path`.
 - If re-reviewing after a backtrack or human revision, overwrite/update the same canonical review file in place.
 - Do not create alternate review files such as `_v2`, `_new`, `_revised`, `_revision`, `_backtrack`, `_fixed`, `_updated`, `_draft`, or `_copy`.
+- The only shared sidecar file reviewers may update is packet `reviewer_memory_path`, when present.
 
 ## Review Output Skeleton
 ```markdown

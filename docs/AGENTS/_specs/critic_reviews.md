@@ -5,6 +5,8 @@ Use `docs/AGENTS/_shared/review_contract.md` for verdict schema. Read only the s
 ## evidence_boundary
 Reviewer advice must be grounded in files actually checked. If you only inspected Markdown reports, write task-level repair advice: route to the owning stage, name the suspected symptom, require the executor to inspect/verify/repair the implementation or protocol, specify success criteria/evidence, and rerun downstream. Do not prescribe exact code lines, function calls, signatures, config values, or shell commands unless the relevant code/config/log path was directly read and listed in `Evidence Checked` or `evidence_paths`.
 
+For code-writing, experiment-running, analysis-running, or paper-build stages, inspect packet runtime ledgers when present: `command_ledger_path`, `code_change_ledger_path`, artifact manifest, stdout/stderr log paths, patch paths, changed-file hashes, and validation summaries. Treat missing ledgers as an evidence gap when the stage claims code was changed or commands were run.
+
 ## source_log_validator
 Validate M1/M2 source logs: required top-level keys, stable ids, credibility, discovery source/query, gap/solution maps, search statistics, query ledger, and no uncited literature claims. Prefer existing validator scripts when available.
 
