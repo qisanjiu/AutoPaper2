@@ -107,6 +107,26 @@ class TestSurveyMemoryIntegration(unittest.TestCase):
             date="2023-07",
             credibility_score=4,
             limitations_noted=["small dataset"],
+            artifacts=[
+                {
+                    "artifact_id": "manual-artifact",
+                    "artifact_type": "pdf",
+                    "uri": "https://example.org/test.pdf",
+                    "status": "failed",
+                    "failure_reason": "download blocked",
+                    "recovery_actions": ["use abstract"],
+                }
+            ],
+            parse_profile={
+                "metadata_status": "complete",
+                "fulltext_status": "metadata_only",
+                "parse_status": "partial",
+                "parse_backend": "abstract_only",
+                "extraction_sources": ["abstract"],
+                "missing_fields": ["experiment_setup"],
+                "section_summaries": {"method": "test method"},
+                "downstream_signals": {"M2": {}, "M3": {}, "M4": {}, "M5": {}},
+            },
         )
         memory.add_source(src)
         sm.save(memory)
@@ -114,10 +134,14 @@ class TestSurveyMemoryIntegration(unittest.TestCase):
         result = sm.import_sources_to_public_db(list(memory.source_registry.values()))
         self.assertEqual(result["imported"], 1)
         self.assertEqual(result["merged"], 0)
+        self.assertEqual(result["artifacts"], 1)
+        self.assertEqual(result["extractions"], 1)
 
         paper = self.public_db.get_paper("smith2023test")
         self.assertIsNotNone(paper)
         self.assertEqual(paper.credibility_score, 4)
+        self.assertEqual(self.public_db.list_artifacts("smith2023test")[0].status, "failed")
+        self.assertEqual(self.public_db.get_extraction("smith2023test").parse_status, "partial")
 
     def test_import_merge_existing(self):
         """Re-importing same source should merge instead of duplicate."""

@@ -9,9 +9,15 @@ sources:
     venue: "{{venue}}"
     date: "{{YYYY-MM}}"
     url: "{{url}}"
+    pdf_url: "{{pdf_url}}"
     type: academic
     credibility: {{1-5}}
     verification: confirmed
+    identifiers:
+      doi: "{{doi}}"
+      arxiv_id: "{{arxiv_id}}"
+      semantic_scholar_id: "{{s2_id}}"
+      dblp_id: "{{dblp_id}}"
     key_claims: ["{{claim_id}}"]
     limitations_noted: ["{{limitation1}}", "{{limitation2}}"]
     code_availability: open_source / broken / closed
@@ -25,6 +31,49 @@ sources:
     # Discovery tracking
     discovery_source: public_db   # public_db | web_search | citation_chain | recommendation
     discovery_query: "{{search_query_used}}"
+    discovery_records:
+      - search_surface: public_db
+        query_text: "{{search_query_used}}"
+        result_rank: {{rank}}
+        result_url: "{{url}}"
+        screened_status: retained
+        retained_reason: "{{why shortlisted for method transfer}}"
+    artifacts:
+      - artifact_type: pdf   # pdf | html | abstract | bibtex | source_tex | supplement
+        uri: "{{pdf_or_html_url}}"
+        local_path: "{{project_relative_path_if_downloaded}}"
+        status: available    # available | unavailable | failed | pending | skipped | unknown
+        sha256: "{{sha256_if_local}}"
+        failure_reason: "{{if status is failed/unavailable/skipped}}"
+        recovery_actions:
+          - "{{metadata fallback, alternate mirror, abstract-only parse, manual review}}"
+        license_note: "{{open access / user-provided / metadata-only}}"
+    parse_profile:
+      metadata_status: complete     # complete | partial | missing
+      fulltext_status: parsed       # parsed | metadata_only | unreadable | not_available
+      parse_status: complete        # complete | partial | blocked | not_attempted
+      parse_backend: "{{grobid|pdftotext|publisher_html|arxiv_source|abstract_only|source_log_card}}"
+      extraction_sources: ["pdf", "abstract", "metadata"]
+      missing_fields: []
+      section_summaries:
+        method: "{{method/mechanism slice for M2}}"
+        experiment_setup: "{{dataset, metrics, baselines, protocol for M3}}"
+        results: "{{key numeric/qualitative results}}"
+        analysis: "{{ablation/mechanism/robustness/failure signals for M4}}"
+      downstream_signals:
+        M2:
+          method_reference: true
+          core_mechanism: "{{core mechanism}}"
+        M3:
+          experiment_protocol: true
+          datasets_metrics_baselines: "{{setup transferable to our experiments}}"
+        M4:
+          analysis_patterns: true
+          analysis: "{{analysis patterns to reuse}}"
+        M5:
+          citation_ready: true
+          writing_context: "{{related-work/method wording context}}"
+      confidence: high
     # Paper details for deep analysis (populated for shortlisted papers)
     abstract: "{{abstract}}"
     problem_statement: "{{problem_summary}}"

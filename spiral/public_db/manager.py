@@ -20,6 +20,9 @@ from .merge import MergePolicy, merge_papers, deserialize_limitations, serialize
 from .models import (
     Claim,
     DomainTag,
+    LiteratureArtifact,
+    LiteratureDiscovery,
+    LiteratureExtraction,
     LimitationEntry,
     Paper,
     PaperIdentifiers,
@@ -179,6 +182,7 @@ class PublicLiteratureDB:
                 ),
             )
             self._sync_identifiers(conn, paper)
+            self._upsert_extraction_from_paper(conn, paper)
 
         # Auto-tagging
         if auto_tag if auto_tag is not None else self.config.auto_tagging:
@@ -275,6 +279,7 @@ class PublicLiteratureDB:
                 ),
             )
             self._sync_identifiers(conn, merged)
+            self._upsert_extraction_from_paper(conn, merged)
 
         logger.debug("Updated paper %s", merged.paper_id)
         return merged.paper_id
@@ -305,6 +310,308 @@ class PublicLiteratureDB:
         """Return total number of papers in the database."""
         self._ensure_init()
         return self.db.fetchval("SELECT COUNT(*) FROM papers") or 0
+
+    def count_artifacts(self, status: str | None = None, artifact_type: str | None = None) -> int:
+        """Return the number of artifact acquisition records."""
+        self._ensure_init()
+        conditions: list[str] = []
+        params: list[Any] = []
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+        if artifact_type:
+            conditions.append("artifact_type = ?")
+            params.append(artifact_type)
+        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+        return self.db.fetchval(f"SELECT COUNT(*) FROM literature_artifacts{where_clause}", tuple(params)) or 0
+
+    def count_extractions(self, parse_status: str | None = None) -> int:
+        """Return the number of structured parse profiles."""
+        self._ensure_init()
+        if parse_status:
+            return self.db.fetchval(
+                "SELECT COUNT(*) FROM literature_extractions WHERE parse_status = ?",
+                (parse_status,),
+            ) or 0
+        return self.db.fetchval("SELECT COUNT(*) FROM literature_extractions") or 0
+
+    def count_discoveries(self) -> int:
+        """Return the number of retained/search discovery records."""
+        self._ensure_init()
+        return self.db.fetchval("SELECT COUNT(*) FROM literature_discovery") or 0
+
+    # ------------------------------------------------------------------
+    # Literature ingestion provenance
+    # ------------------------------------------------------------------
+
+    def upsert_discovery(self, discovery: LiteratureDiscovery) -> str:
+        """Record where a paper was found and how it was screened."""
+        self._ensure_init()
+        if not discovery.discovery_id:
+            discovery.discovery_id = self._make_discovery_id(discovery)
+        discovery.discovered_at = discovery.discovered_at or datetime.now().isoformat()
+        self.db.execute(
+            """
+            INSERT INTO literature_discovery (
+                discovery_id, paper_id, search_surface, query_text, result_rank,
+                result_url, metadata_source, discovered_at, screened_status,
+                retained_reason, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(discovery_id) DO UPDATE SET
+                paper_id = excluded.paper_id,
+                search_surface = excluded.search_surface,
+                query_text = excluded.query_text,
+                result_rank = excluded.result_rank,
+                result_url = excluded.result_url,
+                metadata_source = excluded.metadata_source,
+                discovered_at = excluded.discovered_at,
+                screened_status = excluded.screened_status,
+                retained_reason = excluded.retained_reason,
+                notes = excluded.notes
+            """,
+            (
+                discovery.discovery_id,
+                discovery.paper_id,
+                discovery.search_surface,
+                discovery.query_text,
+                discovery.result_rank,
+                discovery.result_url,
+                discovery.metadata_source,
+                discovery.discovered_at,
+                discovery.screened_status,
+                discovery.retained_reason,
+                discovery.notes,
+            ),
+        )
+        return discovery.discovery_id
+
+    def list_discoveries(self, paper_id: str | None = None, limit: int = 100) -> list[LiteratureDiscovery]:
+        """List discovery provenance records, newest first."""
+        self._ensure_init()
+        if paper_id:
+            rows = self.db.fetchall(
+                """
+                SELECT * FROM literature_discovery
+                WHERE paper_id = ?
+                ORDER BY discovered_at DESC
+                LIMIT ?
+                """,
+                (paper_id, limit),
+            )
+        else:
+            rows = self.db.fetchall(
+                """
+                SELECT * FROM literature_discovery
+                ORDER BY discovered_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        return [self._row_to_discovery(row) for row in rows]
+
+    def upsert_artifact(self, artifact: LiteratureArtifact) -> str:
+        """Record PDF/HTML/BibTeX acquisition status for a paper."""
+        self._ensure_init()
+        if not artifact.artifact_id:
+            artifact.artifact_id = self._make_artifact_id(artifact)
+        artifact.attempted_at = artifact.attempted_at or datetime.now().isoformat()
+        artifact.updated_at = artifact.updated_at or datetime.now().isoformat()
+        self.db.execute(
+            """
+            INSERT INTO literature_artifacts (
+                artifact_id, paper_id, artifact_type, uri, local_path, status, sha256,
+                attempted_at, updated_at, failure_reason, recovery_actions,
+                license_note, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(artifact_id) DO UPDATE SET
+                paper_id = excluded.paper_id,
+                artifact_type = excluded.artifact_type,
+                uri = excluded.uri,
+                local_path = excluded.local_path,
+                status = excluded.status,
+                sha256 = excluded.sha256,
+                attempted_at = excluded.attempted_at,
+                updated_at = excluded.updated_at,
+                failure_reason = excluded.failure_reason,
+                recovery_actions = excluded.recovery_actions,
+                license_note = excluded.license_note,
+                notes = excluded.notes
+            """,
+            (
+                artifact.artifact_id,
+                artifact.paper_id,
+                artifact.artifact_type,
+                artifact.uri,
+                artifact.local_path,
+                artifact.status,
+                artifact.sha256,
+                artifact.attempted_at,
+                artifact.updated_at,
+                artifact.failure_reason,
+                json.dumps(artifact.recovery_actions, ensure_ascii=False),
+                artifact.license_note,
+                artifact.notes,
+            ),
+        )
+        return artifact.artifact_id
+
+    def list_artifacts(
+        self,
+        paper_id: str | None = None,
+        *,
+        status: str | None = None,
+        artifact_type: str | None = None,
+        limit: int = 100,
+    ) -> list[LiteratureArtifact]:
+        """List artifact acquisition records."""
+        self._ensure_init()
+        conditions: list[str] = []
+        params: list[Any] = []
+        if paper_id:
+            conditions.append("paper_id = ?")
+            params.append(paper_id)
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+        if artifact_type:
+            conditions.append("artifact_type = ?")
+            params.append(artifact_type)
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+        rows = self.db.fetchall(
+            f"""
+            SELECT * FROM literature_artifacts
+            {where_clause}
+            ORDER BY updated_at DESC, attempted_at DESC
+            LIMIT ?
+            """,
+            tuple(params + [limit]),
+        )
+        return [self._row_to_artifact(row) for row in rows]
+
+    def upsert_extraction(self, extraction: LiteratureExtraction) -> str:
+        """Record structured parsed content and downstream-module readiness."""
+        self._ensure_init()
+        if not extraction.paper_id:
+            raise ValueError("LiteratureExtraction.paper_id is required")
+        extraction.parsed_at = extraction.parsed_at or datetime.now().isoformat()
+        self.db.execute(
+            """
+            INSERT INTO literature_extractions (
+                paper_id, metadata_status, fulltext_status, parse_status, parse_backend,
+                parsed_at, extraction_sources, missing_fields, section_summaries,
+                downstream_signals, confidence, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(paper_id) DO UPDATE SET
+                metadata_status = excluded.metadata_status,
+                fulltext_status = excluded.fulltext_status,
+                parse_status = excluded.parse_status,
+                parse_backend = excluded.parse_backend,
+                parsed_at = excluded.parsed_at,
+                extraction_sources = excluded.extraction_sources,
+                missing_fields = excluded.missing_fields,
+                section_summaries = excluded.section_summaries,
+                downstream_signals = excluded.downstream_signals,
+                confidence = excluded.confidence,
+                notes = excluded.notes
+            """,
+            (
+                extraction.paper_id,
+                extraction.metadata_status,
+                extraction.fulltext_status,
+                extraction.parse_status,
+                extraction.parse_backend,
+                extraction.parsed_at,
+                json.dumps(extraction.extraction_sources, ensure_ascii=False),
+                json.dumps(extraction.missing_fields, ensure_ascii=False),
+                json.dumps(extraction.section_summaries, ensure_ascii=False),
+                json.dumps(extraction.downstream_signals, ensure_ascii=False),
+                extraction.confidence,
+                extraction.notes,
+            ),
+        )
+        return extraction.paper_id
+
+    def get_extraction(self, paper_id: str) -> LiteratureExtraction | None:
+        """Retrieve a paper's structured parse profile."""
+        self._ensure_init()
+        row = self.db.fetchone(
+            "SELECT * FROM literature_extractions WHERE paper_id = ?",
+            (paper_id,),
+        )
+        return self._row_to_extraction(row) if row else None
+
+    def list_extractions(
+        self,
+        *,
+        parse_status: str | None = None,
+        metadata_status: str | None = None,
+        limit: int = 100,
+    ) -> list[LiteratureExtraction]:
+        """List parse profiles, optionally filtered by status."""
+        self._ensure_init()
+        conditions: list[str] = []
+        params: list[Any] = []
+        if parse_status:
+            conditions.append("parse_status = ?")
+            params.append(parse_status)
+        if metadata_status:
+            conditions.append("metadata_status = ?")
+            params.append(metadata_status)
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+        rows = self.db.fetchall(
+            f"""
+            SELECT * FROM literature_extractions
+            {where_clause}
+            ORDER BY parsed_at DESC
+            LIMIT ?
+            """,
+            tuple(params + [limit]),
+        )
+        return [self._row_to_extraction(row) for row in rows]
+
+    def ingestion_summary(self) -> dict[str, Any]:
+        """Return high-level acquisition/parse health metrics for the public DB."""
+        self._ensure_init()
+        artifact_rows = self.db.fetchall(
+            """
+            SELECT artifact_type, status, COUNT(*) AS count
+            FROM literature_artifacts
+            GROUP BY artifact_type, status
+            ORDER BY artifact_type, status
+            """
+        )
+        extraction_rows = self.db.fetchall(
+            """
+            SELECT parse_status, COUNT(*) AS count
+            FROM literature_extractions
+            GROUP BY parse_status
+            ORDER BY parse_status
+            """
+        )
+        missing_rows = self.db.fetchall(
+            """
+            SELECT metadata_status, COUNT(*) AS count
+            FROM literature_extractions
+            GROUP BY metadata_status
+            ORDER BY metadata_status
+            """
+        )
+        return {
+            "papers": self.count_papers(),
+            "discoveries": self.count_discoveries(),
+            "artifacts": [
+                {"artifact_type": row["artifact_type"], "status": row["status"], "count": row["count"]}
+                for row in artifact_rows
+            ],
+            "extractions": [
+                {"parse_status": row["parse_status"], "count": row["count"]}
+                for row in extraction_rows
+            ],
+            "metadata": [
+                {"metadata_status": row["metadata_status"], "count": row["count"]}
+                for row in missing_rows
+            ],
+        }
 
     # ------------------------------------------------------------------
     # Deduplication
@@ -894,6 +1201,191 @@ class PublicLiteratureDB:
             last_updated_at=row["last_updated_at"],
             survey_count=row["survey_count"],
             citation_count=row["citation_count"],
+        )
+
+    def _row_to_discovery(self, row: Any) -> LiteratureDiscovery:
+        """Convert a sqlite3.Row to a LiteratureDiscovery dataclass."""
+        return LiteratureDiscovery(
+            discovery_id=row["discovery_id"],
+            paper_id=row["paper_id"],
+            search_surface=row["search_surface"],
+            query_text=row["query_text"],
+            result_rank=row["result_rank"],
+            result_url=row["result_url"],
+            metadata_source=row["metadata_source"],
+            discovered_at=row["discovered_at"],
+            screened_status=row["screened_status"],
+            retained_reason=row["retained_reason"],
+            notes=row["notes"],
+        )
+
+    def _row_to_artifact(self, row: Any) -> LiteratureArtifact:
+        """Convert a sqlite3.Row to a LiteratureArtifact dataclass."""
+        return LiteratureArtifact(
+            artifact_id=row["artifact_id"],
+            paper_id=row["paper_id"],
+            artifact_type=row["artifact_type"],
+            uri=row["uri"],
+            local_path=row["local_path"],
+            status=row["status"],
+            sha256=row["sha256"],
+            attempted_at=row["attempted_at"],
+            updated_at=row["updated_at"],
+            failure_reason=row["failure_reason"],
+            recovery_actions=json.loads(row["recovery_actions"] or "[]"),
+            license_note=row["license_note"],
+            notes=row["notes"],
+        )
+
+    def _row_to_extraction(self, row: Any) -> LiteratureExtraction:
+        """Convert a sqlite3.Row to a LiteratureExtraction dataclass."""
+        return LiteratureExtraction(
+            paper_id=row["paper_id"],
+            metadata_status=row["metadata_status"],
+            fulltext_status=row["fulltext_status"],
+            parse_status=row["parse_status"],
+            parse_backend=row["parse_backend"],
+            parsed_at=row["parsed_at"],
+            extraction_sources=json.loads(row["extraction_sources"] or "[]"),
+            missing_fields=json.loads(row["missing_fields"] or "[]"),
+            section_summaries=json.loads(row["section_summaries"] or "{}"),
+            downstream_signals=json.loads(row["downstream_signals"] or "{}"),
+            confidence=row["confidence"],
+            notes=row["notes"],
+        )
+
+    @staticmethod
+    def _make_discovery_id(discovery: LiteratureDiscovery) -> str:
+        raw = "|".join(
+            [
+                discovery.paper_id,
+                discovery.search_surface,
+                discovery.query_text,
+                discovery.result_url,
+                str(discovery.result_rank),
+            ]
+        )
+        import hashlib
+
+        return "disc:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    @staticmethod
+    def _make_artifact_id(artifact: LiteratureArtifact) -> str:
+        raw = "|".join(
+            [
+                artifact.paper_id,
+                artifact.artifact_type,
+                artifact.uri,
+                artifact.local_path,
+            ]
+        )
+        import hashlib
+
+        return "art:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    @staticmethod
+    def _paper_missing_fields(paper: Paper) -> list[str]:
+        fields = []
+        for attr in ("title", "authors", "venue", "year", "url", "abstract", "method_summary"):
+            value = getattr(paper, attr)
+            if value in ("", 0, [], None):
+                fields.append(attr)
+        return fields
+
+    def _upsert_extraction_from_paper(self, conn: Any, paper: Paper) -> None:
+        """Keep a baseline parse profile for metadata-only imports."""
+        missing_fields = self._paper_missing_fields(paper)
+        if paper.method_summary and paper.key_results and paper.abstract:
+            parse_status = "partial"
+            metadata_status = "complete" if not missing_fields else "partial"
+        elif paper.title and (paper.abstract or paper.method_summary):
+            parse_status = "partial"
+            metadata_status = "partial"
+        else:
+            parse_status = "not_attempted"
+            metadata_status = "partial" if paper.title else "missing"
+
+        row = conn.execute(
+            "SELECT parse_status FROM literature_extractions WHERE paper_id = ?",
+            (paper.paper_id,),
+        ).fetchone()
+        if row and row["parse_status"] == "complete":
+            return
+
+        downstream_signals = {
+            "M2": {"method_reference": bool(paper.method_summary), "method_summary": paper.method_summary},
+            "M3": {"experiment_protocol": False, "basis": ""},
+            "M4": {"analysis_patterns": bool(paper.key_results), "basis": paper.key_results},
+            "M5": {"citation_ready": bool(paper.title and paper.authors), "bibtex_ready": bool(paper.identifiers.doi or paper.identifiers.arxiv_id)},
+        }
+        section_summaries = {
+            "abstract": paper.abstract,
+            "problem": paper.problem_statement,
+            "method": paper.method_summary,
+            "results": paper.key_results,
+            "limitations": [lim.limitation for lim in paper.limitations_noted],
+        }
+        conn.execute(
+            """
+            INSERT INTO literature_extractions (
+                paper_id, metadata_status, fulltext_status, parse_status, parse_backend,
+                parsed_at, extraction_sources, missing_fields, section_summaries,
+                downstream_signals, confidence, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(paper_id) DO UPDATE SET
+                metadata_status = CASE
+                    WHEN literature_extractions.metadata_status = 'complete' THEN literature_extractions.metadata_status
+                    ELSE excluded.metadata_status
+                END,
+                fulltext_status = CASE
+                    WHEN literature_extractions.fulltext_status IN ('parsed', 'parsed_fulltext') THEN literature_extractions.fulltext_status
+                    ELSE excluded.fulltext_status
+                END,
+                parse_status = CASE
+                    WHEN literature_extractions.parse_status = 'complete' THEN literature_extractions.parse_status
+                    ELSE excluded.parse_status
+                END,
+                parse_backend = CASE
+                    WHEN literature_extractions.parse_backend != '' THEN literature_extractions.parse_backend
+                    ELSE excluded.parse_backend
+                END,
+                parsed_at = excluded.parsed_at,
+                extraction_sources = CASE
+                    WHEN literature_extractions.parse_status = 'complete' THEN literature_extractions.extraction_sources
+                    ELSE excluded.extraction_sources
+                END,
+                missing_fields = excluded.missing_fields,
+                section_summaries = CASE
+                    WHEN literature_extractions.parse_status = 'complete' THEN literature_extractions.section_summaries
+                    ELSE excluded.section_summaries
+                END,
+                downstream_signals = CASE
+                    WHEN literature_extractions.parse_status = 'complete' THEN literature_extractions.downstream_signals
+                    ELSE excluded.downstream_signals
+                END,
+                confidence = CASE
+                    WHEN literature_extractions.confidence = 'high' THEN literature_extractions.confidence
+                    ELSE excluded.confidence
+                END,
+                notes = CASE
+                    WHEN literature_extractions.notes != '' THEN literature_extractions.notes
+                    ELSE excluded.notes
+                END
+            """,
+            (
+                paper.paper_id,
+                metadata_status,
+                "metadata_only",
+                parse_status,
+                "metadata_import",
+                datetime.now().isoformat(),
+                json.dumps(["metadata"], ensure_ascii=False),
+                json.dumps(missing_fields, ensure_ascii=False),
+                json.dumps(section_summaries, ensure_ascii=False),
+                json.dumps(downstream_signals, ensure_ascii=False),
+                "medium" if parse_status == "partial" else "low",
+                "Auto-created from paper metadata; replace with full-text parse when PDF/HTML is readable.",
+            ),
         )
 
     def _sync_identifiers(self, conn, paper: Paper) -> None:

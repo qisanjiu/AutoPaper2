@@ -1,8 +1,8 @@
 # AutoPaper2 公共文献数据库设计方案
 
-> **状态**: 设计文档（未实现）  
+> **状态**: 已实现核心 SQLite 公共库，并扩展了检索/采集/解析/入库状态表
 > **目标**: 打通项目间文献数据孤岛，实现跨项目文献复用与去重  
-> **范围**: Schema 设计、标签体系、查询复用流程、集成方案
+> **范围**: Schema 设计、标签体系、查询复用流程、PDF/HTML/BibTeX 工件采集状态、解析 profile、下游模块信号、集成方案
 
 ---
 
@@ -61,6 +61,10 @@ projects/
 │  │  claims     │  │  paper_tags │  │  query_cache            │  │
 │  │  声明知识表  │  │  文献标签关联│  │  查询缓存               │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│  ┌────────────────────┐ ┌────────────────────┐ ┌──────────────┐ │
+│  │ literature_discovery│ │ literature_artifacts│ │ extractions  │ │
+│  │ 检索发现与筛选      │ │ PDF/HTML/BibTeX状态 │ │ 解析和下游信号│ │
+│  └────────────────────┘ └────────────────────┘ └──────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
                               │ YAML/JSON 存储（第一阶段）
@@ -246,6 +250,61 @@ query_cache:
       - paper_id: "wu2021autoformer"
         rank: 2
     total_hits: 47
+```
+
+#### `literature_discovery` — 检索发现与筛选记录
+
+```yaml
+literature_discovery:
+  - discovery_id: "disc:..."
+    paper_id: "vaswani2017attention"
+    search_surface: "Semantic Scholar"
+    query_text: "transformer sequence modeling"
+    result_rank: 1
+    result_url: "https://..."
+    metadata_source: "Semantic Scholar + Crossref"
+    screened_status: "retained"          # retained | rejected | duplicate | pending
+    retained_reason: "foundational method and baseline comparator"
+```
+
+#### `literature_artifacts` — 工件采集状态
+
+```yaml
+literature_artifacts:
+  - artifact_id: "art:..."
+    paper_id: "vaswani2017attention"
+    artifact_type: "pdf"                 # pdf | html | xml | abstract | bibtex | source_tex | supplement
+    uri: "https://arxiv.org/pdf/1706.03762"
+    local_path: "literature/pdfs/vaswani2017attention.pdf"
+    status: "available"                  # available | failed | unavailable | skipped | pending | unknown
+    sha256: "..."
+    failure_reason: ""
+    recovery_actions: []
+```
+
+PDF 不可下载或不可读不是自动失败条件，但必须写入 `failure_reason` 和 `recovery_actions`，例如 DOI/Crossref 元数据、Semantic Scholar 摘要、publisher HTML、arXiv source 或人工 metadata-only card。
+
+#### `literature_extractions` — 解析 profile 与下游信号
+
+```yaml
+literature_extractions:
+  - paper_id: "vaswani2017attention"
+    metadata_status: "complete"
+    fulltext_status: "parsed_fulltext"   # parsed_fulltext | partial_fulltext | metadata_only | parse_failed | unavailable
+    parse_status: "complete"             # complete | partial | blocked | not_attempted
+    parse_backend: "pdfminer"
+    extraction_sources: ["pdf"]
+    missing_fields: []
+    section_summaries:
+      method: "..."
+      experiment_setup: "datasets, metrics, baselines, protocol"
+      results: "..."
+      analysis: "..."
+    downstream_signals:
+      M2: {method_reference: true, core_mechanism: "..."}
+      M3: {experiment_protocol: true, datasets_metrics_baselines: "..."}
+      M4: {analysis_patterns: true, analysis: "..."}
+      M5: {citation_ready: true, writing_context: "..."}
 ```
 
 ---

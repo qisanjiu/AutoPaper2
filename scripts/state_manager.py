@@ -478,15 +478,22 @@ def _sync_source_log_to_survey_memory(project_dir: str) -> None:
                 title=src.get("title", ""),
                 authors=src.get("authors", []),
                 venue=src.get("venue", ""),
+                year=src.get("year", 0) or 0,
                 date=src.get("date", ""),
                 url=src.get("url", ""),
+                pdf_url=src.get("pdf_url", ""),
                 type=src.get("type", "academic"),
                 credibility_score=src.get("credibility", 3),
                 verification_status=src.get("verification", "unverified"),
                 key_claims=src.get("key_claims", []),
                 limitations_noted=src.get("limitations_noted", []),
                 code_availability=src.get("code_availability", "closed"),
+                code_url=src.get("code_url", ""),
                 relevance_to_our_gap=src.get("relevance_to_our_gap", ""),
+                discovery_records=src.get("discovery_records", []),
+                artifacts=src.get("artifacts", []),
+                parse_profile=src.get("parse_profile", {}),
+                identifiers=src.get("identifiers", {}),
                 background=src.get("background", ""),
                 contributions=src.get("contributions", []),
                 model=src.get("model", ""),
@@ -1508,8 +1515,12 @@ def cmd_public_db_status() -> None:
             db = _get_public_db()
             count = db.count_papers()
             tags = len(db.list_tags())
+            ingestion = db.ingestion_summary()
             print(f"  Papers:      {count}")
             print(f"  Tags:        {tags}")
+            print(f"  Discoveries: {ingestion['discoveries']}")
+            print(f"  Artifacts:   {sum(item['count'] for item in ingestion['artifacts'])}")
+            print(f"  Extractions: {sum(item['count'] for item in ingestion['extractions'])}")
         except Exception as exc:
             print(f"  [WARN] Could not read stats: {exc}")
     else:
@@ -1529,6 +1540,10 @@ def cmd_public_db_stats() -> None:
     print("  PUBLIC DB STATISTICS")
     print(f"{'='*60}")
     print(f"  Total papers:    {db.count_papers()}")
+    ingestion = db.ingestion_summary()
+    print(f"  Discoveries:     {ingestion['discoveries']}")
+    print(f"  Artifact records:{sum(item['count'] for item in ingestion['artifacts'])}")
+    print(f"  Parse profiles:  {sum(item['count'] for item in ingestion['extractions'])}")
 
     tag_stats = db.get_tag_statistics()
     if tag_stats:
@@ -1546,6 +1561,50 @@ def cmd_public_db_stats() -> None:
     print(f"{'='*60}\n")
 
 
+def cmd_public_db_ingestion(limit: int = 20) -> None:
+    db = _get_public_db()
+    summary = db.ingestion_summary()
+    print(f"\n{'='*60}")
+    print("  PUBLIC DB INGESTION HEALTH")
+    print(f"{'='*60}")
+    print(f"  Papers:       {summary['papers']}")
+    print(f"  Discoveries:  {summary['discoveries']}")
+    print("\n  Artifacts by type/status:")
+    if summary["artifacts"]:
+        for item in summary["artifacts"]:
+            print(f"    {item['artifact_type']:<12s} {item['status']:<12s} {item['count']:4d}")
+    else:
+        print("    (none)")
+    print("\n  Parse profiles:")
+    if summary["extractions"]:
+        for item in summary["extractions"]:
+            print(f"    {item['parse_status']:<14s} {item['count']:4d}")
+    else:
+        print("    (none)")
+    print("\n  Metadata status:")
+    if summary["metadata"]:
+        for item in summary["metadata"]:
+            print(f"    {item['metadata_status']:<14s} {item['count']:4d}")
+    else:
+        print("    (none)")
+
+    failed = db.list_artifacts(status="failed", limit=limit)
+    partial = db.list_extractions(parse_status="partial", limit=limit)
+    if failed:
+        print(f"\n  Recent failed artifacts (showing {min(len(failed), limit)}):")
+        for artifact in failed[:limit]:
+            print(f"    {artifact.paper_id}: {artifact.artifact_type} {artifact.uri or artifact.local_path}")
+            print(f"      reason: {artifact.failure_reason or 'n/a'}")
+            if artifact.recovery_actions:
+                print(f"      recovery: {'; '.join(artifact.recovery_actions)}")
+    if partial:
+        print(f"\n  Recent partial parses (showing {min(len(partial), limit)}):")
+        for extraction in partial[:limit]:
+            missing = ", ".join(extraction.missing_fields) or "n/a"
+            print(f"    {extraction.paper_id}: backend={extraction.parse_backend or 'n/a'} missing={missing}")
+    print(f"{'='*60}\n")
+
+
 def cmd_public_db_import_project(project_dir: str) -> None:
     source_log = Path(project_dir) / "knowledge" / "M1" / "M1_source_log.yaml"
     if not source_log.exists():
@@ -1560,6 +1619,7 @@ def cmd_public_db_import_project(project_dir: str) -> None:
     result = importer.import_from_source_log(source_log, project_name)
     print(f"[PUBLIC DB] Imported from {project_name}")
     print(f"            New: {result['imported']}  Merged: {result['merged']}  Total sources: {result['total_sources']}")
+    print(f"            Discoveries: {result.get('discoveries', 0)}  Artifacts: {result.get('artifacts', 0)}  Extractions: {result.get('extractions', 0)}")
 
 
 def cmd_public_db_list_papers(tag: str | None = None, limit: int = 20) -> None:
@@ -1625,7 +1685,23 @@ def cmd_public_db_show_paper(paper_id: str) -> None:
     if p.limitations_noted:
         print(f"\n  Limitations:")
         for lim in p.limitations_noted:
-            print(f"    • {lim.limitation}")
+            print(f"    - {lim.limitation}")
+    artifacts = db.list_artifacts(p.paper_id)
+    if artifacts:
+        print(f"\n  Artifacts:")
+        for artifact in artifacts:
+            location = artifact.local_path or artifact.uri or "n/a"
+            print(f"    - {artifact.artifact_type}: {artifact.status} ({location})")
+            if artifact.failure_reason:
+                print(f"      failure: {artifact.failure_reason}")
+            if artifact.recovery_actions:
+                print(f"      recovery: {'; '.join(artifact.recovery_actions)}")
+    extraction = db.get_extraction(p.paper_id)
+    if extraction:
+        print(f"\n  Parse:")
+        print(f"    status={extraction.parse_status}; backend={extraction.parse_backend or 'n/a'}; fulltext={extraction.fulltext_status}")
+        if extraction.missing_fields:
+            print(f"    missing: {', '.join(extraction.missing_fields)}")
     tags = db.get_paper_tags(p.paper_id)
     if tags:
         print(f"\n  Tags: {', '.join(t.tag_id for t in tags)}")
@@ -1878,6 +1954,7 @@ def _print_help() -> None:
     print("Public DB subcommands:")
     print("  public-db status              Show database location and size")
     print("  public-db stats               Show tag statistics and top papers")
+    print("  public-db ingestion           Show artifact/PDF and parse-profile health")
     print("  public-db list-papers [tag]   List papers (optionally filter by tag)")
     print("  public-db search <keywords>   Full-text search across titles/abstracts")
     print("  public-db show-paper <id>     Show full details of a paper")
@@ -2116,6 +2193,15 @@ def main(argv: list[str] | None = None) -> None:
             cmd_public_db_init()
         elif sub == "stats":
             cmd_public_db_stats()
+        elif sub == "ingestion":
+            limit = 20
+            if len(remaining) > 1:
+                try:
+                    limit = int(remaining[1])
+                except ValueError:
+                    print("Usage: public-db ingestion [limit]")
+                    sys.exit(1)
+            cmd_public_db_ingestion(limit=limit)
         elif sub == "import-project":
             if len(remaining) < 2:
                 print("Usage: public-db import-project <project_dir>")

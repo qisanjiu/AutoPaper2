@@ -121,6 +121,84 @@ search_provenance:
 
 **硬性要求**: 三轮 `queries`、`retrieved_count`、`screened_count`、保留来源 ID/数量都必须为可审计记录；`retained_source_ids` 必须对应 `sources[].id`。`perspective_coverage` 必须覆盖 scenario/task、model/method、metric/performance、dataset/protocol、failure/limitation、baseline/comparison 六类视角，每类必须有 status、queries、source_ids 和 finding/evidence_summary。
 
+### Collection / Parsing / Ingestion Contract（必须同步写入每个 `sources[]`）
+
+每篇保留论文都必须按以下顺序记录：
+
+1. **检索发现**: 记录来源库/网页、query、rank、URL、为什么 retained。
+2. **元数据补全**: 优先 DOI/arXiv/Semantic Scholar/OpenAlex/Crossref/DBLP；若作者、年份、venue、摘要缺失，写入 `parse_profile.missing_fields`。
+3. **工件收集**: PDF、HTML、BibTeX、arXiv source、supplement 至少记录一种。PDF 不可下载、不可读、需要权限或解析失败时，不得留空，必须写 `status=failed|unavailable|skipped`、`failure_reason` 和 `recovery_actions`。
+4. **结构化解析**: 用 PDF/HTML/arXiv source 时写 parser/backend；只能用摘要/元数据时写 `parse_backend=abstract_only|metadata_import` 和 `parse_status=partial|blocked`。
+5. **下游信号**: 明确提供给 M2/M3/M4/M5 的信息是否可用。
+6. **入库**: 新论文完成 source log 后会由公共库导入，保留 `artifacts` 与 `parse_profile`。
+
+```yaml
+sources:
+  - id: "source_id_1"
+    title: "..."
+    authors: ["..."]
+    venue: "..."
+    year: 2026
+    url: "https://..."
+    pdf_url: "https://..."
+    identifiers:
+      doi: "10.xxxx/..."
+      arxiv_id: "2601.00001"
+      semantic_scholar_id: "..."
+      dblp_id: "..."
+    discovery_records:
+      - search_surface: "Semantic Scholar"
+        query_text: "topic method dataset"
+        result_rank: 3
+        result_url: "https://..."
+        screened_status: retained
+        retained_reason: "reports comparable method and experiment protocol"
+    artifacts:
+      - artifact_type: pdf
+        uri: "https://..."
+        local_path: "literature/pdfs/source_id_1.pdf"
+        status: available
+        sha256: ""
+        license_note: "open access / user-provided / metadata-only"
+      - artifact_type: html
+        uri: "https://publisher.example/paper"
+        status: failed
+        failure_reason: "publisher page blocks automated access"
+        recovery_actions:
+          - "Use DOI/Crossref metadata"
+          - "Use Semantic Scholar abstract"
+    parse_profile:
+      metadata_status: complete      # complete | partial | missing
+      fulltext_status: parsed        # parsed | metadata_only | unreadable | not_available
+      parse_status: complete         # complete | partial | blocked | not_attempted
+      parse_backend: "grobid / pdftotext / publisher_html / arxiv_source / abstract_only / source_log_card"
+      extraction_sources: ["pdf", "abstract", "publisher_html"]
+      missing_fields: []
+      section_summaries:
+        background: "..."
+        contributions: ["..."]
+        model: "..."
+        method: "..."
+        experiment_setup: "dataset, metrics, baselines, fairness protocol, seeds"
+        results: "..."
+        analysis: "..."
+        conclusion: "..."
+      downstream_signals:
+        M2:
+          method_reference: true
+          core_mechanism: "..."
+        M3:
+          experiment_protocol: true
+          datasets_metrics_baselines: "..."
+        M4:
+          analysis_patterns: true
+          analysis: "..."
+        M5:
+          citation_ready: true
+          writing_context: "background, related work, limitation wording"
+      confidence: high
+```
+
 ### Perspective Coverage（必须同步写入 `M1_source_log.yaml`）
 
 | Perspective | Queries | Source IDs | Finding | Gap implication |
@@ -156,6 +234,8 @@ search_provenance:
 - **结论 (Conclusion)**: ...
 - **局限性**: ...
 - **可迁移信号**: 可迁移的方法模块、实验设置、评价指标或写作结构
+- **采集/解析状态**: 元数据来源、PDF/HTML/BibTeX/source 工件状态、解析 backend、缺失字段、失败补救动作
+- **下游信号**: M2 方法参考、M3 实验设置、M4 分析模式、M5 引文/写作素材
 - **与我们的相关性**: ...
 - **entry_anchor_id**: ...（如果该论文来自项目入口锚点）
 

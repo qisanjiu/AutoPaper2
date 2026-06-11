@@ -39,6 +39,103 @@ class CodeAvailability(str, Enum):
     CLOSED = "closed"
 
 
+class ArtifactStatus(str, Enum):
+    AVAILABLE = "available"
+    UNAVAILABLE = "unavailable"
+    FAILED = "failed"
+    PENDING = "pending"
+    SKIPPED = "skipped"
+    UNKNOWN = "unknown"
+
+
+class ParseStatus(str, Enum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    BLOCKED = "blocked"
+    NOT_ATTEMPTED = "not_attempted"
+
+
+class MetadataStatus(str, Enum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    MISSING = "missing"
+
+
+@dataclass
+class LiteratureDiscovery:
+    """Search-result provenance for a retained or screened paper."""
+
+    discovery_id: str
+    paper_id: str = ""
+    search_surface: str = ""  # public_db | semantic_scholar | openalex | arxiv | crossref | web | citation_chain
+    query_text: str = ""
+    result_rank: int = 0
+    result_url: str = ""
+    metadata_source: str = ""
+    discovered_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    screened_status: str = "retained"  # retained | rejected | duplicate | pending
+    retained_reason: str = ""
+    notes: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> LiteratureDiscovery:
+        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class LiteratureArtifact:
+    """Acquisition state for a paper artifact such as PDF, HTML, BibTeX, or source TeX."""
+
+    artifact_id: str
+    paper_id: str = ""
+    artifact_type: str = "pdf"  # pdf | html | xml | abstract | bibtex | source_tex | supplement
+    uri: str = ""
+    local_path: str = ""
+    status: str = ArtifactStatus.UNKNOWN
+    sha256: str = ""
+    attempted_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    failure_reason: str = ""
+    recovery_actions: list[str] = field(default_factory=list)
+    license_note: str = ""
+    notes: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> LiteratureArtifact:
+        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class LiteratureExtraction:
+    """Structured parse profile used by M2/M3/M4/M5 instead of ad hoc notes."""
+
+    paper_id: str
+    metadata_status: str = MetadataStatus.PARTIAL
+    fulltext_status: str = "metadata_only"  # parsed_fulltext | partial_fulltext | metadata_only | parse_failed | unavailable
+    parse_status: str = ParseStatus.PARTIAL
+    parse_backend: str = ""  # pdftotext | pdfminer | pymupdf | html_text | xml_text | source_log_card | manual_card
+    parsed_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    extraction_sources: list[str] = field(default_factory=list)
+    missing_fields: list[str] = field(default_factory=list)
+    section_summaries: dict[str, Any] = field(default_factory=dict)
+    downstream_signals: dict[str, Any] = field(default_factory=dict)
+    confidence: str = ConfidenceLevel.MEDIUM
+    notes: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> LiteratureExtraction:
+        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+
+
 @dataclass
 class LimitationEntry:
     """A single limitation note with provenance."""
@@ -263,7 +360,7 @@ class QueryResult:
 # SQL Schema Definition
 # ---------------------------------------------------------------------------
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 CREATE_TABLES_SQL = """
 -- Schema version tracking
@@ -337,6 +434,66 @@ CREATE TABLE IF NOT EXISTS paper_identifiers (
 );
 
 CREATE INDEX IF NOT EXISTS idx_paper_identifiers_paper ON paper_identifiers(paper_id);
+
+-- Search-result provenance. Retained papers are linked after canonicalization;
+-- rejected candidates may be imported later when a canonical paper is created.
+CREATE TABLE IF NOT EXISTS literature_discovery (
+    discovery_id TEXT PRIMARY KEY,
+    paper_id TEXT NOT NULL REFERENCES papers(paper_id) ON DELETE CASCADE,
+    search_surface TEXT NOT NULL DEFAULT '',
+    query_text TEXT NOT NULL DEFAULT '',
+    result_rank INTEGER NOT NULL DEFAULT 0,
+    result_url TEXT NOT NULL DEFAULT '',
+    metadata_source TEXT NOT NULL DEFAULT '',
+    discovered_at TEXT NOT NULL DEFAULT (datetime('now')),
+    screened_status TEXT NOT NULL DEFAULT 'retained',
+    retained_reason TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_literature_discovery_paper ON literature_discovery(paper_id);
+CREATE INDEX IF NOT EXISTS idx_literature_discovery_query ON literature_discovery(query_text);
+CREATE INDEX IF NOT EXISTS idx_literature_discovery_surface ON literature_discovery(search_surface);
+
+-- Acquisition state for PDFs, HTML, BibTeX, source TeX, and supplements.
+CREATE TABLE IF NOT EXISTS literature_artifacts (
+    artifact_id TEXT PRIMARY KEY,
+    paper_id TEXT NOT NULL REFERENCES papers(paper_id) ON DELETE CASCADE,
+    artifact_type TEXT NOT NULL DEFAULT 'pdf',
+    uri TEXT NOT NULL DEFAULT '',
+    local_path TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'unknown',
+    sha256 TEXT NOT NULL DEFAULT '',
+    attempted_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    failure_reason TEXT NOT NULL DEFAULT '',
+    recovery_actions TEXT NOT NULL DEFAULT '[]',
+    license_note TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_literature_artifacts_paper ON literature_artifacts(paper_id);
+CREATE INDEX IF NOT EXISTS idx_literature_artifacts_status ON literature_artifacts(status);
+CREATE INDEX IF NOT EXISTS idx_literature_artifacts_type ON literature_artifacts(artifact_type);
+
+-- Structured parse profile consumed by downstream modules.
+CREATE TABLE IF NOT EXISTS literature_extractions (
+    paper_id TEXT PRIMARY KEY REFERENCES papers(paper_id) ON DELETE CASCADE,
+    metadata_status TEXT NOT NULL DEFAULT 'partial',
+    fulltext_status TEXT NOT NULL DEFAULT 'metadata_only',
+    parse_status TEXT NOT NULL DEFAULT 'partial',
+    parse_backend TEXT NOT NULL DEFAULT '',
+    parsed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    extraction_sources TEXT NOT NULL DEFAULT '[]',
+    missing_fields TEXT NOT NULL DEFAULT '[]',
+    section_summaries TEXT NOT NULL DEFAULT '{}',
+    downstream_signals TEXT NOT NULL DEFAULT '{}',
+    confidence TEXT NOT NULL DEFAULT 'medium',
+    notes TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_literature_extractions_parse_status ON literature_extractions(parse_status);
+CREATE INDEX IF NOT EXISTS idx_literature_extractions_metadata_status ON literature_extractions(metadata_status);
 
 -- Claims: domain-agnostic knowledge claims
 CREATE TABLE IF NOT EXISTS claims (
@@ -423,5 +580,7 @@ CREATE TABLE IF NOT EXISTS paper_tag_stats (
 """
 
 MIGRATIONS: dict[int, str] = {
-    # Future schema migrations go here
+    # CREATE_TABLES_SQL is idempotent and creates v2 literature ingestion tables
+    # before this version marker is advanced.
+    2: "",
 }

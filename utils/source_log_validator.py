@@ -19,6 +19,18 @@ M1_DEEP_READING_FIELDS = [
     "conclusion",
 ]
 
+LITERATURE_ARTIFACT_TERMS = ("pdf", "html", "abstract", "bibtex", "source_tex", "supplement")
+LITERATURE_ARTIFACT_STATUSES = {
+    "available",
+    "unavailable",
+    "failed",
+    "pending",
+    "skipped",
+    "unknown",
+}
+LITERATURE_PARSE_STATUSES = {"complete", "partial", "blocked", "not_attempted"}
+LITERATURE_DOWNSTREAM_MODULES = ("M2", "M3", "M4", "M5")
+
 M1_GAP_LEVELS = {
     "large": ("large", "big", "大方向", "场景", "领域", "domain", "scenario", "task-level"),
     "middle": ("middle", "mid", "中方向", "模型", "精度", "指标", "数据集", "model", "metric", "accuracy", "dataset"),
@@ -65,6 +77,138 @@ def _as_list(value: Any) -> list[Any]:
 
 def _is_positive_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and value > 0
+
+
+def _check_literature_ingestion_contract(
+    sources: list[dict[str, Any]],
+    *,
+    module: str,
+) -> tuple[bool, list[str]]:
+    """Validate collection/artifact/parse metadata for retained papers.
+
+    The contract does not require every PDF to be downloadable. It requires a
+    durable status record, a failure reason when acquisition failed, and enough
+    structured extraction metadata for downstream modules to know what is ready.
+    """
+    messages: list[str] = []
+    ok = True
+    for src in sources:
+        if src.get("type") != "academic":
+            continue
+        source_id = src.get("id", "?")
+
+        discovery_records = _as_list(src.get("discovery_records") or src.get("discovery"))
+        legacy_discovery = bool(src.get("discovery_source") or src.get("discovery_query"))
+        if discovery_records or legacy_discovery:
+            messages.append(f"[PASS] Source '{source_id}': discovery provenance recorded")
+        else:
+            messages.append(f"[FAIL] Source '{source_id}': missing discovery_records or discovery_source/discovery_query")
+            ok = False
+
+        artifacts = _as_list(src.get("artifacts"))
+        if not artifacts and src.get("pdf_url"):
+            artifacts = [
+                {
+                    "artifact_type": "pdf",
+                    "status": src.get("pdf_status", "unknown"),
+                    "uri": src.get("pdf_url"),
+                    "local_path": src.get("pdf_path", ""),
+                    "failure_reason": src.get("pdf_failure_reason", ""),
+                    "recovery_actions": src.get("pdf_recovery_actions", []),
+                }
+            ]
+        if not artifacts:
+            messages.append(f"[FAIL] Source '{source_id}': missing artifacts acquisition record")
+            ok = False
+        else:
+            source_has_parseable_artifact = False
+            for idx, artifact in enumerate(artifacts, start=1):
+                if not isinstance(artifact, dict):
+                    messages.append(f"[FAIL] Source '{source_id}': artifact {idx} must be a mapping")
+                    ok = False
+                    continue
+                artifact_type = str(artifact.get("artifact_type") or artifact.get("type") or "").strip()
+                status = str(artifact.get("status") or "").strip()
+                if artifact_type not in LITERATURE_ARTIFACT_TERMS:
+                    messages.append(f"[FAIL] Source '{source_id}': artifact {idx} has unknown artifact_type='{artifact_type}'")
+                    ok = False
+                if status not in LITERATURE_ARTIFACT_STATUSES:
+                    messages.append(f"[FAIL] Source '{source_id}': artifact {idx} has unknown status='{status}'")
+                    ok = False
+                if status in {"available", "pending", "unknown"} and not (
+                    artifact.get("uri") or artifact.get("local_path") or artifact.get("path")
+                ):
+                    messages.append(f"[FAIL] Source '{source_id}': artifact {idx} status={status} missing uri/local_path")
+                    ok = False
+                if status in {"failed", "unavailable", "skipped"}:
+                    if not artifact.get("failure_reason"):
+                        messages.append(f"[FAIL] Source '{source_id}': artifact {idx} status={status} missing failure_reason")
+                        ok = False
+                    if not _as_list(artifact.get("recovery_actions")):
+                        messages.append(f"[FAIL] Source '{source_id}': artifact {idx} status={status} missing recovery_actions")
+                        ok = False
+                if artifact_type in {"pdf", "html", "source_tex"} and status == "available":
+                    source_has_parseable_artifact = True
+            if source_has_parseable_artifact:
+                messages.append(f"[PASS] Source '{source_id}': parseable artifact available")
+            else:
+                messages.append(f"[PASS] Source '{source_id}': artifact failure/unavailability is explicitly recorded")
+
+        parse_profile = src.get("parse_profile") or src.get("extraction")
+        if not isinstance(parse_profile, dict) or not parse_profile:
+            messages.append(f"[FAIL] Source '{source_id}': missing parse_profile")
+            ok = False
+            continue
+
+        parse_status = str(parse_profile.get("parse_status") or "").strip()
+        if parse_status not in LITERATURE_PARSE_STATUSES:
+            messages.append(f"[FAIL] Source '{source_id}': parse_profile.parse_status invalid or missing")
+            ok = False
+        elif parse_status == "blocked":
+            if not _as_list(parse_profile.get("missing_fields")):
+                messages.append(f"[FAIL] Source '{source_id}': blocked parse_profile missing missing_fields")
+                ok = False
+            else:
+                messages.append(f"[PASS] Source '{source_id}': blocked parse records missing fields")
+        else:
+            messages.append(f"[PASS] Source '{source_id}': parse_status={parse_status}")
+
+        backend = str(parse_profile.get("parse_backend") or "").strip()
+        if not backend:
+            messages.append(f"[FAIL] Source '{source_id}': parse_profile missing parse_backend")
+            ok = False
+
+        section_summaries = parse_profile.get("section_summaries", {})
+        if not isinstance(section_summaries, dict) or not section_summaries:
+            messages.append(f"[FAIL] Source '{source_id}': parse_profile missing section_summaries")
+            ok = False
+
+        downstream = parse_profile.get("downstream_signals", {})
+        if not isinstance(downstream, dict) or not downstream:
+            messages.append(f"[FAIL] Source '{source_id}': parse_profile missing downstream_signals")
+            ok = False
+        else:
+            missing_modules = [mod for mod in LITERATURE_DOWNSTREAM_MODULES if mod not in downstream]
+            if missing_modules:
+                messages.append(f"[FAIL] Source '{source_id}': downstream_signals missing {missing_modules}")
+                ok = False
+            else:
+                messages.append(f"[PASS] Source '{source_id}': downstream_signals cover M2/M3/M4/M5")
+
+        if module == "M1":
+            required_signal_checks = {
+                "M2": ("method_reference", "core_mechanism"),
+                "M3": ("experiment_protocol", "datasets_metrics_baselines"),
+                "M4": ("analysis_patterns", "analysis"),
+                "M5": ("citation_ready", "writing_context"),
+            }
+            for mod, fields in required_signal_checks.items():
+                signal = downstream.get(mod, {}) if isinstance(downstream, dict) else {}
+                if not isinstance(signal, dict) or not any(signal.get(field) for field in fields):
+                    messages.append(f"[FAIL] Source '{source_id}': downstream_signals.{mod} lacks {fields}")
+                    ok = False
+
+    return ok, messages
 
 
 def _check_m1_search_provenance(data: dict[str, Any], sources: list[dict[str, Any]]) -> tuple[bool, list[str]]:
@@ -508,6 +652,11 @@ def validate(project_root: str | Path, module: str = "M1") -> tuple[bool, list[s
             else:
                 messages.append(f"[PASS] Source '{src.get('id', '?')}': deep-reading fields complete")
 
+        ingestion_ok, ingestion_messages = _check_literature_ingestion_contract(sources, module=module)
+        messages.extend(ingestion_messages)
+        if not ingestion_ok:
+            ok = False
+
     if module == "M1":
         anchors_ok, anchor_messages = _check_entry_anchor_coverage(root, sources)
         messages.extend(anchor_messages)
@@ -528,6 +677,11 @@ def validate(project_root: str | Path, module: str = "M1") -> tuple[bool, list[s
         search_ok, search_messages = _check_m2_search_provenance(data, sources)
         messages.extend(search_messages)
         if not search_ok:
+            ok = False
+
+        ingestion_ok, ingestion_messages = _check_literature_ingestion_contract(sources, module=module)
+        messages.extend(ingestion_messages)
+        if not ingestion_ok:
             ok = False
 
         # Check M2-specific fields

@@ -8,7 +8,7 @@ Reviewer advice must be grounded in files actually checked. If you only inspecte
 For code-writing, experiment-running, analysis-running, or paper-build stages, inspect packet runtime ledgers when present: `command_ledger_path`, `code_change_ledger_path`, artifact manifest, stdout/stderr log paths, patch paths, changed-file hashes, and validation summaries. Treat missing ledgers as an evidence gap when the stage claims code was changed or commands were run.
 
 ## source_log_validator
-Validate M1/M2 source logs: required top-level keys, stable ids, credibility, discovery source/query, gap/solution maps, search statistics, query ledger, and no uncited literature claims. Prefer existing validator scripts when available.
+Validate M1/M2 source logs: required top-level keys, stable ids, credibility, discovery source/query, artifact/PDF acquisition status, parse profiles, downstream M2/M3/M4/M5 signals, gap/solution maps, search statistics, query ledger, and no uncited literature claims. Missing PDFs are acceptable only with explicit failure reason and recovery actions. Prefer existing validator scripts when available.
 
 ## survey_review
 Review M1S02 round outputs: search breadth/depth/blindspots, source credibility, gap taxonomy, solution arsenal, source log consistency, survey memory updates, and whether another round/backtrack is needed.
@@ -41,7 +41,7 @@ Review experiment code quality and reproducibility: runnable entrypoints, config
 Review dataset availability, completeness, checksums/splits/counts, cache/symlink paths, longrun ledger acquisition status, and no hidden unavailable data dependency. PASS is forbidden if `M3S02_dataset_pending.md` exists, `experiments/data/dataset_manifest.yaml` is missing/incomplete, any required split/file is absent or zero-count, smoke-load evidence is missing, or any dataset/model-asset acquisition ledger row is failed, running, queued, blocked_user_action, missing log evidence, or waiting for human action.
 
 ## m2_search_quality
-Check M2S01 search dimensions, source diversity, M1 cross-check, candidate novelty/difference, query ledger, and `M2_source_log.yaml` completeness.
+Check M2S01 search dimensions, source diversity, M1 cross-check, candidate novelty/difference, query ledger, `M2_source_log.yaml` completeness, artifact/PDF failure handling, parse-profile limits, and whether experiment/protocol signals passed to M3/M4 are actually extracted from sources.
 
 ## m2_migration
 Check M2S02 mappings: source problem, target problem, transferable mechanism, adaptation changes, why direct reuse is insufficient, no over-combination, M1 overlap handled.

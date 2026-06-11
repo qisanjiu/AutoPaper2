@@ -76,6 +76,45 @@ def _create_diverse_sources(count: int = MIN_SOURCES) -> list[dict]:
             "authors": [authors[i % len(authors)]],
             "venue": "Test Venue",
             "date": "2024",
+            "url": f"https://example.com/s{i+1}",
+            "discovery_records": [
+                {
+                    "search_surface": "public_db",
+                    "query_text": f"paper {i+1} method experiment evidence",
+                    "result_rank": i + 1,
+                    "result_url": f"https://example.com/s{i+1}",
+                    "screened_status": "retained",
+                    "retained_reason": "Supports source-log validation fixture",
+                }
+            ],
+            "artifacts": [
+                {
+                    "artifact_type": "pdf",
+                    "uri": f"https://example.com/s{i+1}.pdf",
+                    "status": "available",
+                }
+            ],
+            "parse_profile": {
+                "metadata_status": "complete",
+                "fulltext_status": "parsed",
+                "parse_status": "complete",
+                "parse_backend": "manual_card",
+                "extraction_sources": ["pdf"],
+                "section_summaries": {
+                    "abstract": f"Abstract for Paper {i+1}",
+                    "method": f"Method for Paper {i+1}",
+                    "experiment_setup": "datasets, metrics, baselines, protocol, and seeds",
+                    "results": f"Results for Paper {i+1}",
+                    "analysis": f"Analysis for Paper {i+1}",
+                },
+                "downstream_signals": {
+                    "M2": {"method_reference": True, "core_mechanism": f"Method for Paper {i+1}"},
+                    "M3": {"experiment_protocol": True, "datasets_metrics_baselines": "datasets, metrics, baselines"},
+                    "M4": {"analysis_patterns": True, "analysis": f"Analysis for Paper {i+1}"},
+                    "M5": {"citation_ready": True, "writing_context": f"Context for Paper {i+1}"},
+                },
+                "confidence": "high",
+            },
             "background": f"Background for Paper {i+1}",
             "contributions": [f"Contribution for Paper {i+1}"],
             "model": f"Model for Paper {i+1}",

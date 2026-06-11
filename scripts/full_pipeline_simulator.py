@@ -146,6 +146,51 @@ def _source(idx: int) -> dict[str, Any]:
         "results": "Reports quantitative results and statistical summary.",
         "analysis": "Includes ablation, failure analysis, and mechanism discussion.",
         "conclusion": "Concludes with limitations and future work.",
+        "discovery_records": [
+            {
+                "search_surface": "Semantic Scholar",
+                "query_text": f"representative paper {idx} method experiment",
+                "result_rank": idx,
+                "result_url": f"https://example.org/src{idx}",
+                "screened_status": "retained",
+                "retained_reason": "simulated literature evidence",
+            }
+        ],
+        "artifacts": [
+            {
+                "artifact_type": "pdf",
+                "uri": f"https://example.org/src{idx}.pdf",
+                "local_path": f"literature/pdfs/src{idx}.pdf",
+                "status": "available",
+                "sha256": "",
+                "license_note": "simulated open-access source",
+            }
+        ],
+        "parse_profile": {
+            "metadata_status": "complete",
+            "fulltext_status": "parsed",
+            "parse_status": "complete",
+            "parse_backend": "source_log_card",
+            "extraction_sources": ["pdf"],
+            "missing_fields": [],
+            "section_summaries": {
+                "background": "Defines the problem background and scenario.",
+                "contributions": "Contributes a relevant model and evaluation protocol.",
+                "model": "Uses a neural model with a comparable baseline.",
+                "method": "Describes the method components and training objective.",
+                "experiment_setup": "Reports datasets, metrics, baselines, seeds, and protocol.",
+                "results": "Reports quantitative results and statistical summary.",
+                "analysis": "Includes ablation, failure analysis, and mechanism discussion.",
+                "conclusion": "Concludes with limitations and future work.",
+            },
+            "downstream_signals": {
+                "M2": {"method_reference": True, "core_mechanism": "method components and training objective"},
+                "M3": {"experiment_protocol": True, "datasets_metrics_baselines": "datasets, metrics, baselines, seeds, and protocol"},
+                "M4": {"analysis_patterns": True, "analysis": "ablation, failure analysis, and mechanism discussion"},
+                "M5": {"citation_ready": True, "writing_context": "limitations and future work"},
+            },
+            "confidence": "high",
+        },
     }
 
 

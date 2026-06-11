@@ -211,6 +211,9 @@ class DatabaseManager:
         """Quick sanity check that required tables exist."""
         required = {
             "papers",
+            "literature_discovery",
+            "literature_artifacts",
+            "literature_extractions",
             "claims",
             "domain_tags",
             "paper_tags",

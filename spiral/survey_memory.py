@@ -166,15 +166,22 @@ class Source:
     title: str = ""
     authors: list[str] = field(default_factory=list)
     venue: str = ""
+    year: int = 0
     date: str = ""
     url: str = ""
+    pdf_url: str = ""
     type: str = SourceType.ACADEMIC
     credibility_score: int = 3  # 1-5
     verification_status: str = VerificationStatus.UNVERIFIED
     key_claims: list[str] = field(default_factory=list)
     limitations_noted: list[str] = field(default_factory=list)
     code_availability: str = CodeAvailability.CLOSED
+    code_url: str = ""
     relevance_to_our_gap: str = ""
+    discovery_records: list[dict[str, Any]] = field(default_factory=list)
+    artifacts: list[dict[str, Any]] = field(default_factory=list)
+    parse_profile: dict[str, Any] = field(default_factory=dict)
+    identifiers: dict[str, Any] = field(default_factory=dict)
     background: str = ""
     contributions: list[str] = field(default_factory=list)
     model: str = ""
@@ -494,6 +501,8 @@ class SurveyMemoryManager:
 
         imported = 0
         merged = 0
+        artifacts = 0
+        extractions = 0
         for src in sources:
             paper = self._source_to_paper(src)
             existing_id = self.public_db.check_duplicate(paper)
@@ -503,8 +512,29 @@ class SurveyMemoryManager:
             else:
                 self.public_db.insert_paper(paper, source_project=self.project_name)
                 imported += 1
+            canonical_id = existing_id or paper.paper_id
+            for raw in src.artifacts:
+                try:
+                    from .public_db.models import LiteratureArtifact
 
-        return {"imported": imported, "merged": merged}
+                    self.public_db.upsert_artifact(
+                        LiteratureArtifact.from_dict({"artifact_id": "", **raw, "paper_id": canonical_id})
+                    )
+                    artifacts += 1
+                except Exception:
+                    pass
+            if src.parse_profile:
+                try:
+                    from .public_db.models import LiteratureExtraction
+
+                    self.public_db.upsert_extraction(
+                        LiteratureExtraction.from_dict({**src.parse_profile, "paper_id": canonical_id})
+                    )
+                    extractions += 1
+                except Exception:
+                    pass
+
+        return {"imported": imported, "merged": merged, "artifacts": artifacts, "extractions": extractions}
 
     # ------------------------------------------------------------------
     # Conversion helpers
@@ -518,15 +548,19 @@ class SurveyMemoryManager:
             title=paper.title,
             authors=paper.authors,
             venue=paper.venue,
+            year=paper.year,
             date=paper.date,
             url=paper.url,
+            pdf_url=paper.pdf_url,
             type=paper.type,
             credibility_score=paper.credibility_score,
             verification_status=paper.verification_status,
             key_claims=[],
             limitations_noted=[lim.limitation for lim in paper.limitations_noted],
             code_availability=paper.code_availability,
+            code_url=paper.code_url,
             relevance_to_our_gap="",
+            identifiers=paper.identifiers.to_dict(),
         )
 
     @staticmethod
@@ -539,14 +573,30 @@ class SurveyMemoryManager:
             title=src.title,
             authors=src.authors,
             venue=src.venue,
+            year=src.year,
             date=src.date,
             url=src.url,
+            pdf_url=src.pdf_url,
             type=src.type,
-            identifiers=PaperIdentifiers(),
+            identifiers=PaperIdentifiers.from_dict(src.identifiers),
             credibility_score=src.credibility_score,
             verification_status=src.verification_status,
             code_availability=src.code_availability,
+            code_url=src.code_url,
+            abstract=src.parse_profile.get("section_summaries", {}).get("abstract", ""),
+            method_summary=src.parse_profile.get("section_summaries", {}).get("method", ""),
+            key_results=_as_list(src.parse_profile.get("section_summaries", {}).get("results", [])),
             limitations_noted=[
                 LimitationEntry(limitation=lim) for lim in src.limitations_noted
             ],
         )
+
+
+def _as_list(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    if value in (None, ""):
+        return []
+    return [value]

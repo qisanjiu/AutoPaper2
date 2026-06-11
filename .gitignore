@@ -43,6 +43,7 @@ generated-images/
 # Local media config with API secrets
 config/image_generation.local.yaml
 config/figure_style_profiles.local.yaml
+config/browser_sessions/
 
 # Personal / environment-specific configs (contain SSH, hardware, author info)
 config/execution_env.yaml

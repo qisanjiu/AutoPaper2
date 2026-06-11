@@ -82,8 +82,8 @@ def merge_papers(
 
     # 5. Year / Date — prefer non-zero / non-empty
     if incoming.year and (not result.year or incoming.year < result.year):
-        # For year, prefer earliest (publication year shouldn't change)
-        pass
+        # For year, prefer earliest plausible publication year.
+        result.year = incoming.year
     if incoming.date and not result.date:
         result.date = incoming.date
 

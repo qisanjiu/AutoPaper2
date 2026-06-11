@@ -41,6 +41,51 @@ def _rich_source(source_id: str, title: str, author: str) -> dict:
         "results": f"Results reported by {title}",
         "analysis": f"Analysis from {title}",
         "conclusion": f"Conclusion of {title}",
+        "discovery_records": [
+            {
+                "search_surface": "Semantic Scholar",
+                "query_text": f"{title} method experiment",
+                "result_rank": 1,
+                "result_url": f"https://example.org/{source_id}",
+                "screened_status": "retained",
+                "retained_reason": "relevant method and experiment evidence",
+            }
+        ],
+        "artifacts": [
+            {
+                "artifact_type": "pdf",
+                "uri": f"https://example.org/{source_id}.pdf",
+                "local_path": f"literature/pdfs/{source_id}.pdf",
+                "status": "available",
+                "sha256": "",
+                "license_note": "open access or user-provided copy",
+            }
+        ],
+        "parse_profile": {
+            "metadata_status": "complete",
+            "fulltext_status": "parsed",
+            "parse_status": "complete",
+            "parse_backend": "source_log_card",
+            "extraction_sources": ["pdf"],
+            "missing_fields": [],
+            "section_summaries": {
+                "background": f"Background for {title}",
+                "contributions": [f"Contribution of {title}"],
+                "model": f"Model used in {title}",
+                "method": f"Method details for {title}",
+                "experiment_setup": "datasets, metrics, baselines, protocol, and seeds",
+                "results": f"Results reported by {title}",
+                "analysis": f"Analysis from {title}",
+                "conclusion": f"Conclusion of {title}",
+            },
+            "downstream_signals": {
+                "M2": {"method_reference": True, "core_mechanism": f"Method details for {title}"},
+                "M3": {"experiment_protocol": True, "datasets_metrics_baselines": "datasets, metrics, baselines, protocol, and seeds"},
+                "M4": {"analysis_patterns": True, "analysis": f"Analysis from {title}"},
+                "M5": {"citation_ready": True, "writing_context": f"Conclusion of {title}"},
+            },
+            "confidence": "high",
+        },
     }
 
 
@@ -153,6 +198,36 @@ def _m2_source(source_id: str, dimension: str, target_gap: str, domain: str, aut
         "adaptation_potential": "high",
         "discovery_source": "public_db" if dimension != "same_task_diff_modality" else "web_search",
         "discovery_query": f"{domain} {dimension} transferable mechanism",
+        "artifacts": [
+            {
+                "artifact_type": "pdf",
+                "uri": f"https://example.org/{source_id}.pdf",
+                "status": "failed" if dimension == "same_task_diff_modality" else "available",
+                "failure_reason": "publisher PDF unavailable; abstract and HTML used" if dimension == "same_task_diff_modality" else "",
+                "recovery_actions": ["Use Semantic Scholar abstract", "Search publisher HTML"] if dimension == "same_task_diff_modality" else [],
+                "local_path": "" if dimension == "same_task_diff_modality" else f"literature/pdfs/{source_id}.pdf",
+            }
+        ],
+        "parse_profile": {
+            "metadata_status": "complete",
+            "fulltext_status": "metadata_only" if dimension == "same_task_diff_modality" else "parsed",
+            "parse_status": "partial" if dimension == "same_task_diff_modality" else "complete",
+            "parse_backend": "abstract_only" if dimension == "same_task_diff_modality" else "source_log_card",
+            "extraction_sources": ["metadata", "abstract"] if dimension == "same_task_diff_modality" else ["pdf"],
+            "missing_fields": ["experiment_setup"] if dimension == "same_task_diff_modality" else [],
+            "section_summaries": {
+                "method": f"{domain} mechanism can transfer to {target_gap}",
+                "experiment_setup": "" if dimension == "same_task_diff_modality" else "comparable dataset and metrics",
+                "results": "reported gains in the source domain",
+                "analysis": "contains transferable mechanism analysis",
+            },
+            "downstream_signals": {
+                "M2": {"method_reference": True, "core_mechanism": f"{domain} mechanism can transfer to {target_gap}"},
+                "M3": {"experiment_protocol": dimension != "same_task_diff_modality", "datasets_metrics_baselines": "comparable dataset and metrics"},
+                "M4": {"analysis_patterns": True, "analysis": "transferable mechanism analysis"},
+                "M5": {"citation_ready": True, "writing_context": "method inspiration reference"},
+            },
+        },
     }
 
 
@@ -344,6 +419,64 @@ class TestSourceLogValidator(unittest.TestCase):
         fail_msgs = [m for m in msgs if "missing deep-reading fields" in m and "[FAIL]" in m]
         assert fail_msgs, f"Expected deep-reading failure, got: {msgs}"
         print("  [PASS] Validator fails on missing deep-reading fields")
+
+    def test_pdf_failure_with_recovery_actions_is_accepted(self):
+        gaps = [
+            _gap("gap_1", "large", "enhancement", ["s1", "s2"]),
+            _gap("gap_2", "middle", "validation", ["s2", "s3"]),
+            _gap("gap_3", "small", "vacancy", ["s4", "s5"]),
+        ]
+        sources = [
+            _rich_source(f"s{i}", f"Paper {i}", f"Author {i}")
+            for i in range(1, 6)
+        ]
+        sources[0]["artifacts"] = [
+            {
+                "artifact_type": "pdf",
+                "uri": "https://publisher.example/s1.pdf",
+                "status": "failed",
+                "failure_reason": "publisher blocks automated PDF download",
+                "recovery_actions": ["Use DOI metadata", "Use abstract and publisher HTML"],
+            }
+        ]
+        sources[0]["parse_profile"]["fulltext_status"] = "metadata_only"
+        sources[0]["parse_profile"]["parse_status"] = "partial"
+        sources[0]["parse_profile"]["parse_backend"] = "abstract_only"
+        sources[0]["parse_profile"]["missing_fields"] = ["fulltext"]
+        proj = self._create_project_with_source_log(gaps, sources)
+
+        ok, msgs = validate_source_log(proj, module="M1")
+
+        assert ok is True, msgs
+        assert any("artifact failure/unavailability is explicitly recorded" in msg for msg in msgs), msgs
+        print("  [PASS] Validator accepts explicit PDF failure recovery path")
+
+    def test_pdf_failure_without_reason_fails(self):
+        gaps = [
+            _gap("gap_1", "large", "enhancement", ["s1", "s2"]),
+            _gap("gap_2", "middle", "validation", ["s2", "s3"]),
+            _gap("gap_3", "small", "vacancy", ["s4", "s5"]),
+        ]
+        sources = [
+            _rich_source(f"s{i}", f"Paper {i}", f"Author {i}")
+            for i in range(1, 6)
+        ]
+        sources[0]["artifacts"] = [
+            {
+                "artifact_type": "pdf",
+                "uri": "https://publisher.example/s1.pdf",
+                "status": "failed",
+                "recovery_actions": [],
+            }
+        ]
+        proj = self._create_project_with_source_log(gaps, sources)
+
+        ok, msgs = validate_source_log(proj, module="M1")
+
+        assert ok is False
+        assert any("missing failure_reason" in msg for msg in msgs), msgs
+        assert any("missing recovery_actions" in msg for msg in msgs), msgs
+        print("  [PASS] Validator fails on silent PDF acquisition failure")
 
     def test_missing_search_provenance_fail(self):
         gaps = [

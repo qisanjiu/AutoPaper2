@@ -33,6 +33,9 @@ from spiral.public_db.merge import MergePolicy, deserialize_limitations, merge_p
 from spiral.public_db.models import (
     Claim,
     DomainTag,
+    LiteratureArtifact,
+    LiteratureDiscovery,
+    LiteratureExtraction,
     LimitationEntry,
     Paper,
     PaperIdentifiers,
@@ -689,6 +692,78 @@ class TestImporter(TempDBMixin, unittest.TestCase):
         self.assertEqual(paper.title, "Updated Longer")
         self.assertEqual(paper.survey_count, 2)
 
+    def test_import_from_source_log_records_ingestion_state(self):
+        importer = ProjectImporter(self.db)
+        source_log = {
+            "sources": [
+                {
+                    "id": "ingest2026",
+                    "title": "Ingestion Contract Paper",
+                    "authors": ["A"],
+                    "venue": "ICLR",
+                    "year": 2026,
+                    "type": "academic",
+                    "credibility": 4,
+                    "verification": "confirmed",
+                    "discovery_records": [
+                        {
+                            "search_surface": "Semantic Scholar",
+                            "query_text": "ingestion contract",
+                            "result_rank": 2,
+                            "screened_status": "retained",
+                            "retained_reason": "tests literature pipeline",
+                        }
+                    ],
+                    "artifacts": [
+                        {
+                            "artifact_type": "pdf",
+                            "uri": "https://example.org/ingest.pdf",
+                            "status": "failed",
+                            "failure_reason": "PDF not accessible",
+                            "recovery_actions": ["Use Crossref metadata", "Use publisher HTML"],
+                        }
+                    ],
+                    "parse_profile": {
+                        "metadata_status": "complete",
+                        "fulltext_status": "metadata_only",
+                        "parse_status": "partial",
+                        "parse_backend": "abstract_only",
+                        "extraction_sources": ["metadata", "abstract"],
+                        "missing_fields": ["experiment_setup"],
+                        "section_summaries": {"method": "method summary"},
+                        "downstream_signals": {
+                            "M2": {"method_reference": True},
+                            "M3": {"experiment_protocol": False},
+                            "M4": {"analysis_patterns": False},
+                            "M5": {"citation_ready": True},
+                        },
+                    },
+                }
+            ],
+            "gap_evidence_map": {},
+        }
+        log_path = os.path.join(self.tmpdir, "ingestion_log.yaml")
+        with open(log_path, "w", encoding="utf-8") as f:
+            import yaml
+
+            yaml.dump(source_log, f, allow_unicode=True)
+
+        summary = importer.import_from_source_log(log_path, "test-project")
+
+        self.assertEqual(summary["imported"], 1)
+        self.assertEqual(summary["discoveries"], 1)
+        self.assertEqual(summary["artifacts"], 1)
+        self.assertEqual(summary["extractions"], 1)
+        artifacts = self.db.list_artifacts("ingest2026")
+        self.assertEqual(len(artifacts), 1)
+        self.assertEqual(artifacts[0].status, "failed")
+        self.assertIn("Use Crossref metadata", artifacts[0].recovery_actions)
+        extraction = self.db.get_extraction("ingest2026")
+        self.assertIsNotNone(extraction)
+        self.assertEqual(extraction.parse_status, "partial")
+        discoveries = self.db.list_discoveries("ingest2026")
+        self.assertEqual(discoveries[0].search_surface, "Semantic Scholar")
+
 
 # ---------------------------------------------------------------------------
 # 8. Performance Tests
@@ -1046,6 +1121,53 @@ class TestEdgeCases(TempDBMixin, unittest.TestCase):
         )
         types = {row["id_type"] for row in rows}
         self.assertEqual(types, {"arxiv", "doi"})
+
+    def test_literature_ingestion_crud(self):
+        pid = self.db.insert_paper(_make_paper(title="Ingestion CRUD"), auto_tag=False)
+
+        discovery_id = self.db.upsert_discovery(
+            LiteratureDiscovery(
+                discovery_id="",
+                paper_id=pid,
+                search_surface="OpenAlex",
+                query_text="ingestion crud",
+                result_rank=1,
+                screened_status="retained",
+            )
+        )
+        artifact_id = self.db.upsert_artifact(
+            LiteratureArtifact(
+                artifact_id="",
+                paper_id=pid,
+                artifact_type="pdf",
+                uri="https://example.org/paper.pdf",
+                status="available",
+                local_path="literature/pdfs/paper.pdf",
+            )
+        )
+        self.db.upsert_extraction(
+            LiteratureExtraction(
+                paper_id=pid,
+                metadata_status="complete",
+                fulltext_status="parsed",
+                parse_status="complete",
+                parse_backend="grobid",
+                extraction_sources=["pdf"],
+                section_summaries={"method": "M"},
+                downstream_signals={"M2": {}, "M3": {}, "M4": {}, "M5": {}},
+            )
+        )
+
+        self.assertTrue(discovery_id.startswith("disc:"))
+        self.assertTrue(artifact_id.startswith("art:"))
+        self.assertEqual(self.db.count_discoveries(), 1)
+        self.assertEqual(self.db.count_artifacts(status="available"), 1)
+        self.assertEqual(self.db.count_extractions(parse_status="complete"), 1)
+        self.assertEqual(self.db.list_artifacts(pid)[0].local_path, "literature/pdfs/paper.pdf")
+        self.assertEqual(self.db.get_extraction(pid).parse_backend, "grobid")
+        summary = self.db.ingestion_summary()
+        self.assertEqual(summary["discoveries"], 1)
+        self.assertEqual(summary["artifacts"][0]["status"], "available")
 
 
 # ---------------------------------------------------------------------------

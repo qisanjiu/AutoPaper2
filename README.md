@@ -415,11 +415,19 @@ python scripts/state_manager.py create "Topic" "Name" neurips \
 ```bash
 python scripts/state_manager.py public-db status
 python scripts/state_manager.py public-db stats
+python scripts/state_manager.py public-db ingestion
 python scripts/state_manager.py public-db search "semantic communication"
 python scripts/state_manager.py public-db import-project projects/<project>
+python scripts/literature_ingestion.py search "semantic communication robust compression" --limit 10 --output /tmp/source_candidates.yaml
+python scripts/literature_ingestion.py prepare-source-log projects/<project>/knowledge/M1/M1_source_log.yaml --project-root projects/<project>
+python scripts/literature_ingestion.py prepare-source-log projects/<project>/knowledge/M1/M1_source_log.yaml --project-root projects/<project> --fetch-fulltext --download-pdfs --parse-local-pdfs --max-sources 20
+pip install -e '.[browser]'
+playwright install chromium
+python scripts/literature_ingestion.py browser-auth --start-url https://ieeexplore.ieee.org/ --user-data-dir config/browser_sessions/literature_profile --output config/browser_sessions/literature_storage_state.json
+python scripts/literature_ingestion.py prepare-source-log projects/<project>/knowledge/M1/M1_source_log.yaml --project-root projects/<project> --fetch-fulltext --download-pdfs --browser-downloads --browser-session-state config/browser_sessions/literature_storage_state.json --parse-local-pdfs --max-sources 20
 ```
 
-M1 survey memory connects to this database so source logs can be reused across projects.
+M1 survey memory connects to this database so source logs can be reused across projects. Source logs now preserve discovery provenance, artifact/PDF/HTML/XML acquisition status, parse profiles, downstream signals for M2/M3/M4/M5, and publisher-coverage hints for venues such as IEEE, Elsevier, ACM, Wiley, Springer, and Web of Science. Full-text discovery can use arXiv, OpenAlex OA links, Crossref publisher/TDM links, Unpaywall, publisher HTML/XML APIs, and PDF parsers; commercial full text requires local API/institutional credentials. Optional `browser-auth` saves an authorized local Playwright storage state after user login and `--browser-downloads` can reuse it for licensed publisher PDF/HTML acquisition; pass the same `--user-data-dir` to reuse the browser profile. Do not store account passwords in source logs or repository files. See `docs/design/literature_ingestion_workflow.md`.
 
 ### Figure and Diagram Generation
 

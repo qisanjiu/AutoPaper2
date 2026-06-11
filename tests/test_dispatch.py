@@ -34,9 +34,10 @@ def _valid_m2_source_log() -> dict:
         ],
         start=1,
     ):
+        source_id = f"m2s{idx}"
         sources.append(
             {
-                "id": f"m2s{idx}",
+                "id": source_id,
                 "title": f"{domain} transferable method",
                 "type": "academic",
                 "credibility": 4,
@@ -48,6 +49,44 @@ def _valid_m2_source_log() -> dict:
                 "adaptation_potential": "high",
                 "discovery_source": discovery_source,
                 "discovery_query": f"{domain} {dimension} transferable mechanism",
+                "discovery_records": [
+                    {
+                        "search_surface": discovery_source,
+                        "query_text": f"{domain} {dimension} transferable mechanism",
+                        "result_rank": idx,
+                        "result_url": f"https://example.com/{source_id}",
+                        "screened_status": "retained",
+                        "retained_reason": f"Supports {gap_id} via {dimension}",
+                    }
+                ],
+                "artifacts": [
+                    {
+                        "artifact_type": "pdf",
+                        "uri": f"https://example.com/{source_id}.pdf",
+                        "status": "available",
+                    }
+                ],
+                "parse_profile": {
+                    "metadata_status": "complete",
+                    "fulltext_status": "parsed",
+                    "parse_status": "complete",
+                    "parse_backend": "manual_card",
+                    "extraction_sources": ["pdf"],
+                    "section_summaries": {
+                        "abstract": f"{domain} transferable method abstract",
+                        "method": f"{domain} mechanism",
+                        "experiment_setup": "datasets, metrics, baselines, protocol, and seeds",
+                        "results": "Transfer evidence recorded",
+                        "analysis": "Mechanism transfer conditions recorded",
+                    },
+                    "downstream_signals": {
+                        "M2": {"method_reference": True, "core_mechanism": f"{domain} mechanism"},
+                        "M3": {"experiment_protocol": True, "datasets_metrics_baselines": "datasets and metrics recorded"},
+                        "M4": {"analysis_patterns": True, "analysis": "transfer condition analysis"},
+                        "M5": {"citation_ready": True, "writing_context": "cross-domain method inspiration"},
+                    },
+                    "confidence": "high",
+                },
             }
         )
     return {

@@ -28,6 +28,49 @@ def _deep_fields(title: str) -> dict:
     }
 
 
+def _ingestion_fields(source_id: str, title: str, rank: int = 1) -> dict:
+    return {
+        "discovery_records": [
+            {
+                "search_surface": "public_db",
+                "query_text": f"{title} method experiment evidence",
+                "result_rank": rank,
+                "result_url": f"https://example.com/{source_id}",
+                "screened_status": "retained",
+                "retained_reason": "Covers project-entry source-log fixture",
+            }
+        ],
+        "artifacts": [
+            {
+                "artifact_type": "pdf",
+                "uri": f"https://example.com/{source_id}.pdf",
+                "status": "available",
+            }
+        ],
+        "parse_profile": {
+            "metadata_status": "complete",
+            "fulltext_status": "parsed",
+            "parse_status": "complete",
+            "parse_backend": "manual_card",
+            "extraction_sources": ["pdf"],
+            "section_summaries": {
+                "abstract": f"Abstract for {title}",
+                "method": f"Method for {title}",
+                "experiment_setup": "datasets, metrics, baselines, protocol, and seeds",
+                "results": f"Results for {title}",
+                "analysis": f"Analysis for {title}",
+            },
+            "downstream_signals": {
+                "M2": {"method_reference": True, "core_mechanism": f"Method for {title}"},
+                "M3": {"experiment_protocol": True, "datasets_metrics_baselines": "datasets, metrics, baselines"},
+                "M4": {"analysis_patterns": True, "analysis": f"Analysis for {title}"},
+                "M5": {"citation_ready": True, "writing_context": f"Context for {title}"},
+            },
+            "confidence": "high",
+        },
+    }
+
+
 def _search_provenance(source_ids: list[str]) -> dict:
     return {
         "databases": ["public_db", "Semantic Scholar", "arXiv", "internet web search"],
@@ -285,6 +328,8 @@ class TestProjectEntryManifest(unittest.TestCase):
                 **_deep_fields("Extra Paper 5"),
             },
         ]
+        for rank, src in enumerate(sources, start=1):
+            src.update(_ingestion_fields(src["id"], src["title"], rank))
         gap_evidence_map = {
             "gap_1": {
                 "supporting_sources": ["anchor_source_1", "anchor_source_2"],

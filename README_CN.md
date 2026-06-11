@@ -415,11 +415,19 @@ python scripts/state_manager.py create "Topic" "Name" neurips \
 ```bash
 python scripts/state_manager.py public-db status
 python scripts/state_manager.py public-db stats
+python scripts/state_manager.py public-db ingestion
 python scripts/state_manager.py public-db search "semantic communication"
 python scripts/state_manager.py public-db import-project projects/<project>
+python scripts/literature_ingestion.py search "semantic communication robust compression" --limit 10 --output /tmp/source_candidates.yaml
+python scripts/literature_ingestion.py prepare-source-log projects/<project>/knowledge/M1/M1_source_log.yaml --project-root projects/<project>
+python scripts/literature_ingestion.py prepare-source-log projects/<project>/knowledge/M1/M1_source_log.yaml --project-root projects/<project> --fetch-fulltext --download-pdfs --parse-local-pdfs --max-sources 20
+pip install -e '.[browser]'
+playwright install chromium
+python scripts/literature_ingestion.py browser-auth --start-url https://ieeexplore.ieee.org/ --user-data-dir config/browser_sessions/literature_profile --output config/browser_sessions/literature_storage_state.json
+python scripts/literature_ingestion.py prepare-source-log projects/<project>/knowledge/M1/M1_source_log.yaml --project-root projects/<project> --fetch-fulltext --download-pdfs --browser-downloads --browser-session-state config/browser_sessions/literature_storage_state.json --parse-local-pdfs --max-sources 20
 ```
 
-M1 survey memory 会连接该数据库，以便跨项目复用 source log。
+M1 survey memory 会连接该数据库，以便跨项目复用 source log。Source log 现在保留检索来源、PDF/HTML/XML/BibTeX 等工件采集状态、解析 profile、传给 M2/M3/M4/M5 的下游信号，以及通过公共索引或带凭证直连检索命中 IEEE、Elsevier、ACM、Wiley、Springer、Web of Science 等出版源时的 publisher coverage 提示。全文发现可使用 arXiv、OpenAlex OA 链接、Crossref 出版商/TDM 链接、Unpaywall、出版商 HTML/XML API 和 PDF 解析器；商业全文需要本地 API 或机构访问凭据。可选的 `browser-auth` 会在用户完成机构登录后保存本地 Playwright storage state，`--browser-downloads` 可复用该授权会话获取已授权的出版商 PDF/HTML；传入同一个 `--user-data-dir` 可复用浏览器 profile。不要把账号密码写入 source log 或仓库文件。详见 `docs/design/literature_ingestion_workflow.md`。
 
 ### 图像与图表生成
 
